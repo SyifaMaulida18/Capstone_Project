@@ -4,7 +4,7 @@ import { TrashIcon, PencilIcon, MagnifyingGlassIcon, FunnelIcon, PlusIcon } from
 import AdminLayout from "@/app/admin/components/admin_layout";
 
 const queues = [
-  { id: 1, namaPasien: "Ayu Gideon", dokter: "Dr. Budi Santoso", waktu: "08:30", status: "Menunggu" },
+  { id: 1, namaPasien: "Ayu dan Gideon", dokter: "Dr. Budi Santoso", waktu: "08:30", status: "Menunggu" },
   { id: 2, namaPasien: "Syifa Tito", dokter: "Dr. Andi Rahman", waktu: "09:00", status: "Dalam Pemeriksaan" },
   { id: 3, namaPasien: "Sheva Rebecca", dokter: "Dr. Rina Kartika", waktu: "09:45", status: "Selesai" },
 ];
