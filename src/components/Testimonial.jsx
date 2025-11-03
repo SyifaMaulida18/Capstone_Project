@@ -28,13 +28,12 @@ export default function Testimonial({ isLoggedIn }) {
     };
 
     fetchTestimonials();
-    
+
     // Auto-slide hanya jika ada data
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % testimonials.length);
     }, 5000);
     return () => clearInterval(interval);
-    
   }, [testimonials.length]); // Re-run effect saat data testimoni berubah
 
   const next = () => setIndex((prev) => (prev + 1) % testimonials.length);
@@ -51,7 +50,8 @@ export default function Testimonial({ isLoggedIn }) {
       {/* Testimoni Carousel */}
       <section className="bg-white py-20 text-center relative overflow-hidden">
         <div className="relative z-10 max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-gray-900">
+          {/* UBAH: Menggunakan 'neutral-900' */}
+          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-neutral-900">
             Apa Kata Mereka?
           </h2>
 
@@ -60,7 +60,8 @@ export default function Testimonial({ isLoggedIn }) {
             {testimonials.length > 1 && (
               <button
                 onClick={prev}
-                className="absolute left-0 top-1/2 -translate-y-1/2 bg-blue-500 text-white shadow-lg p-3 rounded-full hover:bg-blue-600 transition-all duration-300 z-20"
+                /* UBAH: Menggunakan 'primary-500' dan 'primary-600' */
+                className="absolute left-0 top-1/2 -translate-y-1/2 bg-primary-500 text-white shadow-lg p-3 rounded-full hover:bg-primary-600 transition-all duration-300 z-20"
               >
                 <ChevronLeft className="w-7 h-7" />
               </button>
@@ -72,20 +73,24 @@ export default function Testimonial({ isLoggedIn }) {
                 alt={testimonials[index]?.name}
                 width={80}
                 height={80}
-                className="w-20 h-20 mx-auto rounded-full object-cover mb-6 border-4 border-blue-200"
+                /* UBAH: Menggunakan 'border-primary-200' */
+                className="w-20 h-20 mx-auto rounded-full object-cover mb-6 border-4 border-primary-200"
               />
-              <p className="text-gray-700 italic text-lg mb-4 leading-relaxed">
+              {/* UBAH: Menggunakan 'neutral-700' */}
+              <p className="text-neutral-700 italic text-lg mb-4 leading-relaxed">
                 “{testimonials[index]?.text}”
               </p>
-              <p className="font-bold text-blue-800 text-lg">
+              {/* UBAH: Menggunakan 'primary-800' */}
+              <p className="font-bold text-primary-800 text-lg">
                 {testimonials[index]?.name}
               </p>
             </div>
-            
+
             {testimonials.length > 1 && (
               <button
                 onClick={next}
-                className="absolute right-0 top-1/2 -translate-y-1/2 bg-blue-500 text-white shadow-lg p-3 rounded-full hover:bg-blue-600 transition-all duration-300 z-20"
+                /* UBAH: Menggunakan 'primary-500' dan 'primary-600' */
+                className="absolute right-0 top-1/2 -translate-y-1/2 bg-primary-500 text-white shadow-lg p-3 rounded-full hover:bg-primary-600 transition-all duration-300 z-20"
               >
                 <ChevronRight className="w-7 h-7" />
               </button>
@@ -95,7 +100,8 @@ export default function Testimonial({ isLoggedIn }) {
       </section>
 
       {/* Bagian Ulasan */}
-      <section className="px-6 py-12 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+      {/* UBAH: Menggunakan gradasi 'primary' */}
+      <section className="px-6 py-12 bg-gradient-to-r from-primary-500 to-primary-600 text-white">
         {isLoggedIn ? (
           <div>
             <h2 className="text-lg font-bold mb-4">Tulis Ulasan Anda</h2>
@@ -103,9 +109,11 @@ export default function Testimonial({ isLoggedIn }) {
               <input
                 type="text"
                 placeholder="Tulis ulasan disini..."
-                className="flex-1 px-4 py-2 rounded-full text-gray-800 outline-none"
+                /* UBAH: Menggunakan 'text-neutral-800' */
+                className="flex-1 px-4 py-2 rounded-full text-neutral-800 outline-none"
               />
-              <button className="bg-green-500 px-6 py-2 rounded-full hover:bg-green-600">
+              {/* UBAH: Menggunakan 'secondary' */}
+              <button className="bg-secondary-500 px-6 py-2 rounded-full hover:bg-secondary-600">
                 Kirim
               </button>
             </div>
@@ -118,7 +126,8 @@ export default function Testimonial({ isLoggedIn }) {
             </p>
             <Link
               href="/login"
-              className="bg-green-500 px-6 py-2 rounded-full hover:bg-green-600 transition-colors"
+              /* UBAH: Menggunakan 'secondary' */
+              className="bg-secondary-500 px-6 py-2 rounded-full hover:bg-secondary-600 transition-colors"
             >
               Masuk Sekarang
             </Link>

@@ -2,24 +2,23 @@ import { BellIcon, ChatBubbleLeftIcon, UserCircleIcon } from '@heroicons/react/2
 
 export default function Header() {
   return (
-    // Tambahkan kelas h-20 di sini untuk mengatur tingginya
-    <header className="flex justify-end items-center space-x-4 h-16 bg-blue-800 text-white px-8 shadow-md">
-      
-      {/* Container utama untuk ikon dan profil */}
+    // UBAH: Menggunakan bg-neutral-900
+    <header className="flex justify-end items-center space-x-4 h-16 bg-neutral-900 text-white px-8 shadow-md">
+
       <div className="flex items-center space-x-6">
 
-        {/* Ikon Notifikasi (Ubah ukuran ikon agar proporsional) */}
-        <div className="cursor-pointer hover:text-blue-200 transition-colors">
-          <BellIcon className="h-7 w-7" /> 
+        {/* UBAH: Menggunakan hover:text-primary-200 */}
+        <div className="cursor-pointer hover:text-primary-200 transition-colors">
+          <BellIcon className="h-7 w-7" />
         </div>
 
-        {/* Ikon Chat */}
-        <div className="cursor-pointer hover:text-blue-200 transition-colors">
-          <ChatBubbleLeftIcon className="h-7 w-7" /> 
+        {/* UBAH: Menggunakan hover:text-primary-200 */}
+        <div className="cursor-pointer hover:text-primary-200 transition-colors">
+          <ChatBubbleLeftIcon className="h-7 w-7" />
         </div>
-        
-        {/* Profil Admin */}
-        <div className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-blue-700 transition-colors">
+
+        {/* UBAH: Menggunakan hover:bg-neutral-800 (shade lebih terang dari neutral-900) */}
+        <div className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-neutral-800 transition-colors">
           <UserCircleIcon className="h-9 w-9" />
           <span className="font-semibold text-lg">Admin</span>
         </div>

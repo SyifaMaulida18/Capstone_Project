@@ -1,37 +1,40 @@
 "use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation'; // Diperlukan untuk menandai item aktif
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function TopNav() {
   const navItems = [
-    { name: 'Beranda', href: '/dashboardadmin' },
-    { name: 'Manajemen User', href: '/dashboardadmin/users' },
-    { name: 'Manajemen Poli & Dokter', href: '/dashboardadmin/poli' },
-    { name: 'Manajemen Reservasi', href: '/dashboardadmin/reservasi' },
-    { name: 'Riwayat Reservasi', href: '/dashboardadmin/riwayat' },
+    // FIX: Path href disesuaikan ke /admin/...
+    { name: "Beranda", href: "/admin/dashboard" }, // Asumsi halaman utama admin
+    { name: "Manajemen User", href: "/admin/users" },
+    { name: "Manajemen Poli & Dokter", href: "/admin/dokter" }, // Sesuaikan jika path berbeda
+    { name: "Manajemen Reservasi", href: "/admin/reservasi" },
+    { name: "Riwayat Reservasi", href: "/admin/riwayat" }, // Sesuaikan jika path berbeda
   ];
 
-  // Gunakan usePathname, yang sekarang diizinkan karena 'use client'
   const pathname = usePathname();
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm">
+    // UBAH: Menggunakan border-neutral-200
+    <nav className="bg-white border-b border-neutral-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-start h-12 space-x-6 text-sm">
           {navItems.map((item) => {
-            // Menentukan apakah item ini adalah rute aktif saat ini
-            // Kita harus menyesuaikan rute aktif, karena rute utama di sini adalah /dashboardadmin
-            const isActive = pathname === item.href || (item.href === '/dashboardadmin' && pathname === '/');
+            // Cek rute aktif (lebih sederhana sekarang karena path konsisten)
+            const isActive = pathname === item.href;
 
             return (
               <Link key={item.name} href={item.href}>
-                <p 
+                <p
                   className={`
-                    font-medium transition-colors duration-200 cursor-pointer 
-                    ${isActive 
-                      ? 'text-gray-900 border-b-2 border-black font-semibold' 
-                      : 'text-gray-500 hover:text-gray-700'
+                    font-medium transition-colors duration-200 cursor-pointer
+                    ${
+                      isActive
+                        ? /* UBAH: Menggunakan text-primary-600 dan border-primary-600 */
+                          "text-primary-600 border-b-2 border-primary-600 font-semibold"
+                        : /* UBAH: Menggunakan text-neutral-600 dan hover:text-neutral-900 */
+                          "text-neutral-600 hover:text-neutral-900"
                     }
                     h-full flex items-center
                   `}

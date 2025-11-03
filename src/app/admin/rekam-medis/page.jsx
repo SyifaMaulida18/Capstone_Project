@@ -6,8 +6,8 @@ import {
   PencilIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/admin/components/admin_layout";
-import { Dialog } from "@/app/admin/components/ui/dialog";
+import AdminLayout from "@/app/admin/components/admin_layout"; // Path AdminLayout
+import { Dialog } from "@/app/admin/components/ui/dialog"; // Path Dialog
 
 export default function MedicalRecordsPage() {
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -16,7 +16,7 @@ export default function MedicalRecordsPage() {
   // Data dummy pasien dan rekam medis
   const patients = [
     { id: 1, name: "Ayu Gideon", hasRecord: true },
-    { id: 2, name: "Syifa Tito", hasRecord: false },
+    { id: 2, name: "Syifa Maulida", hasRecord: false },
     { id: 3, name: "Sheva Rebecca", hasRecord: false },
   ];
 
@@ -36,24 +36,29 @@ export default function MedicalRecordsPage() {
 
   return (
     <AdminLayout>
-      <div className="bg-white p-8 rounded-xl shadow-lg border border-blue-400 max-w-6xl mx-auto min-h-[70vh]">
-        <h1 className="text-2xl font-bold text-center mb-8 text-gray-800">
+      {/* UBAH: Menggunakan border-primary-200 */}
+      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
+        {/* UBAH: Menggunakan text-neutral-800 */}
+        <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
           Manajemen Rekam Medis
         </h1>
 
         {/* Header buttons */}
         <div className="flex justify-end mb-6 space-x-3">
-          <button className="flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100 transition-colors font-semibold">
-            <FunnelIcon className="h-5 w-5 text-gray-600" />
+          {/* UBAH: Menggunakan neutral */}
+          <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
+            <FunnelIcon className="h-5 w-5 text-neutral-600" />
             <span>Filter</span>
           </button>
 
-          <button className="flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100 transition-colors font-semibold">
-            <PencilIcon className="h-5 w-5 text-gray-600" />
+          {/* UBAH: Menggunakan neutral */}
+          <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
+            <PencilIcon className="h-5 w-5 text-neutral-600" />
             <span>Edit</span>
           </button>
 
-          <button className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors font-semibold">
+          {/* UBAH: Menggunakan secondary */}
+          <button className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold">
             <PlusIcon className="h-5 w-5" />
             <span>Add</span>
           </button>
@@ -62,24 +67,32 @@ export default function MedicalRecordsPage() {
         {/* Dua kolom utama */}
         <div className="grid grid-cols-2 gap-6">
           {/* Kolom kiri: daftar pasien */}
-          <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+          {/* UBAH: Menggunakan bg-neutral-100 dan border-neutral-200 */}
+          <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
             <ul className="space-y-3">
               {patients.map((p) => (
                 <li
                   key={p.id}
-                  className={`flex items-center justify-between bg-white p-3 rounded-lg shadow-sm border hover:bg-blue-50 cursor-pointer transition ${
-                    p.id === selectedPatient?.id ? "border-blue-500" : ""
+                  /* UBAH: Menggunakan hover:bg-primary-50 dan border-primary-500 */
+                  className={`flex items-center justify-between bg-white p-3 rounded-lg shadow-sm border hover:bg-primary-50 cursor-pointer transition ${
+                    p.id === selectedPatient?.id
+                      ? "border-primary-500"
+                      : "border-transparent" // Border default transparan
                   }`}
                   onClick={() => handleSelectPatient(p)}
                 >
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="accent-blue-500"
+                      // UBAH: Menggunakan accent-primary-500
+                      className="accent-primary-500"
                       checked={p.id === selectedPatient?.id}
                       readOnly
                     />
-                    <span className="text-gray-800 font-medium">{p.name}</span>
+                    {/* UBAH: Menggunakan text-neutral-800 */}
+                    <span className="text-neutral-800 font-medium">
+                      {p.name}
+                    </span>
                   </label>
                   {p.hasRecord && <span className="text-sm">📁</span>}
                 </li>
@@ -87,8 +100,9 @@ export default function MedicalRecordsPage() {
             </ul>
           </div>
 
-          {/* Kolom kanan: daftar tanggal rekam medis pasien aktif */}
-          <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+          {/* Kolom kanan: daftar tanggal rekam medis */}
+          {/* UBAH: Menggunakan bg-neutral-100 dan border-neutral-200 */}
+          <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
             {selectedPatient ? (
               <>
                 {medicalRecords[selectedPatient.id]?.length > 0 ? (
@@ -96,20 +110,24 @@ export default function MedicalRecordsPage() {
                     {medicalRecords[selectedPatient.id].map((r, i) => (
                       <li
                         key={i}
-                        className="bg-white p-3 rounded-lg border shadow-sm hover:bg-gray-50"
+                        // UBAH: Menggunakan border-neutral-100 dan hover:bg-neutral-50
+                        className="bg-white p-3 rounded-lg border border-neutral-100 shadow-sm hover:bg-neutral-50"
                       >
-                        {r.date}
+                        {/* UBAH: Menggunakan text-neutral-700 */}
+                        <span className="text-neutral-700">{r.date}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-gray-500 italic text-center mt-10">
+                  // UBAH: Menggunakan text-neutral-600
+                  <p className="text-neutral-600 italic text-center mt-10">
                     Belum ada rekam medis untuk pasien ini
                   </p>
                 )}
               </>
             ) : (
-              <p className="text-gray-500 italic text-center mt-10">
+              // UBAH: Menggunakan text-neutral-600
+              <p className="text-neutral-600 italic text-center mt-10">
                 Pilih pasien untuk melihat rekam medis
               </p>
             )}
@@ -121,7 +139,8 @@ export default function MedicalRecordsPage() {
       <Dialog show={showDialog} onClose={() => setShowDialog(false)}>
         {selectedPatient && (
           <div className="p-6 space-y-4">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            {/* UBAH: Menggunakan text-neutral-800 */}
+            <h2 className="text-xl font-semibold text-neutral-800 mb-2">
               Riwayat Perawatan — {selectedPatient.name}
             </h2>
 
@@ -130,21 +149,30 @@ export default function MedicalRecordsPage() {
                 {medicalRecords[selectedPatient.id].map((record, index) => (
                   <li
                     key={index}
-                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    // UBAH: Menggunakan bg-neutral-50 dan border-neutral-200
+                    className="p-3 bg-neutral-50 rounded-lg border border-neutral-200"
                   >
-                    <p className="font-medium text-gray-700">{record.date}</p>
-                    <p className="text-sm text-gray-500">{record.treatment}</p>
+                    {/* UBAH: Menggunakan text-neutral-700 */}
+                    <p className="font-medium text-neutral-700">
+                      {record.date}
+                    </p>
+                    {/* UBAH: Menggunakan text-neutral-600 */}
+                    <p className="text-sm text-neutral-600">
+                      {record.treatment}
+                    </p>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-gray-500 italic">Tidak ada riwayat perawatan</p>
+              // UBAH: Menggunakan text-neutral-600
+              <p className="text-neutral-600 italic">Tidak ada riwayat perawatan</p>
             )}
 
             <div className="flex justify-end pt-4">
               <button
                 onClick={() => setShowDialog(false)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                // UBAH: Menggunakan bg-primary-600 dan hover:bg-primary-800
+                className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-800 transition"
               >
                 Tutup
               </button>

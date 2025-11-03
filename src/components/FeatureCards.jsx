@@ -46,36 +46,42 @@ export default function FeatureCards() {
   return (
     <section className="relative px-6 py-16 -mt-16 z-20 overflow-hidden">
       <div className="max-w-6xl mx-auto text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900">Fitur Unggulan</h2>
+        {/* UBAH: Menggunakan 'neutral-900' */}
+        <h2 className="text-3xl font-bold text-neutral-900">Fitur Unggulan</h2>
       </div>
-      
+
       <div className="relative max-w-5xl mx-auto">
         <div className="flex items-center justify-center gap-4 transition-transform duration-500">
           <button
             onClick={prev}
-            className="hidden lg:block absolute left-0 z-10 p-3 rounded-full bg-white shadow-lg text-blue-500 hover:bg-gray-100 transition-colors"
+            /* UBAH: Menggunakan 'text-primary-500' dan 'hover:bg-neutral-100' */
+            className="hidden lg:block absolute left-0 z-10 p-3 rounded-full bg-white shadow-lg text-primary-500 hover:bg-neutral-100 transition-colors"
           >
             <ChevronLeft size={24} />
           </button>
-          
+
           <div className="flex overflow-x-auto lg:overflow-visible snap-x snap-mandatory scrollbar-hide lg:grid lg:grid-cols-3 gap-6 py-2">
             {features.map((item, idx) => (
               <div
                 key={idx}
-                className="min-w-[80vw] sm:min-w-[40vw] lg:min-w-0 snap-center bg-white p-8 rounded-2xl shadow-xl border-t-4 border-blue-500 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
+                /* UBAH: Menggunakan 'border-primary-500' */
+                className="min-w-[80vw] sm:min-w-[40vw] lg:min-w-0 snap-center bg-white p-8 rounded-2xl shadow-xl border-t-4 border-primary-500 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
               >
                 <div className="text-4xl mb-4 text-center">{item.icon}</div>
-                <h3 className="font-bold text-xl mb-2 text-blue-800 text-center">
+                {/* UBAH: Menggunakan 'text-primary-800' */}
+                <h3 className="font-bold text-xl mb-2 text-primary-800 text-center">
                   {item.title}
                 </h3>
-                <p className="text-gray-600 text-center">{item.desc}</p>
+                {/* UBAH: Menggunakan 'text-neutral-600' */}
+                <p className="text-neutral-600 text-center">{item.desc}</p>
               </div>
             ))}
           </div>
 
           <button
             onClick={next}
-            className="hidden lg:block absolute right-0 z-10 p-3 rounded-full bg-white shadow-lg text-blue-500 hover:bg-gray-100 transition-colors"
+            /* UBAH: Menggunakan 'text-primary-500' dan 'hover:bg-neutral-100' */
+            className="hidden lg:block absolute right-0 z-10 p-3 rounded-full bg-white shadow-lg text-primary-500 hover:bg-neutral-100 transition-colors"
           >
             <ChevronRight size={24} />
           </button>

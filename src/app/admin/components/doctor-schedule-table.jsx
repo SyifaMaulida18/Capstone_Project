@@ -1,10 +1,12 @@
-import { Button } from "../components/ui/button";
+import { Button } from "../components/ui/button"; // Asumsi path Button benar
 
 export default function DoctorScheduleTable({ data, onDelete }) {
   return (
-    <div className="border rounded-lg overflow-hidden">
+    // UBAH: Menggunakan border-neutral-200
+    <div className="border border-neutral-200 rounded-lg overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-blue-100 text-blue-700 font-semibold">
+        {/* UBAH: Menggunakan bg-primary-100 dan text-primary-800 */}
+        <thead className="bg-primary-100 text-primary-800 font-semibold">
           <tr>
             <th className="p-3 text-left">ID</th>
             <th className="p-3 text-left">Nama Dokter</th>
@@ -17,29 +19,36 @@ export default function DoctorScheduleTable({ data, onDelete }) {
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td colSpan={6} className="text-center p-6 text-gray-500">
+              {/* UBAH: Menggunakan text-neutral-600 */}
+              <td colSpan={6} className="text-center p-6 text-neutral-600">
                 Belum ada jadwal dokter
               </td>
             </tr>
           ) : (
             data.map((s, i) => (
-              <tr key={s.id} className="border-t hover:bg-gray-50">
-                <td className="p-3">{s.id}</td>
-                <td className="p-3">{s.doctorName}</td>
-                <td className="p-3">{s.specialization}</td>
-                <td className="p-3">{s.day}</td>
-                <td className="p-3">
+              // UBAH: Menggunakan border-neutral-100 dan hover:bg-neutral-50
+              <tr
+                key={s.id}
+                className="border-t border-neutral-100 hover:bg-neutral-50"
+              >
+                {/* UBAH: Menggunakan text-neutral-900 atau text-neutral-700 */}
+                <td className="p-3 text-neutral-700">{s.id}</td>
+                <td className="p-3 text-neutral-700">{s.doctorName}</td>
+                <td className="p-3 text-neutral-700">{s.specialization}</td>
+                <td className="p-3 text-neutral-700">{s.day}</td>
+                <td className="p-3 text-neutral-700">
                   {s.startTime} - {s.endTime}
                 </td>
                 <td className="p-3 text-right space-x-2">
                   <Button
-                    variant="destructive"
+                    variant="destructive" // Warna merah dipertahankan
                     size="sm"
                     onClick={() => onDelete(i)}
                   >
                     🗑
                   </Button>
-                  <Button variant="outline" size="sm">
+                  {/* UBAH: Sesuaikan variant Button jika perlu agar cocok dengan tema */}
+                  <Button variant="outline" size="sm"> {/* Asumsi 'outline' menggunakan warna netral */}
                     ✏️
                   </Button>
                 </td>

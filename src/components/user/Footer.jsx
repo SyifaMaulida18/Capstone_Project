@@ -16,14 +16,28 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-[#003366] text-white mt-10 p-6 md:p-8">
+    /* UBAH: Menggunakan 'neutral-900' dari config Anda, bukan hex hardcode */
+    <footer className="bg-neutral-900 text-white mt-10 p-6 md:p-8">
       <div className="container mx-auto grid grid-cols-1 md:grid-cols-4 gap-6 text-sm">
         <div>
           <h3 className="font-bold mb-2">Navigasi</h3>
           <ul className="space-y-1">
-            <li><a href="/dashboard" className="hover:text-indigo-200">Beranda</a></li>
-            <li><a href="/jadwal" className="hover:text-indigo-200">Cek Jadwal Poli & Dokter</a></li>
-            <li><a href="/reservasi" className="hover:text-indigo-200">Reservasi</a></li>
+            {/* UBAH: Menggunakan 'primary-200' */}
+            <li>
+              <a href="/dashboard" className="hover:text-primary-200">
+                Beranda
+              </a>
+            </li>
+            <li>
+              <a href="/jadwal" className="hover:text-primary-200">
+                Cek Jadwal Poli & Dokter
+              </a>
+            </li>
+            <li>
+              <a href="/reservasi" className="hover:text-primary-200">
+                Reservasi
+              </a>
+            </li>
           </ul>
         </div>
 
@@ -36,8 +50,10 @@ export default function Footer() {
 
         <div>
           <h3 className="font-bold mb-2">Informasi</h3>
-          <p className="text-indigo-100">
-            Sistem Reservasi Online digunakan untuk kemudahan pasien dalam melihat jadwal, ketersediaan dokter, dan mengunci nomor antrian poli.
+          {/* UBAH: Menggunakan 'primary-100' */}
+          <p className="text-primary-100">
+            Sistem Reservasi Online digunakan untuk kemudahan pasien dalam
+            melihat jadwal, ketersediaan dokter, dan mengunci nomor antrian poli.
           </p>
         </div>
 
@@ -45,18 +61,23 @@ export default function Footer() {
         <div>
           <h3 className="font-bold mb-2">Ulasan Pasien</h3>
           {sent ? (
-            <p className="text-green-300 italic">Terima kasih atas ulasan Anda 💬</p>
+            /* CATATAN: 'text-green-300' dipertahankan karena ini warna semantik (status sukses) */
+            <p className="text-green-300 italic">
+              Terima kasih atas ulasan Anda 💬
+            </p>
           ) : (
             <form onSubmit={handleSubmit}>
               <textarea
                 value={ulasan}
                 onChange={(e) => setUlasan(e.target.value)}
                 placeholder="Tulis pengalaman Anda di sini..."
-                className="w-full h-20 p-2 rounded-md text-gray-800 text-sm"
+                /* UBAH: Menggunakan 'text-neutral-800' */
+                className="w-full h-20 p-2 rounded-md text-neutral-800 text-sm"
               />
               <button
                 type="submit"
-                className="mt-2 w-full bg-indigo-600 text-white py-1 rounded-md text-sm hover:bg-indigo-700 transition"
+                /* UBAH: Menggunakan 'primary-600' dan 'primary-800' */
+                className="mt-2 w-full bg-primary-600 text-white py-1 rounded-md text-sm hover:bg-primary-800 transition"
               >
                 Kirim
               </button>
@@ -65,8 +86,8 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="text-center mt-6 pt-4 border-t border-indigo-500 text-xs text-indigo-200">
-        &copy; 2025 SiReS-RS. Hak Cipta Dilindungi.
+      <div className="text-center mt-6 pt-4 border-t border-primary-500 text-primary-200 text-xs">
+        &copy; 2025 RSPB. Hak Cipta Dilindungi.
       </div>
     </footer>
   );

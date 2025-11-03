@@ -4,27 +4,37 @@ import { Lock, LogIn, User } from "lucide-react";
 import { useState } from "react";
 
 // --- Komponen InputField ---
-const InputField = ({ label, type, placeholder, required, icon: Icon, ...props }) => {
+const InputField = ({
+  label,
+  type,
+  placeholder,
+  required,
+  icon: Icon,
+  ...props
+}) => {
   return (
     <div className="space-y-1">
-      <label htmlFor={label} className="block text-sm font-medium text-gray-700">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label
+        htmlFor={label}
+        className="block text-sm font-medium text-neutral-700"
+      >
+        {label} {required && <span className="text-red-500">*</span>}{" "}
       </label>
       <div className="relative rounded-md shadow-sm">
         {Icon && (
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Icon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+            <Icon className="h-5 w-5 text-neutral-600" aria-hidden="true" />
           </div>
         )}
         <input
           id={label}
-          name={label}
+          name={props.name || label} // Gunakan props.name jika ada, fallback ke label
           type={type}
           placeholder={placeholder}
           required={required}
-          className={`block w-full rounded-lg border border-gray-300 py-2 ${
+          className={`block w-full rounded-lg border border-neutral-200 py-2 ${
             Icon ? "pl-10" : "pl-3"
-          } pr-3 text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition duration-150`}
+          } pr-3 text-neutral-900 placeholder-neutral-600 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition duration-150`}
           {...props}
         />
       </div>
@@ -38,17 +48,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // --- Fungsi Handle Login yang Sudah Diperbaiki ---
   const handleLogin = async (e) => {
     e.preventDefault();
+    setErrorMsg(""); // Reset pesan error setiap kali login dicoba
 
     try {
-      // Ambil data dari file lokal db.json
+      // Pastikan db.json ada di folder /public
       const res = await fetch("/db.json");
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
       const data = await res.json();
+      const { users, admins, superadmins, profile } = data; // Tambahkan profile
 
-      const { users, admins, superadmins } = data;
-
-      // 1️⃣ Cek Superadmin
+      // 1️⃣ Cek Superadmin (berdasarkan email ATAU superID)
       const superAdmin = superadmins.find(
         (s) =>
           (s.email === emailOrKTP || s.superID.toString() === emailOrKTP) &&
@@ -57,11 +71,12 @@ export default function LoginPage() {
       if (superAdmin) {
         localStorage.setItem("userRole", "superadmin");
         localStorage.setItem("userName", superAdmin.nama);
-        window.location.href = "/superadmin/dashboard";
+        localStorage.setItem("userID", superAdmin.superID.toString()); // Simpan ID juga jika perlu
+        window.location.href = "/superadmin/dashboard"; // Sesuaikan path jika perlu
         return;
       }
 
-      // 2️⃣ Cek Admin
+      // 2️⃣ Cek Admin (berdasarkan email ATAU adminID)
       const admin = admins.find(
         (a) =>
           (a.email === emailOrKTP || a.adminID.toString() === emailOrKTP) &&
@@ -70,42 +85,64 @@ export default function LoginPage() {
       if (admin) {
         localStorage.setItem("userRole", "admin");
         localStorage.setItem("userName", admin.nama);
-        window.location.href = "/admin/dashboard";
+        localStorage.setItem("userID", admin.adminID.toString()); // Simpan ID juga jika perlu
+        window.location.href = "/admin/dashboard"; // Sesuaikan path jika perlu
         return;
       }
 
       // 3️⃣ Cek User
-      const user = users.find(
+      let foundUser = null;
+
+      // Coba cari berdasarkan email atau nomor telepon dulu di tabel 'users'
+      foundUser = users.find(
         (u) =>
-          (u.email === emailOrKTP || u.nomor_telpon === emailOrKTP || u.userID.toString() === emailOrKTP) &&
+          (u.email === emailOrKTP || u.nomor_telpon === emailOrKTP) &&
           u.password === password
       );
-      if (user) {
+
+      // Jika TIDAK ketemu berdasarkan email/telp, coba cari berdasarkan NIK di tabel 'profile'
+      if (!foundUser) {
+        const userProfile = profile.find((p) => p.noKTP === emailOrKTP);
+        if (userProfile) {
+          // Jika profile ketemu berdasarkan NIK, cari user yang cocok berdasarkan userID
+          foundUser = users.find(
+            (u) => u.userID === userProfile.userID && u.password === password
+          );
+        }
+      }
+
+      // Jika user ditemukan (baik dari email/telp ATAU NIK)
+      if (foundUser) {
         localStorage.setItem("userRole", "user");
-        localStorage.setItem("userName", user.nama);
-        window.location.href = "/user/dashboard";
+        localStorage.setItem("userName", foundUser.nama);
+        localStorage.setItem("userID", foundUser.userID.toString()); // Simpan userID
+        window.location.href = "/user/dashboard"; // Sesuaikan path jika perlu
         return;
       }
 
-      // Jika tidak ditemukan
+      // Jika tidak ditemukan sama sekali
       setErrorMsg("Email/No KTP atau Password salah.");
+
     } catch (err) {
-      console.error("Gagal membaca db.json:", err);
-      setErrorMsg("Terjadi kesalahan saat memuat data login.");
+      console.error("Gagal memproses login:", err);
+      setErrorMsg(
+        "Terjadi kesalahan saat mencoba login. Periksa koneksi atau data."
+      );
     }
   };
+  // --- Akhir Fungsi Handle Login ---
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="bg-white shadow-2xl border-t-8 border-blue-600 rounded-2xl p-8 md:p-12 w-full max-w-md">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4">
+      <div className="bg-white shadow-2xl border-t-8 border-primary-600 rounded-2xl p-8 md:p-12 w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <LogIn className="w-10 h-10 text-blue-600" />
+          <LogIn className="w-10 h-10 text-primary-600" />
         </div>
 
-        <h1 className="text-3xl font-extrabold text-center text-gray-900 mb-2">
+        <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">
           SELAMAT DATANG
         </h1>
-        <p className="text-center text-gray-500 mb-8 text-md">
+        <p className="text-center text-neutral-600 mb-8 text-md">
           Masuk untuk melanjutkan reservasi Anda
         </p>
 
@@ -113,6 +150,7 @@ export default function LoginPage() {
           <InputField
             label="Email atau No. KTP"
             type="text"
+            name="emailOrKTP" // Gunakan name agar lebih standar
             placeholder="Masukkan Email atau No. KTP"
             icon={User}
             required
@@ -122,6 +160,7 @@ export default function LoginPage() {
           <InputField
             label="Password"
             type="password"
+            name="password" // Gunakan name agar lebih standar
             placeholder="Masukkan Password Anda"
             icon={Lock}
             required
@@ -146,24 +185,24 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center space-x-2"
+            className="w-full bg-primary-600 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-primary-800 transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center space-x-2"
           >
             <LogIn className="w-5 h-5" />
             <span>Masuk ke Akun</span>
           </button>
         </form>
 
-        <p className="text-center text-sm mt-6 text-gray-600">
+        <p className="text-center text-sm mt-6 text-neutral-600">
           Belum punya akun?{" "}
           <a
             href="/auth/register"
-            className="text-blue-600 font-bold hover:text-blue-700 transition-colors"
+            className="text-primary-600 font-bold hover:text-primary-800 transition-colors"
           >
             Daftar Sekarang
           </a>
         </p>
 
-        <p className="text-center text-xs mt-4 text-gray-400">
+        <p className="text-center text-xs mt-4 text-neutral-600">
           <a href="/" className="hover:underline">
             Kembali ke Beranda
           </a>

@@ -1,7 +1,11 @@
 "use client";
 import { useState } from "react";
-import AdminLayout from "@/app/admin/components/admin_layout";
-import { MagnifyingGlassIcon, FunnelIcon, PlusIcon } from "@heroicons/react/24/outline";
+import AdminLayout from "@/app/admin/components/admin_layout"; // Path AdminLayout
+import {
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  PlusIcon,
+} from "@heroicons/react/24/outline";
 
 // Komponen Dialog
 function Dialog({ show, onClose, children }) {
@@ -12,7 +16,8 @@ function Dialog({ show, onClose, children }) {
         {children}
         <button
           onClick={onClose}
-          className="absolute top-2 right-3 text-gray-500 hover:text-gray-700 text-2xl font-bold"
+          // UBAH: Menggunakan neutral
+          className="absolute top-2 right-3 text-neutral-600 hover:text-neutral-900 text-2xl font-bold"
         >
           ×
         </button>
@@ -75,8 +80,10 @@ export default function VerifikasiReservasiPage() {
 
   return (
     <AdminLayout>
-      <div className="bg-white p-8 rounded-xl shadow-lg border border-blue-400 max-w-6xl mx-auto min-h-[70vh]">
-        <h1 className="text-2xl font-bold text-center mb-8 text-gray-800">
+      {/* UBAH: Menggunakan border-primary-200 */}
+      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
+        {/* UBAH: Menggunakan text-neutral-800 */}
+        <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
           Verifikasi Reservasi Pasien
         </h1>
 
@@ -87,17 +94,21 @@ export default function VerifikasiReservasiPage() {
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                /* UBAH: Menggunakan neutral dan primary */
+                className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               />
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+              {/* UBAH: Menggunakan text-neutral-600 */}
+              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-600" />
             </div>
 
-            <button className="flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100 transition-colors font-semibold">
-              <FunnelIcon className="h-5 w-5 text-gray-600" />
+            {/* UBAH: Menggunakan neutral */}
+            <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
+              <FunnelIcon className="h-5 w-5 text-neutral-600" />
               <span>Filter</span>
             </button>
 
-            <button className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-colors font-semibold">
+            {/* UBAH: Menggunakan secondary */}
+            <button className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold">
               <PlusIcon className="h-5 w-5" />
               <span>Add</span>
             </button>
@@ -106,8 +117,10 @@ export default function VerifikasiReservasiPage() {
 
         {/* Tabel Data */}
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-blue-400 rounded-t-lg">
+          {/* UBAH: Menggunakan divide-neutral-200 */}
+          <table className="min-w-full divide-y divide-neutral-200">
+            {/* UBAH: Menggunakan bg-primary-600 */}
+            <thead className="bg-primary-600 rounded-t-lg">
               <tr>
                 {["Id", "Nama", "Email", "No Telp", "Aksi"].map((header) => (
                   <th
@@ -119,22 +132,27 @@ export default function VerifikasiReservasiPage() {
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
+            {/* UBAH: Menggunakan divide-neutral-100 */}
+            <tbody className="bg-white divide-y divide-neutral-100">
               {dataPasien.map((p, i) => (
                 <tr
                   key={p.id}
-                  className={i % 2 === 1 ? "bg-gray-50" : "bg-white"}
+                  /* UBAH: Menggunakan bg-neutral-50 */
+                  className={i % 2 === 1 ? "bg-neutral-50" : "bg-white"}
                 >
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                  {/* UBAH: Menggunakan text-neutral-900 */}
+                  <td className="px-6 py-4 text-sm font-medium text-neutral-900">
                     {p.id}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-800">{p.nama}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">{p.email}</td>
-                  <td className="px-6 py-4 text-sm text-gray-800">{p.telp}</td>
+                  {/* UBAH: Menggunakan text-neutral-800 */}
+                  <td className="px-6 py-4 text-sm text-neutral-800">{p.nama}</td>
+                  <td className="px-6 py-4 text-sm text-neutral-800">{p.email}</td>
+                  <td className="px-6 py-4 text-sm text-neutral-800">{p.telp}</td>
                   <td className="px-6 py-4 text-sm font-medium">
                     <button
                       onClick={() => handleDetail(p)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white text-sm px-4 py-2 rounded-md font-semibold transition-all"
+                      /* UBAH: Menggunakan primary */
+                      className="bg-primary-500 hover:bg-primary-600 text-white text-sm px-4 py-2 rounded-md font-semibold transition-all"
                     >
                       Lihat detail
                     </button>
@@ -147,11 +165,13 @@ export default function VerifikasiReservasiPage() {
 
         {/* Dialog Detail Pasien */}
         <Dialog show={showDialog} onClose={() => setShowDialog(false)}>
-          <h2 className="text-xl font-semibold text-center mb-4 text-gray-700">
+          {/* UBAH: Menggunakan text-neutral-700 */}
+          <h2 className="text-xl font-semibold text-center mb-4 text-neutral-700">
             Verifikasi Reservasi Pasien
           </h2>
           {selectedPatient && (
-            <div className="space-y-2 text-gray-700 text-sm leading-relaxed">
+            // UBAH: Menggunakan text-neutral-700
+            <div className="space-y-2 text-neutral-700 text-sm leading-relaxed">
               <p><strong>Nama Lengkap:</strong> {selectedPatient.nama}</p>
               <p><strong>Tanggal Lahir:</strong> {selectedPatient.tglLahir}</p>
               <p><strong>Jenis Kelamin:</strong> {selectedPatient.jk}</p>
@@ -165,17 +185,18 @@ export default function VerifikasiReservasiPage() {
           )}
 
           <div className="flex justify-center mt-6 space-x-4">
+            {/* CATATAN: Warna red dan green dipertahankan (semantik) */}
             <button
               onClick={() => setShowDialog(false)}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-lg font-bold"
             >
-              ✖
+              ✖ {/* Tolak */}
             </button>
             <button
               onClick={() => setShowDialog(false)}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-lg font-bold"
             >
-              ✔
+              ✔ {/* Terima */}
             </button>
           </div>
         </Dialog>
