@@ -1,7 +1,7 @@
 // src/app/admin/dashboard/page.jsx
-import TopNav from "@/app/admin/components/ui/top_navbar"; // Path diubah ke ui
-import Header from "@/app/admin/components/ui/header"; // Path diubah ke ui
-import Card from "@/app/admin/components/ui/card"; // Path diubah ke ui
+import TopNav from "@/app/admin/components/top_navbar"; // Path diubah ke ui
+import Header from "@/app/admin/components/header"; // Path diubah ke ui
+import Card from "@/app/admin/components/card"; // Path diubah ke ui
 
 export default function HomeAdminPage() {
   return (

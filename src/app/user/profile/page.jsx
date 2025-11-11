@@ -1,3 +1,5 @@
+// src/app/user/profile/page.js
+
 "use client";
 
 import {
@@ -16,10 +18,11 @@ import {
   Menu,
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
-// FIX: Mengubah jalur relatif yang bermasalah ke jalur alias root (@/) untuk stabilitas
+import { useRouter } from "next/navigation"; // 1. Impor useRouter
+import api from "../../../services/api"; // 2. Impor helper API Anda
 import Sidebar from "@/components/user/Sidebar";
 
-// --- Komponen InputField yang Di-inline ---
+// --- Komponen InputField (Tidak Berubah) ---
 const InputField = ({
   label,
   type,
@@ -32,26 +35,14 @@ const InputField = ({
   disabled,
   ...props
 }) => {
-  // Styling input field
   const inputClassName = `block w-full rounded-lg border ${
-    disabled
-      ? // UBAH: Menggunakan 'neutral-200' dan 'neutral-50'
-        "border-neutral-200 bg-neutral-50"
-      : // UBAH: Menggunakan 'neutral-200'
-        "border-neutral-200"
+    disabled ? "border-neutral-200 bg-neutral-50" : "border-neutral-200"
   } py-2 ${Icon ? "pl-10" : "pl-3"} pr-3 ${
-    disabled
-      ? // UBAH: Menggunakan 'neutral-600'
-        "text-neutral-600"
-      : // UBAH: Menggunakan 'neutral-900'
-        "text-neutral-900"
-  } 
-  // UBAH: Menggunakan 'placeholder-neutral-600' dan 'focus:ring-primary-600'
-  placeholder-neutral-600 focus:ring-primary-600 focus:border-primary-600 sm:text-sm transition duration-150`;
+    disabled ? "text-neutral-600" : "text-neutral-900"
+  } placeholder-neutral-600 focus:ring-primary-600 focus:border-primary-600 sm:text-sm transition duration-150`;
 
   return (
     <div className="space-y-1">
-      {/* UBAH: Menggunakan 'neutral-700' */}
       <label
         htmlFor={label}
         className="block text-sm font-medium text-neutral-700"
@@ -61,11 +52,9 @@ const InputField = ({
       <div className="relative rounded-md shadow-sm">
         {Icon && (
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            {/* UBAH: Menggunakan 'neutral-600' */}
             <Icon className="h-5 w-5 text-neutral-600" aria-hidden="true" />
           </div>
         )}
-        {/* Input Tipe Select */}
         {type === "select" && options ? (
           <select
             id={label}
@@ -87,7 +76,6 @@ const InputField = ({
             ))}
           </select>
         ) : (
-          // Input Tipe Text/Email/Date/Telp
           <input
             id={label}
             name={props.name || label}
@@ -107,106 +95,76 @@ const InputField = ({
 };
 // -----------------------------------------------------------------------------------
 
-// Mocking the complex data structure for the profile
-const emptyProfileData = {
-  jenisKelamin: "",
-  golonganDarah: "",
-  tempatLahir: "",
-  tanggalLahir: "",
-  agama: "",
-  wargaNegara: "WNI",
-  statusPerkawinan: "",
-  pendidikan: "",
-  pekerjaan: "",
-  noKTP: "",
-  noKK: "",
-  alamatJalan: "",
-  kelurahan: "",
-  kecamatan: "",
-  kabupaten: "",
-  provinsi: "",
-  kodePos: "",
-};
-
-// Data dummy yang sudah terisi dari halaman register (5 field awal)
-const initialData = {
-  namaLengkap: "Syifa Maulida",
-  email: "syifamaulida18@gmail.com",
-  noTelepon: "083849375372",
-};
-
-// Gabungan data awal dan data kosong untuk initial state
-const mockInitialProfile = { ...initialData, ...emptyProfileData };
-
-/**
- * =================================================================================
- * KONEKSI BACKEND DUMMY (Menggunakan localStorage untuk simulasi penyimpanan)
- * =================================================================================
- */
-const mockBackendApi = async (endpoint, method, data = null) => {
-  await new Promise((resolve) => setTimeout(resolve, Math.random() * 1000 + 500));
-  const userKey = "profileData_user123";
-  if (method === "GET") {
-    const storedData =
-      typeof window !== "undefined" ? localStorage.getItem(userKey) : null;
-    if (storedData) {
-      return { ...mockInitialProfile, ...JSON.parse(storedData) };
-    }
-    return mockInitialProfile;
-  }
-  if (method === "POST") {
-    const dataToStore = Object.fromEntries(
-      Object.entries(data).filter(
-        ([key]) => !["namaLengkap", "email", "noTelepon"].includes(key)
-      )
-    );
-    if (typeof window !== "undefined") {
-      localStorage.setItem(userKey, JSON.stringify(dataToStore));
-    }
-    return { success: true, message: "Data berhasil disimpan." };
-  }
-  console.error("Metode API tidak dikenal.");
-  throw new Error("Metode API tidak dikenal.");
-};
-/**
- * =================================================================================
- * AKHIR KONEKSI BACKEND DUMMY
- * =================================================================================
- */
-
 // --- MODE 2: FORMULIR PENGISIAN/EDIT PROFIL ---
 const ProfileCompletionForm = ({
   setViewMode,
-  initialProfileData,
-  setProfileData,
+  initialProfileData, // Ini adalah data profil yang ada (atau {} jika baru)
+  userData, // Ini adalah data user (nama, email, tlp)
+  setProfileData, // Fungsi untuk update state di parent
   isComplete,
 }) => {
-  const [formData, setFormData] = useState(initialProfileData);
+  // Inisialisasi state formData (Tidak Berubah)
+  const [formData, setFormData] = useState({
+    lokasi: initialProfileData.lokasi || "",
+    jenis_kelamin: initialProfileData.jenis_kelamin || "",
+    noKTP: initialProfileData.noKTP || "",
+    suku: initialProfileData.suku || "",
+    tempat_lahir: initialProfileData.tempat_lahir || "",
+    tanggal_lahir: initialProfileData.tanggal_lahir || "",
+    status_keluarga: initialProfileData.status_keluarga || "",
+    nama_keluarga: initialProfileData.nama_keluarga || "",
+    agama: initialProfileData.agama || "",
+    status_perkawinan: initialProfileData.status_perkawinan || "",
+    pendidikan_terakhir: initialProfileData.pendidikan_terakhir || "",
+    alamat: initialProfileData.alamat || "",
+    provinsi: initialProfileData.provinsi || "",
+    "kota/kabupaten": initialProfileData["kota/kabupaten"] || "",
+    kecamatan: initialProfileData.kecamatan || "",
+    kelurahan: initialProfileData.kelurahan || "",
+    nomor_telepon: initialProfileData.nomor_telepon || "",
+    nomor_pegawai: initialProfileData.nomor_pegawai || "",
+  });
   const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (errors[e.target.name]) {
+      setErrors({ ...errors, [e.target.name]: null });
+    }
   };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setIsSaving(true);
+    setErrors({});
+
+    // Validasi frontend sederhana (Tidak Berubah)
     if (!formData.noKTP || formData.noKTP.length !== 16) {
-      console.error("Gagal: No KTP harus 16 digit.");
+      setErrors({ noKTP: "No KTP harus 16 digit." });
       setIsSaving(false);
       return;
     }
-    const finalData = {
-      ...initialData,
-      ...formData,
-    };
+
     try {
-      await mockBackendApi("/profile/save", "POST", finalData);
-      setProfileData(finalData);
-      console.log("Data diri berhasil dilengkapi/diperbarui!");
-      setViewMode("summary");
+      // 3. Menggunakan api.post (Axios). Header & Token sudah otomatis.
+      const res = await api.post("/profile", formData);
+
+      // Jika sukses (status 2xx)
+      setProfileData(res.data.data); // Update state di parent dengan data baru
+      console.log("Data diri berhasil disimpan!");
+      setViewMode("summary"); // Kembali ke halaman ringkasan
+
     } catch (error) {
-      console.error("Terjadi kesalahan jaringan saat menyimpan profil:", error);
+      // 4. Penanganan error untuk Axios
+      if (error.response && error.response.status === 422) {
+        // Handle error validasi dari Laravel
+        setErrors(error.response.data.errors);
+        console.error("Validasi gagal:", error.response.data.errors);
+      } else {
+        // Handle error server lainnya
+        console.error("Gagal menyimpan profil:", error);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -221,66 +179,74 @@ const ProfileCompletionForm = ({
     ? "Edit Detail Profil"
     : "Lengkapi Data Profil (Wajib Reservasi)";
 
+  // --- JSX untuk Form (Tidak Berubah) ---
   return (
     <div className="flex-1 bg-white p-6 md:p-10 rounded-r-xl shadow-inner overflow-y-auto h-full scrollbar-hide">
       <button
         onClick={handleGoBack}
-        /* UBAH: Menggunakan 'neutral-600' dan 'hover:text-primary-800' */
         className="text-neutral-600 hover:text-primary-800 flex items-center mb-6 transition duration-150"
       >
         <ArrowLeft className="w-5 h-5 mr-1" />
         Kembali ke Ringkasan Profil
       </button>
 
-      {/* UBAH: Menggunakan 'text-neutral-900' */}
       <h1 className="text-3xl font-extrabold text-neutral-900 mb-6 border-b pb-2">
         {formTitle}
       </h1>
+      
+      {errors.message && (
+          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-4">
+            {errors.message}
+          </div>
+      )}
 
       <form onSubmit={handleSaveProfile} className="space-y-8">
         {/* BAGIAN 1: DATA AKUN & IDENTITAS UTAMA */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 border-b pb-6">
-          {/* UBAH: Menggunakan 'text-primary-800' */}
           <h2 className="col-span-full text-xl font-bold text-primary-800 mb-4">
-            Informasi Akun
+            Informasi Akun (Tidak dapat diubah)
           </h2>
-          <InputField label="Nama Lengkap" type="text" value={initialData.namaLengkap} disabled icon={User} />
-          <InputField label="Email" type="email" value={initialData.email} disabled icon={Mail} />
-          <InputField label="Nomor Telepon (WA)" type="tel" value={initialData.noTelepon} disabled icon={Smartphone} />
+          <InputField label="Nama Lengkap" type="text" value={userData.name} disabled icon={User} />
+          <InputField label="Email" type="email" value={userData.email} disabled icon={Mail} />
+          <InputField label="Nomor Telepon (WA)" type="tel" value={userData.nomor_telepon_user} disabled icon={Smartphone} />
           <InputField label="Kata Sandi" type="password" placeholder="******" value="******" disabled icon={Settings} />
         </div>
 
-        {/* BAGIAN 2: DATA IDENTITAS & ALAMAT LENGKAP */}
+        {/* BAGIAN 2: DATA IDENTITAS & ALAMAT LENGKAP (Sesuai Controller) */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* UBAH: Menggunakan 'text-neutral-800' */}
           <h2 className="col-span-full text-xl font-bold text-neutral-800 mb-4 mt-4">
-            Data Rekam Medis & Alamat (18 Fields)
+            Data Diri & Alamat
           </h2>
-          <InputField label="No KTP" type="text" name="noKTP" placeholder="16 digit No KTP" required value={formData.noKTP} onChange={handleChange} maxLength={16} icon={Clipboard} />
-          <InputField label="No KK" type="text" name="noKK" placeholder="16 digit No KK" required value={formData.noKK} onChange={handleChange} maxLength={16} icon={Clipboard} />
-          <InputField label="Jenis Kelamin" type="select" name="jenisKelamin" required options={['Laki-laki', 'Perempuan']} value={formData.jenisKelamin} onChange={handleChange} icon={User} />
-          <InputField label="Tempat Lahir" type="text" name="tempatLahir" placeholder="Kota/Kabupaten" required value={formData.tempatLahir} onChange={handleChange} icon={MapPin} />
-          <InputField label="Tanggal Lahir" type="date" name="tanggalLahir" required value={formData.tanggalLahir} onChange={handleChange} icon={Calendar} />
-          <InputField label="Golongan Darah" type="select" name="golonganDarah" options={['A', 'B', 'AB', 'O', 'Tidak Tahu']} value={formData.golonganDarah} onChange={handleChange} icon={Briefcase} />
-          <InputField label="Status Perkawinan" type="select" name="statusPerkawinan" required options={['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati']} value={formData.statusPerkawinan} onChange={handleChange} icon={Briefcase} />
-          <InputField label="Pendidikan Terakhir" type="select" name="pendidikan" required options={['SD/Sederajat', 'SMP/Sederajat', 'SMA/Sederajat', 'D1/D2/D3', 'S1/D4', 'S2', 'S3', 'Tidak Sekolah']} value={formData.pendidikan} onChange={handleChange} icon={Briefcase} />
-          <InputField label="Pekerjaan" type="text" name="pekerjaan" placeholder="Contoh: Karyawan Swasta" required value={formData.pekerjaan} onChange={handleChange} icon={Briefcase} />
-          <InputField label="Agama" type="select" name="agama" required options={['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Lainnya']} value={formData.agama} onChange={handleChange} icon={Briefcase} />
-          <InputField label="Warga Negara" type="select" name="wargaNegara" required options={['WNI', 'WNA']} value={formData.wargaNegara} onChange={handleChange} icon={Briefcase} />
           
+          <InputField label="No KTP" type="text" name="noKTP" placeholder="16 digit No KTP" required value={formData.noKTP} onChange={handleChange} maxLength={16} icon={Clipboard} />
+          {errors.noKTP && <p className="text-red-500 text-sm col-span-full md:col-span-1">{errors.noKTP[0]}</p>}
+
+          <InputField label="Jenis Kelamin" type="select" name="jenis_kelamin" required options={['laki-laki', 'Perempuan']} value={formData.jenis_kelamin} onChange={handleChange} icon={User} />
+          <InputField label="Tempat Lahir" type="text" name="tempat_lahir" placeholder="Kota/Kabupaten" required value={formData.tempat_lahir} onChange={handleChange} icon={MapPin} />
+          <InputField label="Tanggal Lahir" type="date" name="tanggal_lahir" required value={formData.tanggal_lahir} onChange={handleChange} icon={Calendar} />
+          <InputField label="Status Perkawinan" type="select" name="status_perkawinan" required options={['Belum Kawin', 'Kawin', 'Cerai Hidup', 'Cerai Mati']} value={formData.status_perkawinan} onChange={handleChange} icon={Briefcase} />
+          <InputField label="Pendidikan Terakhir" type="select" name="pendidikan_terakhir" required options={['SD/Sederajat', 'SMP/Sederajat', 'SMA/Sederajat', 'D1/D2/D3', 'S1/D4', 'S2', 'S3', 'Tidak Sekolah']} value={formData.pendidikan_terakhir} onChange={handleChange} icon={Briefcase} />
+          <InputField label="Agama" type="select" name="agama" required options={['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Lainnya']} value={formData.agama} onChange={handleChange} icon={Briefcase} />
+
+          {/* Field opsional */}
+          <InputField label="Lokasi" type="text" name="lokasi" placeholder="Lokasi (opsional)" value={formData.lokasi} onChange={handleChange} icon={MapPin} />
+          <InputField label="Suku" type="text" name="suku" placeholder="Suku (opsional)" value={formData.suku} onChange={handleChange} icon={User} />
+          <InputField label="Status Keluarga" type="text" name="status_keluarga" placeholder="Cth: Kepala Keluarga" value={formData.status_keluarga} onChange={handleChange} icon={User} />
+          <InputField label="Nama Keluarga" type="text" name="nama_keluarga" placeholder="Nama Anggota Keluarga" value={formData.nama_keluarga} onChange={handleChange} icon={User} />
+          <InputField label="Nomor Pegawai" type="text" name="nomor_pegawai" placeholder="Nomor Pegawai (jika ada)" value={formData.nomor_pegawai} onChange={handleChange} icon={Briefcase} />
+          <InputField label="Nomor Telepon (Profil)" type="tel" name="nomor_telepon" placeholder="Nomor telepon (opsional)" value={formData.nomor_telepon} onChange={handleChange} icon={Smartphone} />
+
           {/* Alamat Lengkap */}
-          {/* UBAH: Menggunakan 'text-neutral-700' */}
           <div className="col-span-full pt-4">
             <h3 className="font-semibold text-neutral-700">Detail Alamat</h3>
           </div>
           <div className="md:col-span-2 lg:col-span-3">
-            <InputField label="Alamat Jalan Lengkap" type="text" name="alamatJalan" placeholder="Contoh: Jl. Sudirman No. 12 RT 01/RW 02" required value={formData.alamatJalan} onChange={handleChange} icon={MapPin} />
+            <InputField label="Alamat Jalan Lengkap" type="text" name="alamat" placeholder="Contoh: Jl. Sudirman No. 12 RT 01/RW 02" required value={formData.alamat} onChange={handleChange} icon={MapPin} />
           </div>
           <InputField label="Provinsi" type="text" name="provinsi" placeholder="Contoh: Kalimantan Timur" required value={formData.provinsi} onChange={handleChange} />
-          <InputField label="Kabupaten/Kota" type="text" name="kabupaten" placeholder="Contoh: Balikpapan" required value={formData.kabupaten} onChange={handleChange} />
+          <InputField label="Kabupaten/Kota" type="text" name="kota/kabupaten" placeholder="Contoh: Balikpapan" required value={formData['kota/kabupaten']} onChange={handleChange} />
           <InputField label="Kecamatan" type="text" name="kecamatan" placeholder="Nama Kecamatan" required value={formData.kecamatan} onChange={handleChange} />
           <InputField label="Kelurahan" type="text" name="kelurahan" placeholder="Nama Kelurahan/Desa" required value={formData.kelurahan} onChange={handleChange} />
-          <InputField label="Kode Pos" type="text" name="kodePos" placeholder="Contoh: 76111" required value={formData.kodePos} onChange={handleChange} />
         </div>
 
         {/* Footer Form: Tombol Simpan dan Kembali */}
@@ -288,7 +254,6 @@ const ProfileCompletionForm = ({
           <button
             type="button"
             onClick={handleGoBack}
-            /* UBAH: Menggunakan 'border-neutral-200', 'text-neutral-700', 'hover:bg-neutral-100' */
             className="sm:w-auto w-full border border-neutral-200 text-neutral-700 font-medium py-3 px-6 rounded-xl shadow-sm hover:bg-neutral-100 transition-all duration-300 flex items-center justify-center space-x-2"
           >
             <X className="w-5 h-5" />
@@ -297,12 +262,14 @@ const ProfileCompletionForm = ({
           <button
             type="submit"
             disabled={isSaving}
-            /* UBAH: Menggunakan 'bg-primary-600', 'hover:bg-primary-800' */
             className="sm:w-auto w-full bg-primary-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg hover:bg-primary-800 transition-all duration-300 transform hover:scale-[1.005] flex items-center justify-center space-x-3 disabled:opacity-50"
           >
             {isSaving ? (
               <span className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
                 Menyimpan...
               </span>
             ) : (
@@ -318,7 +285,7 @@ const ProfileCompletionForm = ({
   );
 };
 
-// --- MODE 1: RINGKASAN PROFIL UTAMA ---
+// --- MODE 1: RINGKASAN PROFIL UTAMA (Tidak Berubah) ---
 const ProfileSummaryView = ({ profileData, isComplete, setViewMode }) => {
   const StatusIcon = isComplete ? CheckCircle : AlertTriangle;
   const statusColor = isComplete ? "text-green-600" : "text-yellow-600";
@@ -327,21 +294,20 @@ const ProfileSummaryView = ({ profileData, isComplete, setViewMode }) => {
 
   const InfoItem = ({ label, value }) => (
     <div>
-      {/* UBAH: Menggunakan 'text-neutral-600' */}
       <p className="text-neutral-600 font-medium">{label}</p>
-      {/* UBAH: Menggunakan 'text-neutral-800' */}
-      <p className="font-semibold text-neutral-800">{value}</p>
+      <p className="font-semibold text-neutral-800">
+        {value || "- Belum Diisi -"}
+      </p>
     </div>
   );
 
   return (
     <div className="flex-1 bg-white p-6 md:p-10 rounded-r-xl shadow-inner overflow-y-auto h-full scrollbar-hide">
-      {/* UBAH: Menggunakan 'text-neutral-900' */}
       <h1 className="text-3xl font-extrabold text-neutral-900 mb-6 border-b pb-2">
         Ringkasan Profil
       </h1>
 
-      {/* Status Card (Warna semantik dipertahankan) */}
+      {/* Status Card */}
       <div
         className={`p-6 rounded-xl shadow-lg ${statusBg} border border-dashed ${
           isComplete ? "border-green-300" : "border-yellow-300"
@@ -351,11 +317,12 @@ const ProfileSummaryView = ({ profileData, isComplete, setViewMode }) => {
           <div className="flex items-center space-x-4">
             <StatusIcon className={`w-8 h-8 ${statusColor}`} />
             <div>
-              {/* UBAH: Menggunakan 'text-neutral-700' */}
               <p className="text-sm font-medium text-neutral-700">
                 Status Kelengkapan Data Medis
               </p>
-              <h2 className={`text-2xl font-bold ${statusColor}`}>{statusText}</h2>
+              <h2 className={`text-2xl font-bold ${statusColor}`}>
+                {statusText}
+              </h2>
             </div>
           </div>
 
@@ -364,10 +331,8 @@ const ProfileSummaryView = ({ profileData, isComplete, setViewMode }) => {
             className={`px-6 py-2 rounded-full font-semibold transition duration-150 flex items-center space-x-2
               ${
                 isComplete
-                  ? // UBAH: Menggunakan 'bg-primary-500' dan 'hover:bg-primary-600'
-                    "bg-primary-500 text-white hover:bg-primary-600"
-                  : // CATATAN: Warna 'yellow' dipertahankan (semantik)
-                    "bg-yellow-500 text-white hover:bg-yellow-600"
+                  ? "bg-primary-500 text-white hover:bg-primary-600"
+                  : "bg-yellow-500 text-white hover:bg-yellow-600"
               }`}
           >
             <Settings className="w-4 h-4" />
@@ -377,34 +342,37 @@ const ProfileSummaryView = ({ profileData, isComplete, setViewMode }) => {
       </div>
 
       {/* Detailed Info (Summary Grid) */}
-      {/* UBAH: Menggunakan 'border-neutral-200' */}
       <div className="bg-white p-6 rounded-xl shadow-md border border-neutral-200">
-        {/* UBAH: Menggunakan 'text-neutral-800' */}
         <h3 className="text-xl font-bold text-neutral-800 mb-4 flex items-center">
-          <Clipboard className="w-5 h-5 mr-2" /> Data Medis Utama
+          <Clipboard className="w-5 h-5 mr-2" /> Data Diri Utama
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-sm">
-          <InfoItem label="No. KTP" value={profileData.noKTP || "- Belum Diisi -"} />
-          <InfoItem label="No. KK" value={profileData.noKK || "- Belum Diisi -"} />
-          <InfoItem label="Jenis Kelamin" value={profileData.jenisKelamin || "-"} />
-          <InfoItem label="Golongan Darah" value={profileData.golonganDarah || "-"} />
-          <InfoItem label="Tanggal Lahir" value={profileData.tanggalLahir || "-"} />
-          <InfoItem label="Pekerjaan" value={profileData.pekerjaan || "-"} />
+          <InfoItem label="No. KTP" value={profileData.noKTP} />
+          <InfoItem label="Jenis Kelamin" value={profileData.jenis_kelamin} />
+          <InfoItem label="Tanggal Lahir" value={profileData.tanggal_lahir} />
+          <InfoItem label="Tempat Lahir" value={profileData.tempat_lahir} />
+          <InfoItem label="Agama" value={profileData.agama} />
+          <InfoItem
+            label="Status Perkawinan"
+            value={profileData.status_perkawinan}
+          />
+          <InfoItem
+            label="Pendidikan"
+            value={profileData.pendidikan_terakhir}
+          />
+          <InfoItem label="Suku" value={profileData.suku} />
+          <InfoItem label="No. Pegawai" value={profileData.nomor_pegawai} />
         </div>
         <div className="mt-6 border-t pt-4">
-          {/* UBAH: Menggunakan 'text-neutral-800' */}
           <h3 className="text-xl font-bold text-neutral-800 mb-4 flex items-center">
             <MapPin className="w-5 h-5 mr-2" /> Alamat Terdaftar
           </h3>
-          {/* UBAH: Menggunakan 'text-neutral-700' */}
           <p className="text-neutral-700 font-medium">
-            {profileData.alamatJalan || "Alamat belum terisi."}
+            {profileData.alamat || "Alamat belum terisi."}
           </p>
-          {/* UBAH: Menggunakan 'text-neutral-600' */}
           <p className="text-sm text-neutral-600 mt-1">
             {profileData.kelurahan} - {profileData.kecamatan},{" "}
-            {profileData.kabupaten}, {profileData.provinsi} (
-            {profileData.kodePos})
+            {profileData["kota/kabupaten"]}, {profileData.provinsi}
           </p>
         </div>
       </div>
@@ -412,72 +380,106 @@ const ProfileSummaryView = ({ profileData, isComplete, setViewMode }) => {
   );
 };
 
+// --- KOMPONEN UTAMA (PAGE) ---
 export default function ProfilePage() {
   const [viewMode, setViewMode] = useState("summary");
-  const [profileData, setProfileData] = useState(mockInitialProfile);
+  const [userData, setUserData] = useState(null);
+  const [profileData, setProfileData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State untuk sidebar mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const router = useRouter(); // 5. Inisialisasi router
 
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true);
+
+      // 1. Muat data user dasar dari localStorage (Tidak Berubah)
+      const baseUserData = {
+        name: localStorage.getItem("userName") || "Nama User",
+        email: localStorage.getItem("userEmail") || "",
+        nomor_telepon_user: localStorage.getItem("userPhone") || "",
+      };
+      setUserData(baseUserData);
+
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("Token tidak ditemukan, harap login.");
+        router.push("/auth/login"); // 6. Redirect jika tidak ada token
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Ambil data profil dari backend menggunakan api.js
       try {
-        const data = await mockBackendApi("/profile/get", "GET");
-        setProfileData(data);
-        if (!data.noKTP || data.noKTP.length !== 16) {
-          setViewMode("summary");
-        }
+        // 7. Menggunakan api.get (Axios). Header & Token sudah otomatis.
+        const res = await api.get("/profile");
+
+        // Jika sukses (status 2xx)
+        setProfileData(res.data.data); // Data profil berhasil diambil
+        setViewMode("summary");
+
       } catch (error) {
-        console.error("Gagal memuat data profil:", error);
-        setProfileData(mockInitialProfile);
+        // 8. Penanganan error untuk Axios
+        if (error.response && error.response.status === 404) {
+          // Kasus: User login tapi belum punya profil (respons 404 dari controller)
+          console.log("Profil tidak ditemukan, mengarahkan ke form pelengkapan.");
+          setProfileData({}); // Atur sebagai objek kosong agar form tidak error
+          setViewMode("complete"); // Langsung arahkan ke form
+        } else {
+          // Error server lainnya
+          console.error("Gagal memuat data profil:", error);
+          // Mungkin tampilkan pesan error
+        }
       } finally {
         setIsLoading(false);
       }
     };
     loadData();
-  }, []);
+  }, [router]); // Tambahkan router ke dependency array useEffect
 
-  const isProfileComplete = profileData.noKTP && profileData.noKTP.length === 16;
+  // Cek kelengkapan profil (Tidak Berubah)
+  const isProfileComplete =
+    profileData && profileData.noKTP && profileData.noKTP.length === 16;
 
   const scrollbarHideStyle = `
         .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
     `;
 
-  if (isLoading) {
+  // Tampilkan loading (Tidak Berubah)
+  if (isLoading || !userData || !profileData) {
     return (
-      // UBAH: Menggunakan 'bg-neutral-100'
       <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
         <div className="flex items-center space-x-3 p-6 bg-white rounded-xl shadow-lg">
-          {/* UBAH: Menggunakan 'text-primary-600' */}
-          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-          {/* UBAH: Menggunakan 'text-neutral-700' */}
-          <span className="text-neutral-700 font-medium">Memuat data profil...</span>
+          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span className="text-neutral-700 font-medium">
+            Memuat data profil...
+          </span>
         </div>
       </div>
     );
   }
 
+  // --- JSX Halaman Utama (Tidak Berubah) ---
   return (
-    // UBAH: Menggunakan 'bg-neutral-100'
     <div className="min-h-screen bg-neutral-100 flex items-start justify-center p-0 md:p-8">
       <style jsx>{scrollbarHideStyle}</style>
 
-      {/* Tombol menu untuk mobile */}
       <button
         onClick={() => setIsSidebarOpen(true)}
-        /* UBAH: Menggunakan 'bg-primary-600' */
         className="fixed top-4 left-4 z-50 p-2 bg-primary-600 text-white rounded-full shadow-lg md:hidden"
       >
         <Menu className="w-6 h-6" />
       </button>
 
-      {/* Main Container */}
       <div className="w-full max-w-7xl bg-white rounded-xl shadow-2xl flex flex-col md:flex-row h-screen md:h-[90vh]">
         <Sidebar
           activeTab={viewMode}
           setActiveTab={setViewMode}
-          profileData={profileData}
+          profileData={{ name: userData.name, email: userData.email }} 
           isComplete={isProfileComplete}
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
@@ -495,14 +497,14 @@ export default function ProfilePage() {
             <ProfileCompletionForm
               setViewMode={setViewMode}
               initialProfileData={profileData}
+              userData={userData}
               setProfileData={setProfileData}
               isComplete={isProfileComplete}
             />
           )
         ) : (
-          // UBAH: Menggunakan 'text-neutral-600'
           <div className="flex-1 p-10 flex items-center justify-center text-neutral-600 h-full">
-            Konten untuk tab lain akan ditampilkan di sini (misalnya Dashboard Utama, Riwayat, dll).
+            Konten untuk tab lain (Dashboard, Riwayat, dll).
           </div>
         )}
       </div>

@@ -11,15 +11,24 @@ const NavItem = ({ icon: Icon, label, tab, activeTab, setActiveTab, isComplete, 
         // Cek kelengkapan data sebelum Reservasi
         if (tab === 'reservasi' && !isComplete) {
             console.log("Aksi dicekal: Profil belum lengkap.");
-            if (typeof window !== 'undefined') {
-                alert(`⚠️ Mohon lengkapi data profil (KTP, KK, dll.) terlebih dahulu sebelum melanjutkan ke ${label}.`); 
-            }
-            setActiveTab('summary'); // Arahkan ke halaman profile summary/edit
+            // Mengganti alert() dengan console.log atau modal kustom (jika ada)
+           // alert() sering diblokir atau tidak berfungsi di lingkungan tertentu.
+            console.warn(`⚠️ Mohon lengkapi data profil (KTP, KK, dll.) terlebih dahulu sebelum melanjutkan ke ${label}.`); 
+            
+           // Jika ini halaman profile, arahkan ke tab summary
+           if (setActiveTab) {
+              setActiveTab('summary'); // Arahkan ke halaman profile summary/edit
+           } else {
+             // Jika ini bukan halaman profile, navigasi ke halaman profile
+             if (typeof window !== 'undefined') {
+                window.location.href = '/user/profile'; // Asumsi halaman profile ada di sini
+             }
+           }
             return;
         }
 
-        // Jika mengarah ke Pengaturan Profil
-        if (tab === 'summary') {
+        // Jika mengarah ke Pengaturan Profil (di dalam halaman profile)
+        if (tab === 'summary' && setActiveTab) {
             setActiveTab('summary');
         } 
         
@@ -28,9 +37,12 @@ const NavItem = ({ icon: Icon, label, tab, activeTab, setActiveTab, isComplete, 
             setIsSidebarOpen(false); 
         }
 
-        // Simulasi routing untuk tab lain
+        // Navigasi ke halaman lain
         if (typeof window !== 'undefined' && href !== '#') {
-            window.location.href = href;
+           // Jangan navigasi jika kita sudah di halaman itu (kecuali href adalah link eksternal)
+           if (window.location.pathname !== href) {
+              window.location.href = href;
+           }
         }
     };
 
@@ -41,7 +53,6 @@ const NavItem = ({ icon: Icon, label, tab, activeTab, setActiveTab, isComplete, 
         <a
             href={href}
             onClick={handleClick}
-            /* UBAH: Menggunakan 'primary-600', 'neutral-200', dan 'primary-800' */
             className={`flex items-center space-x-3 p-3 rounded-lg transition duration-150 cursor-pointer text-left w-full
                 ${isActive 
                     ? 'bg-primary-600 font-bold shadow-md text-white' /* Status Aktif */
@@ -62,12 +73,14 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
     const profileName = profileData?.namaLengkap || profileData?.name || "Pengguna";
     const profileEmail = profileData?.email || "email@contoh.com";
     
+    // --- PERUBAHAN LINK (href) ---
     const menuItems = [
         { name: 'Dashboard Utama', icon: LayoutDashboard, tab: 'dashboard', href: "/user/dashboard" },
-        { name: 'Notifikasi', icon: Bell, tab: 'notifications', href: "/dashboard/notifications" },
-        { name: 'Riwayat Reservasi', icon: History, tab: 'history', href: "/dashboard/history" },
-        { name: 'Pengaturan Profil', icon: Settings, tab: 'summary', href: "/profile" }, 
+        { name: 'Notifikasi', icon: Bell, tab: 'notifications', href: "/user/notifikasi" }, // Diubah
+        { name: 'Riwayat Kunjungan', icon: History, tab: 'history', href: "/user/riwayat" }, // Diubah
+        { name: 'Pengaturan Profil', icon: Settings, tab: 'summary', href: "/user/profile" }, // Diubah
     ];
+    // ----------------------------
 
     // CSS untuk menyembunyikan scrollbar
     const scrollbarHideStyle = {
@@ -98,7 +111,6 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
                 fixed inset-y-0 left-0 z-50 transform 
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
                 md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
-                /* UBAH: Menggunakan 'bg-neutral-900' agar konsisten dengan Header/Footer */
                 w-64 bg-neutral-900 text-white flex flex-col p-4 md:p-6 rounded-t-xl md:rounded-l-xl md:rounded-tr-none shadow-2xl h-full md:min-h-full
             `}>
                 
@@ -111,15 +123,12 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
                 </button>
 
                 {/* Header Profil */}
-                {/* UBAH: Menggunakan 'border-primary-500' */}
                 <div className="flex items-center space-x-3 mb-8 border-b border-primary-500 pb-5">
-                    {/* UBAH: Menggunakan 'bg-primary-500' */}
                     <div className="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-xl font-bold text-white mb-0">
                         {profileInitial}
                     </div>
                     <div>
                         <p className="font-semibold text-lg">{profileName}</p>
-                        {/* UBAH: Menggunakan 'text-primary-100' */}
                         <p className="text-sm text-primary-100">{profileEmail}</p>
                     </div>
                 </div>
@@ -143,7 +152,6 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
                         />
                     ))}
 
-                    {/* UBAH: Menggunakan 'border-primary-500' dan 'text-primary-100' */}
                     <div className="pt-4 border-t border-primary-500 mt-2">
                         <h3 className="text-sm font-semibold text-primary-100 mb-1">Fitur Utama</h3>
                         <NavItem 
@@ -153,14 +161,13 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
                             activeTab={activeTab} 
                             setActiveTab={setActiveTab} 
                             isComplete={isComplete} 
-                            href="/dashboard/reservasi" 
+                            href="/user/reservasi" // Diubah
                             setIsSidebarOpen={setIsSidebarOpen}
                         />
                     </div>
                 </div>
 
                 {/* Logout */}
-                {/* UBAH: Menggunakan 'border-primary-500' */}
                 <div className="pt-4 border-t border-primary-500 mt-auto">
                     <button
                         onClick={() => { 
@@ -169,7 +176,6 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
                                 window.location.href = '/login'; 
                             }
                         }}
-                        /* CATATAN: Warna 'red' dipertahankan (semantik) */
                         className="flex items-center space-x-3 p-3 w-full rounded-lg text-red-300 hover:bg-red-700/70 transition duration-150"
                     >
                         <LogOut className="w-5 h-5" />
