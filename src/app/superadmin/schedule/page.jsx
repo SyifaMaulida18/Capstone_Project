@@ -1,7 +1,7 @@
 "use client";
-import AdminLayout from "@/app/admin/components/admin_layout"; // Path AdminLayout
-import { Dialog } from "@/app/admin/components/ui/dialog"; // Path Dialog
-import { Input } from "@/app/admin/components/ui/input"; // Path Input
+import AdminLayout from "@/app/superadmin/components/superadmin_layou"; // Path AdminLayout
+import { Dialog } from "@/app/superadmin/components/ui/dialog"; // Path Dialog
+import { Input } from "@/app/superadmin/components/ui/input"; // Path Input
 import {
   FunnelIcon,
   MagnifyingGlassIcon,

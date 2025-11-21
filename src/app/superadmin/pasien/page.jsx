@@ -9,22 +9,24 @@ import {
   FunnelIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/admin/components/admin_layout";
+import AdminLayout from "@/app/superadmin/components/superadmin_layou";
 
-const initialUsers = [
-  { id: 1, nama: "Saputra", email: "saputra123@gmail.com", telp: "081254345678" },
-  { id: 2, nama: "Muhammad Ole", email: "oleganz123@gmail.com", telp: "0822123212321" },
+// Data dummy (dikelola oleh useState)
+const initialPatients = [
+  { id: 1, nama: "Saputra", nik: "123456", telp: "081254345678" },
+  { id: 2, nama: "Muhammad Ole", nik: "1234567", telp: "0822123212321" },
 ];
 
-export default function UserManagementPage() {
-  const [users, setUsers] = useState(initialUsers);
+export default function PasienManagementPage() {
+  const [patients, setPatients] = useState(initialPatients);
 
   // Fungsi untuk simulasi delete
   const handleDelete = (id) => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus data user ini?")) {
+    // Ganti 'window.confirm' dengan modal kustom jika Anda punya
+    if (window.confirm("Apakah Anda yakin ingin menghapus data pasien ini?")) {
       // Logika API delete (simulasi)
-      setUsers(users.filter((u) => u.id !== id));
-      console.log(`Delete user with id: ${id}`);
+      setPatients(patients.filter((p) => p.id !== id));
+      console.log(`Delete patient with id: ${id}`);
     }
   };
 
@@ -32,7 +34,7 @@ export default function UserManagementPage() {
     <AdminLayout>
       <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
         <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
-          Manajemen User
+          Manajemen Pasien
         </h1>
 
         <div className="flex justify-between items-center mb-8">
@@ -53,7 +55,7 @@ export default function UserManagementPage() {
 
             {/* === UBAH DI SINI: Tombol Add menjadi Link === */}
             <Link
-              href="/admin/users/add" // Path ke halaman add user
+              href="/superadmin/pasien/add" // Path ke halaman add pasien
               className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
             >
               <PlusIcon className="h-5 w-5" />
@@ -66,7 +68,7 @@ export default function UserManagementPage() {
           <table className="min-w-full divide-y divide-neutral-200">
             <thead className="bg-primary-600 rounded-t-lg">
               <tr>
-                {["Id", "Nama", "Email", "No Telp", "Aksi"].map((header) => (
+                {["Id", "Nama", "NIK", "No Telp", "Aksi"].map((header) => (
                   <th
                     key={header}
                     className="px-6 py-3 text-left text-sm font-semibold text-white uppercase tracking-wider rounded-t-lg first:rounded-tl-lg last:rounded-tr-lg"
@@ -77,28 +79,28 @@ export default function UserManagementPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-neutral-100">
-              {users.map((user, index) => (
+              {patients.map((patient, index) => (
                 <tr
-                  key={user.id}
+                  key={patient.id}
                   className={index % 2 === 1 ? "bg-neutral-50" : "bg-white"}
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">
-                    {user.id}
+                    {patient.id}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.nama}
+                    {patient.nama}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.email}
+                    {patient.nik}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.telp}
+                    {patient.telp}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-3">
                       {/* === UBAH DI SINI: Tambah onClick === */}
                       <button
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => handleDelete(patient.id)}
                         className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
                       >
                         <TrashIcon className="h-5 w-5" />
@@ -106,7 +108,7 @@ export default function UserManagementPage() {
 
                       {/* === UBAH DI SINI: Tombol Edit menjadi Link === */}
                       <Link
-                        href={`/admin/users/edit/${user.id}`} // Path ke halaman edit user
+                        href={`/superadmin/pasien/edit/${patient.id}`} // Path ke halaman edit pasien
                         className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
                       >
                         <PencilIcon className="h-5 w-5" />

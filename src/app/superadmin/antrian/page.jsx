@@ -8,9 +8,9 @@ import {
   FunnelIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/admin/components/admin_layout";
-import { Dialog } from "@/app/admin/components/ui/dialog"; // Asumsi path Dialog benar
-import { Input } from "@/app/admin/components/ui/input"; // Asumsi path Input benar
+import AdminLayout from "@/app/superadmin/components/superadmin_layou";
+import { Dialog } from "@/app/superadmin/components/ui/dialog"; // Asumsi path Dialog benar
+import { Input } from "@/app/superadmin/components/ui/input"; // Asumsi path Input benar
 
 // --- DATA SIMULASI ---
 // (Di aplikasi nyata, Anda akan fetch data ini)

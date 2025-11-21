@@ -9,7 +9,7 @@ import {
   FunnelIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/admin/components/admin_layout";
+import SuperAdminLayout from "../../superadmin/components/superadmin_layou";
 
 const initialUsers = [
   { id: 1, nama: "Saputra", email: "saputra123@gmail.com", telp: "081254345678" },
@@ -29,7 +29,7 @@ export default function UserManagementPage() {
   };
 
   return (
-    <AdminLayout>
+    <SuperAdminLayout>
       <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
         <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
           Manajemen User
@@ -53,7 +53,7 @@ export default function UserManagementPage() {
 
             {/* === UBAH DI SINI: Tombol Add menjadi Link === */}
             <Link
-              href="/admin/users/add" // Path ke halaman add user
+              href="/superadmin/users/add" // Path ke halaman add user
               className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
             >
               <PlusIcon className="h-5 w-5" />
@@ -106,7 +106,7 @@ export default function UserManagementPage() {
 
                       {/* === UBAH DI SINI: Tombol Edit menjadi Link === */}
                       <Link
-                        href={`/admin/users/edit/${user.id}`} // Path ke halaman edit user
+                        href={`/superadmin/users/edit/${user.id}`} // Path ke halaman edit user
                         className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
                       >
                         <PencilIcon className="h-5 w-5" />
@@ -119,6 +119,6 @@ export default function UserManagementPage() {
           </table>
         </div>
       </div>
-    </AdminLayout>
+    </SuperAdminLayout>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import AdminLayout from "@/app/admin/components/admin_layout";
+import AdminLayout from "@/app/superadmin/components/superadmin_layou";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
@@ -140,7 +140,7 @@ export default function VerifikasiReservasiPage() {
 
             {/* --- UBAH: Tombol Add menjadi Link --- */}
             <Link
-              href="/admin/reservasi/add"
+              href="/superadmin/reservasi/add"
               className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
             >
               <PlusIcon className="h-5 w-5" />
@@ -186,7 +186,7 @@ export default function VerifikasiReservasiPage() {
                     {/* --- UBAH: Tombol Edit menjadi Link --- */}
                     <div className="flex space-x-2">
                       <Link
-                        href={`/admin/reservasi/edit/${p.id}`}
+                        href={`/superadmin/reservasi/edit/${p.id}`}
                         className="text-neutral-600 hover:text-primary-600 p-1 rounded-md hover:bg-primary-50"
                       >
                         <PencilIcon className="h-5 w-5" />

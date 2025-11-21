@@ -8,7 +8,7 @@ import { UserCircleIcon } from "@heroicons/react/24/solid";
 
 const adminNavItems = [
   { name: "Manajemen Dokter", href: "/admin/dokter" }, // Fix: Path absolut lebih aman
-  { name: "Manajemen User", href: "/admin/users" },
+  // { name: "Manajemen User", href: "/admin/users" },
   { name: "Manajemen Pasien", href: "/admin/pasien" },
   { name: "Manajemen Jadwal", href: "/admin/schedule" },
   { name: "Manajemen Rekam Medis", href: "/admin/rekam-medis" },
@@ -28,7 +28,7 @@ function AdminSidebar() {
         <div className="w-20 h-20 rounded-full bg-primary-500 flex items-center justify-center border-4 border-primary-200">
           <UserCircleIcon className="h-16 w-16 text-white" />
         </div>
-        <h2 className="text-xl font-bold mt-3">Super Admin</h2>
+        <h2 className="text-xl font-bold mt-3">Admin</h2>
       </div>
 
       {/* Navigasi Sidebar */}

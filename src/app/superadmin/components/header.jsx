@@ -24,7 +24,7 @@ export default function Header() {
           className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-neutral-800 transition-colors"
         >
           <UserCircleIcon className="h-9 w-9" />
-          <span className="font-semibold text-lg"> Admin </span>
+          <span className="font-semibold text-lg">Super Admin </span>
         </Link>
 
       </div>
