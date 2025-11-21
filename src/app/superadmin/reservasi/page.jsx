@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import AdminLayout from "@/app/superadmin/components/superadmin_layou";
+import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,

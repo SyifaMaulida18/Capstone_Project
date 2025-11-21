@@ -6,11 +6,12 @@ import { usePathname } from "next/navigation";
 export default function TopNav() {
   const navItems = [
     // FIX: Path href disesuaikan ke /admin/...
-    { name: "Beranda", href: "/superadmin/dashboard" }, // Asumsi halaman utama admin
+    { name: "Beranda", href: "/superadmin/dashboard" }, 
+    { name: "Manajemen Admin", href: "/superadmin/admins" },
     { name: "Manajemen User", href: "/superadmin/users" },
-    { name: "Manajemen Poli & Dokter", href: "/superadmin/dokter" }, // Sesuaikan jika path berbeda
+    { name: "Manajemen Poli & Dokter", href: "/superadmin/dokter" }, 
     { name: "Manajemen Reservasi", href: "/superadmin/reservasi" },
-    { name: "Riwayat Reservasi", href: "/superadmin/riwayat" }, // Sesuaikan jika path berbeda
+    { name: "Riwayat Reservasi", href: "/superadmin/riwayat" }, 
   ];
 
   const pathname = usePathname();
@@ -19,9 +20,8 @@ export default function TopNav() {
     // UBAH: Menggunakan border-neutral-200
     <nav className="bg-white border-b border-neutral-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-start h-12 space-x-6 text-sm">
+        <div className="flex items-center justify-start h-12 space-x-6 text-sm overflow-x-auto no-scrollbar">
           {navItems.map((item) => {
-            // Cek rute aktif (lebih sederhana sekarang karena path konsisten)
             const isActive = pathname === item.href;
 
             return (

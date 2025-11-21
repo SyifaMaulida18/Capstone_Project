@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Header from "../components/header"; // Mengimpor header dari folder superadmin
+import Header from "./header"; 
 import { UserCircleIcon } from "@heroicons/react/24/solid";
 
 // --- UBAH: Path navigasi untuk Super Admin ---
 const superAdminNavItems = [
-  { name: "Manajemen Dokter", href: "/superadmin/dokter" },
+  { name: "Manajemen Admin", href: "/superadmin/admins" },
   { name: "Manajemen User", href: "/superadmin/users" },
+  { name: "Manajemen Dokter", href: "/superadmin/dokter" },
   { name: "Manajemen Pasien", href: "/superadmin/pasien" },
   { name: "Manajemen Jadwal", href: "/superadmin/schedule" },
   { name: "Manajemen Rekam Medis", href: "/superadmin/rekam-medis" },

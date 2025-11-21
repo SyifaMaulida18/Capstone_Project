@@ -7,7 +7,7 @@ import {
   PlusIcon,
   TrashIcon, // Impor TrashIcon
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/superadmin/components/superadmin_layou";
+import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 import { Dialog } from "@/app/superadmin/components/ui/dialog";
 import { Input } from "@/app/superadmin/components/ui/input"; // Impor Input untuk form
 

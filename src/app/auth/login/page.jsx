@@ -2,8 +2,8 @@
 
 import { Lock, LogIn, User } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from 'next/navigation'; // 1. Impor useRouter
-import api from '../../../services/api'; // 2. Impor helper API Anda
+import { useRouter } from 'next/navigation'; 
+import api from '../../../services/api'; 
 
 // --- Komponen InputField ---
 const InputField = ({ label, type, placeholder, required, icon: Icon, ...props }) => {
@@ -36,30 +36,41 @@ export default function LoginPage() {
   const [emailOrKTP, setEmailOrKTP] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const router = useRouter(); // 3. Inisialisasi router
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter(); 
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMsg("");
+    setIsLoading(true);
 
     try {
-      // 1️⃣ Coba login admin/superadmin (Axios akan error jika gagal)
-      // Perhatikan: Nama field 'Email' dan 'Password' harus SAMA PERSIS 
-      // dengan yang diharapkan backend admin Anda.
+      // LOGIN ADMIN / SUPERADMIN
       const adminRes = await api.post("/login", {
-        Email: emailOrKTP, // Sesuaikan jika backend admin mengharapkan 'email'
-        Password: password, // Sesuaikan jika backend admin mengharapkan 'password'
+        Email: emailOrKTP, 
+        Password: password, 
       });
 
-      // Jika sukses (tidak error)
-      localStorage.setItem("token", adminRes.data.access_token);
-      localStorage.setItem("userRole", adminRes.data.role);
-      localStorage.setItem("userName", adminRes.data.admin.nama);
-      localStorage.setItem("userID", adminRes.data.admin.id);
-      router.push("/admin/dashboard"); // 4. Gunakan router.push
+      const data = adminRes.data;
+
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("userRole", data.role);
+      
+      if (data.admin) {
+          localStorage.setItem("userName", data.admin.Nama); 
+          localStorage.setItem("userID", data.admin.adminID);
+      }
+
+      if (data.role === 'superadmin') {
+        router.push("/superadmin/dashboard"); 
+      } else {
+        router.push("/admin/dashboard");
+      }
+
       return;
 
     } catch (adminError) {
+      console.error("Gagal Login Admin:", adminError.response?.data || adminError.message);
       // 2️⃣ Kalau login admin gagal, coba login user biasa
       try {
         const userRes = await api.post("/login-user", {
@@ -83,10 +94,13 @@ export default function LoginPage() {
         // Kalau keduanya gagal
         console.error("Login gagal:", userError);
         if (userError.response && userError.response.data) {
-          setErrorMsg(userError.response.data.message || "Email/NIK atau password salah.");
+             setErrorMsg(userError.response.data.message || "Email/NIK atau password salah.");
+        } else if (adminError.response && adminError.response.data) {
+             setErrorMsg(adminError.response.data.message || "Login gagal.");
         } else {
-          setErrorMsg("Terjadi kesalahan server atau koneksi.");
+             setErrorMsg("Terjadi kesalahan server atau koneksi.");
         }
+        setIsLoading(false);
       }
     }
   };

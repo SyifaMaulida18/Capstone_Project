@@ -1,10 +1,11 @@
+"use client";
+
 import TopNav from "../components/top_navbar";
 import Header from "../components/header";
-import Card from "../../admin/components/card"; // Reuse komponen Card dari admin
+import Card from "../../admin/components/card"; 
 
 export default function HomeSuperAdminPage() {
   return (
-    // Styling dijaga tetap konsisten
     <main className="bg-neutral-100 min-h-screen">
       <Header />
       <TopNav />

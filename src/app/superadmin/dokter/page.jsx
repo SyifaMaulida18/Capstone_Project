@@ -9,7 +9,7 @@ import {
   FunnelIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/superadmin/components/superadmin_layou";
+import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 
 // Data dummy (lebih baik dikelola oleh useState jika akan ada delete)
 const initialDoctors = [

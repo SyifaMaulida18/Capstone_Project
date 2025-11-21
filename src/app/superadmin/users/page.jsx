@@ -9,7 +9,7 @@ import {
   FunnelIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import SuperAdminLayout from "../../superadmin/components/superadmin_layou";
+import SuperAdminLayout from "../../superadmin/components/superadmin_layout";
 
 const initialUsers = [
   { id: 1, nama: "Saputra", email: "saputra123@gmail.com", telp: "081254345678" },
