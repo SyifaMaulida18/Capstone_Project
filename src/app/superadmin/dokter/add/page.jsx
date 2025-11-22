@@ -1,10 +1,13 @@
-import SuperAdminLayout from "../../components/superadmin_layou";
-import FormDokterSuperAdmin from "../../components/form/dokter";
+"use client";
+import FormDokter from "../../components/form/dokter"; 
+import SuperAdminLayout from "../../components/superadmin_layout";
 
 export default function AddDokterPage() {
   return (
     <SuperAdminLayout>
-      <FormDokterSuperAdmin initialData={null} />
+      <div className="p-6">
+        <FormDokter />
+      </div>
     </SuperAdminLayout>
   );
 }
