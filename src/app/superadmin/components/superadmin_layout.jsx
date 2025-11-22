@@ -9,6 +9,7 @@ import { UserCircleIcon } from "@heroicons/react/24/solid";
 const superAdminNavItems = [
   { name: "Manajemen Admin", href: "/superadmin/admins" },
   { name: "Manajemen User", href: "/superadmin/users" },
+  { name: "Manajemen Poli", href: "/superadmin/polis" },
   { name: "Manajemen Dokter", href: "/superadmin/dokter" },
   { name: "Manajemen Pasien", href: "/superadmin/pasien" },
   { name: "Manajemen Jadwal", href: "/superadmin/schedule" },

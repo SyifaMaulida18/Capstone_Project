@@ -1,6 +1,6 @@
 "use client"; // Diperlukan untuk useState dan onClick
 
-import { useState } from "react"; // Impor useState
+import { useState, useEffect } from "react"; // Impor useState
 import Link from "next/link"; // Impor Link
 import {
   TrashIcon,
@@ -11,20 +11,63 @@ import {
 } from "@heroicons/react/24/outline";
 import SuperAdminLayout from "../../superadmin/components/superadmin_layout";
 
-const initialUsers = [
-  { id: 1, nama: "Saputra", email: "saputra123@gmail.com", telp: "081254345678" },
-  { id: 2, nama: "Muhammad Ole", email: "oleganz123@gmail.com", telp: "0822123212321" },
-];
-
 export default function UserManagementPage() {
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fungsi untuk simulasi delete
-  const handleDelete = (id) => {
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+        
+        const response = await fetch(`${baseUrl}/users`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setUsers(result.data); 
+        } else {
+          console.error("Gagal mengambil data user");
+        }
+      } catch (error) {
+        console.error("Terjadi kesalahan:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const handleDelete = async (id) => {
     if (window.confirm("Apakah Anda yakin ingin menghapus data user ini?")) {
-      // Logika API delete (simulasi)
-      setUsers(users.filter((u) => u.id !== id));
-      console.log(`Delete user with id: ${id}`);
+      try {
+        const token = localStorage.getItem("token");
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+        const response = await fetch(`${baseUrl}/users/${id}`, {
+          method: "DELETE",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          setUsers(users.filter((u) => u.id !== id));
+          alert("User berhasil dihapus.");
+        } else {
+          alert("Gagal menghapus user.");
+        }
+      } catch (error) {
+        console.error("Error deleting user:", error);
+      }
     }
   };
 
@@ -50,15 +93,6 @@ export default function UserManagementPage() {
               <FunnelIcon className="h-5 w-5 text-neutral-600" />
               <span>Filter</span>
             </button>
-
-            {/* === UBAH DI SINI: Tombol Add menjadi Link === */}
-            <Link
-              href="/superadmin/users/add" // Path ke halaman add user
-              className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add</span>
-            </Link>
           </div>
         </div>
 
@@ -79,26 +113,26 @@ export default function UserManagementPage() {
             <tbody className="bg-white divide-y divide-neutral-100">
               {users.map((user, index) => (
                 <tr
-                  key={user.id}
+                  key={user.userid || index}
                   className={index % 2 === 1 ? "bg-neutral-50" : "bg-white"}
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">
-                    {user.id}
+                    {user.userid}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.nama}
+                    {user.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
                     {user.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.telp}
+                    {user.nomor_telepon}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-3">
                       {/* === UBAH DI SINI: Tambah onClick === */}
                       <button
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => handleDelete(user.userid)}
                         className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
                       >
                         <TrashIcon className="h-5 w-5" />
@@ -106,7 +140,7 @@ export default function UserManagementPage() {
 
                       {/* === UBAH DI SINI: Tombol Edit menjadi Link === */}
                       <Link
-                        href={`/superadmin/users/edit/${user.id}`} // Path ke halaman edit user
+                        href={`/superadmin/users/edit/${user.userid}`} // Path ke halaman edit user
                         className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
                       >
                         <PencilIcon className="h-5 w-5" />

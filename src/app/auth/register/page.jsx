@@ -178,7 +178,7 @@ export default function RegisterPage() {
     try {
       // 3. Kirim permintaan POST ke endpoint /api/register
       //    'api' adalah instance axios kustom Anda
-      const response = await api.post('/api/register', payload);
+      const response = await api.post('/register', payload);
 
       // 4. Handle jika registrasi sukses
       console.log("Registrasi berhasil:", response.data);

@@ -9,7 +9,8 @@ export default function TopNav() {
     { name: "Beranda", href: "/superadmin/dashboard" }, 
     { name: "Manajemen Admin", href: "/superadmin/admins" },
     { name: "Manajemen User", href: "/superadmin/users" },
-    { name: "Manajemen Poli & Dokter", href: "/superadmin/dokter" }, 
+    { name: "Manajemen Poli", href: "/superadmin/polis" }, 
+    { name: "Manajemen Dokter", href: "/superadmin/dokter" }, 
     { name: "Manajemen Reservasi", href: "/superadmin/reservasi" },
     { name: "Riwayat Reservasi", href: "/superadmin/riwayat" }, 
   ];
