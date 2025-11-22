@@ -11,11 +11,11 @@ const superAdminNavItems = [
   { name: "Manajemen User", href: "/superadmin/users" },
   { name: "Manajemen Poli", href: "/superadmin/polis" },
   { name: "Manajemen Dokter", href: "/superadmin/dokter" },
+  { name: "Manajemen Jadwal Dokter", href: "/superadmin/schedule" },
   { name: "Manajemen Pasien", href: "/superadmin/pasien" },
-  { name: "Manajemen Jadwal", href: "/superadmin/schedule" },
-  { name: "Manajemen Rekam Medis", href: "/superadmin/rekam-medis" },
-  { name: "Manajemen Antrian", href: "/superadmin/antrian" },
   { name: "Manajemen Reservasi", href: "/superadmin/reservasi" },
+  { name: "Manajemen Antrian", href: "/superadmin/antrian" },
+  { name: "Manajemen Rekam Medis", href: "/superadmin/rekam-medis" },
 ];
 
 // --- UBAH: Nama komponen Sidebar ---
