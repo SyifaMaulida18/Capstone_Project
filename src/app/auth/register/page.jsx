@@ -6,14 +6,13 @@ import {
   Mail,
   Smartphone,
   Lock,
-  Loader2, // <-- Import ikon loading
+  Loader2,
 } from "lucide-react";
 import React, { useState } from "react";
-// 1. GANTI import axios biasa dengan instance 'api' kustom Anda
-import api from "../../../services/api"; // <-- SESUAIKAN PATH INI
+import Image from "next/image"; // 1. Import Image dari Next.js
+import api from "../../../services/api"; 
 
 // --- Komponen InputField ---
-// (Termasuk prop 'hasError' untuk styling border merah)
 const InputField = ({
   label,
   type,
@@ -23,10 +22,9 @@ const InputField = ({
   value,
   onChange,
   options,
-  hasError, // <-- Prop untuk styling error
+  hasError,
   ...props
 }) => {
-  // Tentukan kelas CSS berdasarkan ada tidaknya error
   const errorClasses = "border-red-500 focus:ring-red-500 focus:border-red-500";
   const normalClasses =
     "border-neutral-200 focus:ring-primary-500 focus:border-primary-500";
@@ -34,7 +32,7 @@ const InputField = ({
   const inputClassName = `block w-full rounded-lg border py-2 ${
     Icon ? "pl-10" : "pl-3"
   } pr-3 text-neutral-900 placeholder-neutral-600 sm:text-sm transition duration-150 ${
-    hasError ? errorClasses : normalClasses // <-- Terapkan style error
+    hasError ? errorClasses : normalClasses
   }`;
 
   return (
@@ -88,10 +86,8 @@ const InputField = ({
     </div>
   );
 };
-// -----------------------------------------------------------------------------------
 
-// --- Komponen Modal Permintaan Lengkapi Data ---
-// (Kode ini diambil dari file Anda, tidak ada perubahan)
+// --- Komponen Modal (Tidak Berubah) ---
 const CompleteProfileModal = ({ isVisible, onClose, onConfirm }) => {
   if (!isVisible) return null;
 
@@ -113,7 +109,7 @@ const CompleteProfileModal = ({ isVisible, onClose, onConfirm }) => {
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-neutral-200 rounded-full text-neutral-700 hover:bg-neutral-100 transition"
           >
-            Nanti Saja (Lihat Jadwal)
+            Nanti Saja
           </button>
           <button
             onClick={onConfirm}
@@ -126,7 +122,6 @@ const CompleteProfileModal = ({ isVisible, onClose, onConfirm }) => {
     </div>
   );
 };
-// ---------------------------------------------------
 
 // --- Komponen Halaman Register ---
 export default function RegisterPage() {
@@ -139,62 +134,49 @@ export default function RegisterPage() {
   });
   const [showModal, setShowModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState({}); // State untuk menyimpan error validasi
+  const [errors, setErrors] = useState({});
 
-  // Fungsi untuk menangani perubahan input
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
 
-    // Hapus error untuk field ini jika user mulai mengetik lagi
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
   };
 
-  // Fungsi untuk menangani submit form registrasi
   const handleRegister = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setErrors({}); // Bersihkan error sebelumnya
+    setErrors({});
 
-    // 1. Validasi konfirmasi password di frontend
     if (formData.password !== formData.confirmPassword) {
       setErrors({ confirmPassword: ["Konfirmasi Kata Sandi tidak cocok."] });
       setIsLoading(false);
       return;
     }
 
-    // 2. Siapkan payload untuk dikirim ke API Laravel
-    //    (Mapping keys frontend ke keys backend)
     const payload = {
       name: formData.namaLengkap,
       email: formData.email,
       nomor_telepon: formData.noTelepon,
       password: formData.password,
-      password_confirmation: formData.confirmPassword, // Wajib untuk aturan 'confirmed'
+      password_confirmation: formData.confirmPassword,
     };
 
     try {
-      // 3. Kirim permintaan POST ke endpoint /api/register
-      //    'api' adalah instance axios kustom Anda
       const response = await api.post('/api/register', payload);
-
-      // 4. Handle jika registrasi sukses
       console.log("Registrasi berhasil:", response.data);
       setIsLoading(false);
-      setShowModal(true); // Tampilkan modal untuk melengkapi profil
+      setShowModal(true); 
 
     } catch (error) {
       setIsLoading(false);
       
-      // 5. Handle jika terjadi error validasi (status 422)
       if (error.response && error.response.status === 422) {
         const validationErrors = error.response.data.errors;
         console.error("Error Validasi:", validationErrors);
 
-        // Map balik keys error dari backend (e.g., 'nomor_telepon')
-        // ke keys state frontend (e.g., 'noTelepon')
         const frontendErrors = {};
         for (const key in validationErrors) {
           const frontendKey = {
@@ -208,13 +190,12 @@ export default function RegisterPage() {
           if (frontendKey) {
             frontendErrors[frontendKey] = validationErrors[key];
           } else {
-            frontendErrors[key] = validationErrors[key]; // Fallback
+            frontendErrors[key] = validationErrors[key];
           }
         }
         setErrors(frontendErrors);
 
       } else {
-        // 6. Handle error server lainnya (500, 404, dll)
         console.error("Error Server:", error.message);
         setErrors({
           general: ["Terjadi kesalahan pada server. Silakan coba lagi nanti."],
@@ -223,36 +204,36 @@ export default function RegisterPage() {
     }
   };
 
-  // Fungsi untuk tombol "Lengkapi Sekarang" pada modal
   const handleCompleteProfile = () => {
-    // Arahkan user ke halaman profil
-    // Ganti '/profile' jika path Anda berbeda
     window.location.href = "/user/profile";
   };
 
-  // Fungsi untuk tombol "Nanti Saja" pada modal
   const handleCloseModal = () => {
     setShowModal(false);
-    // Arahkan user ke halaman lain (misal: dashboard atau jadwal)
-    // Ganti '/jadwal-dokter' jika path Anda berbeda
     window.location.href = "/jadwal-dokter";
   };
 
-  // Komponen helper untuk menampilkan pesan error di bawah input
   const ErrorMessage = ({ field }) => {
     return errors[field] ? (
       <p className="text-xs text-red-600 mt-1">{errors[field][0]}</p>
     ) : null;
   };
 
-  // Render JSX
   return (
     <>
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4">
         <div className="bg-white shadow-2xl border-t-8 border-primary-600 rounded-2xl p-8 md:p-12 w-full max-w-lg transform transition-all duration-500 hover:shadow-3xl">
           
+          {/* --- BAGIAN LOGO (Diperbarui) --- */}
           <div className="flex justify-center mb-6">
-            <UserPlus className="w-10 h-10 text-primary-600" />
+             <Image 
+                src="/images/logo.svg" 
+                alt="Logo Aplikasi"
+                width={120}     
+                height={120}    
+                priority        
+                className="object-contain h-24 w-auto" 
+              />
           </div>
 
           <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">
@@ -263,14 +244,12 @@ export default function RegisterPage() {
           </p>
 
           <form onSubmit={handleRegister} className="space-y-6">
-            {/* Menampilkan error general (misal: server down) */}
             {errors.general && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
                 {errors.general[0]}
               </div>
             )}
 
-            {/* --- Input Field Nama Lengkap --- */}
             <div>
               <InputField
                 label="Nama Lengkap"
@@ -281,12 +260,11 @@ export default function RegisterPage() {
                 icon={User}
                 value={formData.namaLengkap}
                 onChange={handleChange}
-                hasError={!!errors.namaLengkap} // Kirim status error ke komponen
+                hasError={!!errors.namaLengkap}
               />
-              <ErrorMessage field="namaLengkap" /> {/* Tampilkan error jika ada */}
+              <ErrorMessage field="namaLengkap" />
             </div>
 
-            {/* --- Input Field Email --- */}
             <div>
               <InputField
                 label="Email"
@@ -302,7 +280,6 @@ export default function RegisterPage() {
               <ErrorMessage field="email" />
             </div>
 
-            {/* --- Input Field Nomor Telepon --- */}
             <div>
               <InputField
                 label="Nomor Telepon (WA)"
@@ -318,13 +295,12 @@ export default function RegisterPage() {
               <ErrorMessage field="noTelepon" />
             </div>
 
-            {/* --- Input Field Kata Sandi --- */}
             <div>
               <InputField
                 label="Kata Sandi"
                 type="password"
                 name="password"
-                placeholder="Min. 6 Karakter" // Disesuaikan dengan validasi backend (min:6)
+                placeholder="Min. 6 Karakter"
                 required
                 icon={Lock}
                 value={formData.password}
@@ -334,7 +310,6 @@ export default function RegisterPage() {
               <ErrorMessage field="password" />
             </div>
 
-            {/* --- Input Field Konfirmasi Kata Sandi --- */}
             <div>
               <InputField
                 label="Konfirmasi Kata Sandi"
@@ -350,14 +325,13 @@ export default function RegisterPage() {
               <ErrorMessage field="confirmPassword" />
             </div>
 
-            {/* --- Tombol Submit --- */}
             <button
               type="submit"
-              disabled={isLoading} // Nonaktifkan tombol saat loading
+              disabled={isLoading}
               className="w-full bg-secondary-500 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-secondary-600 transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center space-x-2 mt-8 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" /> // Ikon loading
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <UserPlus className="w-5 h-5" />
               )}
@@ -365,7 +339,6 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          {/* --- Link ke Halaman Login --- */}
           <p className="text-center text-sm mt-6 text-neutral-600">
             Sudah punya akun?{" "}
             <a
@@ -378,7 +351,6 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* --- Modal --- */}
       <CompleteProfileModal
         isVisible={showModal}
         onClose={handleCloseModal}

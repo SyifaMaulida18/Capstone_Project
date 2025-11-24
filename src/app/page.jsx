@@ -1,274 +1,237 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { 
+  Phone, 
+  Clock, 
+  Activity, 
+  Shield, 
+  User, 
+  MessageCircle, 
+  Award, 
+  CheckCircle, 
+  ArrowRight 
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-// Impor komponen-komponen yang sudah dipisah menggunakan path relatif
-import DoctorScheduleSection from "../components/guest/DoctorSchedule";
-import CallToAction from "../components/guest/CallToAction";
+// Impor komponen (Pastikan path ini sesuai dengan struktur project Anda)
+import DoctorScheduleSection from "../components/guest/DoctorSchedule"; 
 import Footer from "../components/guest/Footer";
 import { Navbar, TopBar } from "../components/guest/Header";
 
 export default function Home() {
-  const placeholderImage = "https://placehold.co/80x80/6366f1/ffffff?text=U";
-
-  const testimonials = [
-    {
-      id: 1,
-      name: "Jaka, 35 Tahun",
-      text: "Sekarang reservasi ke dokter jadi lebih mudah. Tidak perlu antre lama di rumah sakit. Sangat membantu!",
-      img: placeholderImage,
-    },
-    {
-      id: 2,
-      name: "Sinta, 28 Tahun",
-      text: "Sistemnya cepat dan notifikasinya real-time. Cocok untuk orang sibuk seperti saya.",
-      img: placeholderImage,
-    },
-    {
-      id: 3,
-      name: "Rizal, 41 Tahun",
-      text: "Rekomendasi poli berdasarkan gejala sangat akurat. Saya bisa langsung diarahkan ke dokter yang tepat.",
-      img: placeholderImage,
-    },
-  ];
-
-  const [index, setIndex] = useState(0);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  // State untuk melacak section yang aktif
   const [activeSection, setActiveSection] = useState("beranda");
   const observer = useRef(null);
 
+  // --- Data Sesuai Gambar ---
+  const features = [
+    {
+      title: "Reservasi 24/7",
+      desc: "Akses reservasi kapan saja dan di mana saja. Sistem online tersedia 24 jam.",
+      icon: <Clock className="w-8 h-8 text-[#8CC63F]" />,
+    },
+    {
+      title: "AI Diagnosis",
+      desc: "Teknologi AI membantu merekomendasikan poli yang tepat berdasarkan gejala Anda.",
+      icon: <Activity className="w-8 h-8 text-[#8CC63F]" />,
+    },
+    {
+      title: "Integrasi Asuransi",
+      desc: "Mendukung berbagai jenis asuransi kesehatan termasuk BPJS.",
+      icon: <Shield className="w-8 h-8 text-[#8CC63F]" />,
+    },
+    {
+      title: "Dokter Berpengalaman",
+      desc: "Tim medis profesional siap memberikan pelayanan kesehatan terbaik.",
+      icon: <User className="w-8 h-8 text-[#8CC63F]" />,
+    },
+    {
+      title: "Chat Real-time",
+      desc: "Berkomunikasi langsung dengan admin untuk konsultasi dan informasi.",
+      icon: <MessageCircle className="w-8 h-8 text-[#8CC63F]" />,
+    },
+    {
+      title: "Akreditasi Lengkap",
+      desc: "Rumah sakit terakreditasi dengan standar pelayanan tinggi dan terpercaya.",
+      icon: <Award className="w-8 h-8 text-[#8CC63F]" />,
+    },
+  ];
+
   useEffect(() => {
-    // Logika untuk testimonial dan login
-    const interval = setInterval(
-      () => setIndex((prev) => (prev + 1) % testimonials.length),
-      5000
-    );
-    if (
-      typeof window !== "undefined" &&
-      localStorage.getItem("isLoggedIn") === "true"
-    ) {
-      setIsLoggedIn(true);
-    }
-
-    // --- Logika Intersection Observer untuk Scroll Spy ---
-    const options = {
-      root: null, // viewport
-      rootMargin: "-40% 0px -60% 0px", // trigger di tengah layar
-      threshold: 0,
-    };
-
+    const options = { root: null, rootMargin: "-40% 0px -60% 0px", threshold: 0 };
     observer.current = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          setActiveSection(entry.target.id);
-        }
+        if (entry.isIntersecting) setActiveSection(entry.target.id);
       });
     }, options);
 
-    // Mengamati semua section yang memiliki id
     const sections = document.querySelectorAll("section[id]");
-    sections.forEach((section) => {
-      if (observer.current) {
-        observer.current.observe(section);
-      }
-    });
+    sections.forEach((section) => observer.current?.observe(section));
 
-    // Cleanup function
-    return () => {
-      clearInterval(interval);
-      sections.forEach((section) => {
-        if (observer.current) {
-          observer.current.unobserve(section);
-        }
-      });
-    };
-  }, [testimonials.length]);
-
-  const next = () => setIndex((prev) => (prev + 1) % testimonials.length);
-  const prev = () =>
-    setIndex((prev) => (prev === 0 ? testimonials.length - 1 : prev - 1));
+    return () => sections.forEach((section) => observer.current?.unobserve(section));
+  }, []);
 
   return (
-    // UBAH: Menggunakan 'neutral-700' untuk teks utama
-    <main className="bg-white min-h-screen flex flex-col text-neutral-700 font-sans">
+    <main className="bg-slate-50 min-h-screen flex flex-col font-sans text-slate-800">
+      {/* Header Components */}
       <TopBar />
       <Navbar activeSection={activeSection} />
 
-      {/* Hero Section */}
-      {/* UBAH: Menggunakan gradasi dari 'primary-50' dan 'primary-100' */}
-      <section
-        id="beranda"
-        className="relative overflow-hidden flex items-center justify-center text-center p-6 py-20 lg:py-32 bg-gradient-to-br from-primary-50 to-primary-100 scroll-mt-28"
-      >
-        <div className="relative z-10 max-w-4xl mx-auto">
-          {/* UBAH: Menggunakan 'neutral-900' untuk heading */}
-          <h2 className="text-4xl md:text-6xl font-extrabold mb-4 text-neutral-900 leading-tight">
-            Reservasi Dokter, <br /> Praktis dan Tanpa Antre
-          </h2>
-          {/* UBAH: Menggunakan 'neutral-600' untuk teks sekunder */}
-          <p className="text-neutral-600 text-lg md:text-xl mb-8 max-w-2xl mx-auto">
-            Atur jadwal kedatangan, pilih poli, dan dapatkan dokter sesuai
-            kebutuhan Anda dengan mudah, kapan saja, di mana saja.
-          </p>
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-            <a
-              href={isLoggedIn ? "/auth/reservasi" : "/auth/login"}
-              // UBAH: Menggunakan 'secondary' untuk tombol hijau
-              className="px-8 py-4 bg-secondary-500 text-white font-semibold rounded-full shadow-lg hover:bg-secondary-600 transition-all duration-300 transform hover:scale-105"
-            >
-              {isLoggedIn ? "Mulai Reservasi Sekarang" : "Login untuk Reservasi"}
-            </a>
-            <div className="flex gap-3 mt-4 sm:mt-0">
-              <img
-                src="https://placehold.co/150x45/4f46e5/ffffff?text=AppStore"
-                alt="App Store"
-                className="h-12 w-auto object-contain"
-              />
-              <img
-                src="https://placehold.co/150x45/4f46e5/ffffff?text=PlayStore"
-                alt="Play Store"
-                className="h-12 w-auto object-contain"
-              />
-            </div>
-          </div>
-        </div>
-        <div className="absolute inset-0 z-0">
-          {/* UBAH: Menggunakan 'primary-200' agar konsisten */}
-          <div className="bg-primary-200 opacity-30 w-full h-full animate-pulse-fast"></div>
-        </div>
-      </section>
-
-      {/* Memanggil Komponen Jadwal Dokter */}
-      <DoctorScheduleSection />
-
-      {/* Fitur Unggulan */}
-      <section
-        id="fitur-unggulan"
-        className="grid md:grid-cols-3 gap-8 px-6 py-16 max-w-6xl mx-auto relative z-20 scroll-mt-28"
-      >
-        {[
-          {
-            title: "Reservasi Online 24/7",
-            desc: "Lakukan reservasi kapanpun dan dimanapun tanpa batas waktu. Akses mudah dari smartphone atau desktop.",
-            icon: "⏰",
-          },
-          {
-            title: "Rekomendasi Poli Cerdas",
-            desc: "Sistem cerdas kami membantu memberikan rekomendasi poli yang paling sesuai dengan gejala Anda.",
-            icon: "🧠",
-          },
-          {
-            title: "Notifikasi Jadwal Real-Time",
-            desc: "Dapatkan pengingat jadwal dokter dan informasi penting agar tidak ada janji yang terlewatkan.",
-            icon: "🔔",
-          },
-        ].map((item, idx) => (
-          <div
-            key={idx}
-            // UBAH: Menggunakan 'border-primary-500'
-            className="bg-white p-8 rounded-2xl shadow-xl border-t-4 border-primary-500 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2"
-          >
-            <div className="text-4xl mb-4 text-center">{item.icon}</div>
-            {/* UBAH: Menggunakan 'text-primary-800' */}
-            <h3 className="font-bold text-xl mb-2 text-primary-800 text-center">
-              {item.title}
-            </h3>
-            {/* UBAH: Menggunakan 'neutral-600' */}
-            <p className="text-neutral-600 text-center">{item.desc}</p>
-          </div>
-        ))}
-      </section>
-
-      {/* Manfaat */}
-      {/* UBAH: Menggunakan 'bg-neutral-50' */}
-      <section id="manfaat" className="px-6 py-20 bg-neutral-50 scroll-mt-28">
-        <div className="max-w-6xl mx-auto">
-          {/* UBAH: Menggunakan 'text-neutral-900' */}
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-neutral-900">
-            Manfaat Utama Sistem Reservasi Kami
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              "Akses di Mana Saja",
-              "Pendaftaran Mudah & Cepat",
-              "Rekomendasi Poli Otomatis",
-              "Notifikasi Real-Time",
-              "Riwayat Pasien Tersimpan",
-              "Sistem Terintegrasi",
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                // UBAH: Menggunakan 'hover:bg-primary-50'
-                className="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4 hover:bg-primary-50 transition-colors duration-300"
-              >
-                {/* UBAH: Menggunakan 'bg-primary-500' */}
-                <div className="bg-primary-500 text-white rounded-full p-2">
-                  <Star className="w-5 h-5" />
-                </div>
-                {/* UBAH: Menggunakan 'text-neutral-800' */}
-                <h3 className="font-semibold text-lg text-neutral-800">
-                  {item}
-                </h3>
+      {/* --- 1. HERO SECTION (Warna Biru IHC) --- */}
+      <section id="beranda" className="relative bg-[#003B73] text-white pt-24 pb-32 lg:pt-32 lg:pb-48 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+          
+          {/* Teks Kiri */}
+          <div className="relative z-10">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4">
+              Reservasi <br/> Online
+            </h1>
+            <p className="text-blue-100 text-lg mb-8 max-w-md">
+              Bagi pasien Pribadi, Asuransi, dan Perusahaan. Akses layanan kesehatan prioritas kini dalam genggaman.
+            </p>
+            
+            {/* Widget Call Center (Sesuai Gambar) */}
+            <div className="bg-white text-[#003B73] p-4 rounded-2xl shadow-lg inline-flex items-center gap-4 max-w-md w-full">
+              <div className="bg-[#8CC63F] p-3 rounded-full">
+                <Phone className="w-6 h-6 text-white" />
               </div>
-            ))}
+              <div>
+                <p className="text-xs text-slate-500 font-bold tracking-widest uppercase">Call Center</p>
+                <p className="text-2xl font-extrabold">150-442</p>
+                <p className="text-[10px] text-slate-400">Senin - Minggu, 24 Jam</p>
+              </div>
+            </div>
           </div>
+
+          {/* Gambar Kanan (Hero Section) - MENGGUNAKAN gambar1.svg */}
+          <div className="relative z-10 hidden md:block">
+            <div className="relative rounded-3xl overflow-hidden border-4 border-white/20 shadow-2xl">
+               <img 
+                 src="/images/gambar1.svg" 
+                 alt="Ilustrasi Rumah Sakit" 
+                 className="w-full h-80 object-cover bg-white"
+               />
+               <div className="absolute inset-0 bg-[#003B73]/10"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Background decoration */}
+        <div className="absolute top-0 right-0 w-2/3 h-full bg-white/5 skew-x-12 pointer-events-none"></div>
+      </section>
+
+      {/* --- 2. FLOATING SEARCH SCHEDULE (Menumpuk Hero) --- */}
+      <div className="max-w-6xl mx-auto px-4 relative z-20 -mt-20 lg:-mt-32 mb-16">
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+           {/* Header Form */}
+           <div className="bg-white px-8 py-6 border-b border-slate-100">
+              <h2 className="text-2xl font-bold text-[#003B73]">Cari Jadwal Dokter</h2>
+              <p className="text-slate-500 text-sm mt-1">Temukan jadwal dokter, booking, dan atur janji dengan dokter ahli.</p>
+           </div>
+           
+           {/* Komponen Form Jadwal (Diimpor) */}
+           <div className="p-2 md:p-6">
+              {/* Pastikan DoctorScheduleSection responsif di dalamnya */}
+              <DoctorScheduleSection /> 
+           </div>
+        </div>
+      </div>
+
+      {/* --- 3. BANNER BIRU "PRIORITAS KAMI" --- */}
+      <section className="bg-[#003B73] py-12 px-6 text-center mb-20">
+         <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+              Karena Kebutuhan Anda Prioritas Kami
+            </h2>
+            <p className="text-blue-200 text-sm">Melayani dengan sepenuh hati untuk kesehatan Anda.</p>
+         </div>
+      </section>
+
+      {/* --- 4. MENGAPA MEMILIH KAMI (List Card) --- */}
+      <section id="tentang" className="max-w-7xl mx-auto px-6 pb-24 scroll-mt-28">
+        <div className="text-center mb-12">
+           <h2 className="text-3xl font-bold text-[#003B73] mb-4">Mengapa Memilih RSPB?</h2>
+           <div className="w-20 h-1.5 bg-[#8CC63F] mx-auto rounded-full"></div>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {features.map((item, idx) => (
+            <div 
+              key={idx} 
+              className="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md border border-slate-100 flex items-start gap-4 transition-all duration-300"
+            >
+              <div className="bg-slate-50 p-3 rounded-xl shrink-0">
+                {item.icon}
+              </div>
+              <div>
+                <h3 className="font-bold text-[#003B73] text-lg mb-2">{item.title}</h3>
+                <p className="text-slate-600 text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Testimoni */}
-      <section
-        id="testimoni"
-        className="bg-white py-20 text-center relative overflow-hidden scroll-mt-28"
-      >
-        <div className="relative z-10 max-w-3xl mx-auto">
-          {/* UBAH: Menggunakan 'text-neutral-900' */}
-          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-neutral-900">
-            Apa Kata Mereka?
-          </h2>
-          <div className="relative flex justify-center items-center gap-4">
-            <button
-              onClick={prev}
-              // UBAH: Menggunakan 'primary-500' dan 'primary-600'
-              className="absolute left-0 top-1/2 -translate-y-1/2 bg-primary-500 text-white shadow-lg p-3 rounded-full hover:bg-primary-600 transition-all duration-300 z-20 hidden sm:block"
-            >
-              <ChevronLeft className="w-7 h-7" />
-            </button>
-
-            <div className="bg-white rounded-3xl shadow-xl p-8 lg:p-12 w-full mx-8 md:w-[600px] transform transition-all duration-500 ease-in-out">
-              <img
-                src={testimonials[index].img || placeholderImage}
-                alt={testimonials[index].name}
-                // UBAH: Menggunakan 'border-primary-200'
-                className="w-20 h-20 mx-auto rounded-full object-cover mb-6 border-4 border-primary-200"
-              />
-              {/* UBAH: Menggunakan 'text-neutral-700' */}
-              <p className="text-neutral-700 italic text-lg mb-4 leading-relaxed">
-                “{testimonials[index].text}”
-              </p>
-              {/* UBAH: Menggunakan 'text-primary-800' */}
-              <p className="font-bold text-primary-800 text-lg">
-                {testimonials[index].name}
-              </p>
+      {/* --- 5. FASILITAS MODERN (Split Layout) --- */}
+      <section id="fasilitas" className="bg-white py-20 scroll-mt-28">
+         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+            {/* Gambar Fasilitas - JUGA MENGGUNAKAN gambar1.svg */}
+            <div className="order-2 lg:order-1">
+               <div className="rounded-3xl overflow-hidden shadow-2xl">
+                  <img 
+                    src="/images/gambar1.svg" 
+                    alt="Ilustrasi Fasilitas RS" 
+                    className="w-full h-full object-cover bg-white"
+                  />
+               </div>
             </div>
 
-            <button
-              onClick={next}
-              // UBAH: Menggunakan 'primary-500' dan 'primary-600'
-              className="absolute right-0 top-1/2 -translate-y-1/2 bg-primary-500 text-white shadow-lg p-3 rounded-full hover:bg-primary-600 transition-all duration-300 z-20 hidden sm:block"
-            >
-              <ChevronRight className="w-7 h-7" />
-            </button>
-          </div>
-        </div>
+            {/* Teks & Checklist */}
+            <div className="order-1 lg:order-2">
+               <h2 className="text-3xl font-bold text-[#003B73] mb-4">Fasilitas Modern & Nyaman</h2>
+               <p className="text-slate-600 mb-8 leading-relaxed">
+                 RS kami dilengkapi dengan fasilitas medis terkini dan ruang tunggu yang nyaman untuk menunjang kesembuhan pasien dan kenyamanan keluarga.
+               </p>
+               
+               <ul className="space-y-4 mb-8">
+                  {[
+                    "Ruang perawatan dengan peralatan medis terkini",
+                    "Laboratorium dan radiologi yang lengkap",
+                    "Ruang tunggu yang nyaman dan ber-AC",
+                    "Parkir luas dan mudah diakses"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-3 text-slate-700 font-medium">
+                       <CheckCircle className="w-5 h-5 text-[#8CC63F] shrink-0" />
+                       {item}
+                    </li>
+                  ))}
+               </ul>
+
+               <a href="/auth/reservasi" className="inline-flex items-center gap-2 bg-[#8CC63F] hover:bg-[#7ab332] text-white font-bold py-4 px-8 rounded-xl transition-colors shadow-lg shadow-lime-200/50">
+                  Buat Reservasi Sekarang <ArrowRight className="w-5 h-5" />
+               </a>
+            </div>
+         </div>
       </section>
 
-      {/* Memanggil Komponen CallToAction */}
-      <CallToAction />
+      {/* --- 6. CTA HIJAU (Siap Untuk Memulai?) --- */}
+      <section className="px-6 py-12">
+         <div className="max-w-5xl mx-auto bg-[#8CC63F] rounded-3xl p-8 md:p-12 text-center shadow-xl relative overflow-hidden">
+            <div className="relative z-10">
+              <h2 className="text-3xl font-bold text-white mb-2">Siap Untuk Memulai?</h2>
+              <p className="text-white/90 mb-8">Daftar sekarang dan nikmati kemudahan reservasi online 24/7.</p>
+              
+              <a href="/auth/register" className="inline-block bg-white text-[#8CC63F] font-bold py-4 px-12 rounded-xl hover:bg-slate-50 transition-transform hover:scale-105 shadow-md">
+                 Daftar Sekarang
+              </a>
+            </div>
+            
+            {/* Decoration */}
+            <div className="absolute -top-24 -left-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+         </div>
+      </section>
 
-      {/* Memanggil Komponen Footer */}
+      {/* --- 7. FOOTER --- */}
       <Footer />
     </main>
   );

@@ -1,107 +1,80 @@
-import React from 'react';
-import { User, LogOut, LayoutDashboard, History, Bell, Settings, Send, X } from "lucide-react";
+"use client";
 
-// --- 1. Komponen NavItem (Item tunggal di Sidebar) ---
+import React from 'react';
+import { LogOut, LayoutDashboard, History, Bell, Settings, X } from "lucide-react"; // Ikon Send dihapus
+
+// --- Komponen NavItem (Tidak Berubah) ---
 const NavItem = ({ icon: Icon, label, tab, activeTab, setActiveTab, isComplete, href = '#', setIsSidebarOpen }) => {
     
-    // Logika untuk menangani klik navigasi
     const handleClick = (e) => {
         e.preventDefault();
         
-        // Cek kelengkapan data sebelum Reservasi
         if (tab === 'reservasi' && !isComplete) {
-            console.log("Aksi dicekal: Profil belum lengkap.");
-            // Mengganti alert() dengan console.log atau modal kustom (jika ada)
-           // alert() sering diblokir atau tidak berfungsi di lingkungan tertentu.
-            console.warn(`⚠️ Mohon lengkapi data profil (KTP, KK, dll.) terlebih dahulu sebelum melanjutkan ke ${label}.`); 
-            
-           // Jika ini halaman profile, arahkan ke tab summary
-           if (setActiveTab) {
-              setActiveTab('summary'); // Arahkan ke halaman profile summary/edit
-           } else {
-             // Jika ini bukan halaman profile, navigasi ke halaman profile
-             if (typeof window !== 'undefined') {
-                window.location.href = '/user/profile'; // Asumsi halaman profile ada di sini
-             }
-           }
+            console.warn(`⚠️ Mohon lengkapi data profil terlebih dahulu.`); 
+            if (setActiveTab) setActiveTab('summary');
             return;
         }
 
-        // Jika mengarah ke Pengaturan Profil (di dalam halaman profile)
         if (tab === 'summary' && setActiveTab) {
             setActiveTab('summary');
         } 
         
-        // Tutup sidebar di mode mobile setelah memilih menu
         if (setIsSidebarOpen) {
             setIsSidebarOpen(false); 
         }
 
-        // Navigasi ke halaman lain
         if (typeof window !== 'undefined' && href !== '#') {
-           // Jangan navigasi jika kita sudah di halaman itu (kecuali href adalah link eksternal)
            if (window.location.pathname !== href) {
               window.location.href = href;
            }
         }
     };
 
-    // Tentukan apakah item ini adalah tab aktif (termasuk saat mode 'complete' untuk edit)
     const isActive = activeTab === tab || (activeTab === 'complete' && tab === 'summary');
 
     return (
         <a
             href={href}
             onClick={handleClick}
-            className={`flex items-center space-x-3 p-3 rounded-lg transition duration-150 cursor-pointer text-left w-full
+            className={`flex items-center space-x-3 p-3 rounded-xl transition-all duration-200 cursor-pointer text-left w-full mb-1
                 ${isActive 
-                    ? 'bg-primary-600 font-bold shadow-md text-white' /* Status Aktif */
-                    : 'text-neutral-200 hover:bg-primary-800'} /* Status Default & Hover */
-                ${tab === 'reservasi' && !isComplete ? 'opacity-70 cursor-not-allowed' : ''}
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200' 
+                    : 'text-neutral-600 hover:bg-blue-50 hover:text-blue-700'} 
+                ${tab === 'reservasi' && !isComplete ? 'opacity-50 cursor-not-allowed grayscale' : ''}
             `}
         >
-            <Icon className="w-5 h-5" />
-            <span className="font-medium">{label}</span>
+            <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-neutral-400 group-hover:text-blue-600'}`} />
+            <span className="font-semibold text-sm">{label}</span>
         </a>
     );
 };
 
-// --- 2. Komponen Sidebar Utama ---
+// --- Komponen Sidebar Utama ---
 export default function Sidebar({ activeTab, setActiveTab, profileData, isComplete, isSidebarOpen, setIsSidebarOpen }) {
     
     const profileInitial = profileData?.namaLengkap ? profileData.namaLengkap[0] : (profileData?.name ? profileData.name[0] : 'U');
     const profileName = profileData?.namaLengkap || profileData?.name || "Pengguna";
     const profileEmail = profileData?.email || "email@contoh.com";
     
-    // --- PERUBAHAN LINK (href) ---
     const menuItems = [
-        { name: 'Dashboard Utama', icon: LayoutDashboard, tab: 'dashboard', href: "/user/dashboard" },
-        { name: 'Notifikasi', icon: Bell, tab: 'notifications', href: "/user/notifikasi" }, // Diubah
-        { name: 'Riwayat Kunjungan', icon: History, tab: 'history', href: "/user/riwayat" }, // Diubah
-        { name: 'Pengaturan Profil', icon: Settings, tab: 'summary', href: "/user/profile" }, // Diubah
+        { name: 'Dashboard', icon: LayoutDashboard, tab: 'dashboard', href: "/user/dashboard" },
+        { name: 'Notifikasi', icon: Bell, tab: 'notifications', href: "/user/notifikasi" },
+        { name: 'Riwayat', icon: History, tab: 'history', href: "/user/riwayat" },
+        { name: 'Profil Saya', icon: Settings, tab: 'summary', href: "/user/profile" },
     ];
-    // ----------------------------
 
-    // CSS untuk menyembunyikan scrollbar
-    const scrollbarHideStyle = {
-        scrollbarWidth: 'none', /* Firefox */
-        WebkitOverflowScrolling: 'touch',
-    };
-    
     const scrollbarHidePseudo = `
-        .sidebar-nav::-webkit-scrollbar {
-            display: none; /* Chrome, Safari, Opera */
-        }
+        .sidebar-nav::-webkit-scrollbar { display: none; }
     `;
 
     return (
         <>
             <style jsx>{scrollbarHidePseudo}</style>
 
-            {/* Overlay untuk mobile saat sidebar terbuka */}
+            {/* Overlay Mobile */}
             {isSidebarOpen && (
                 <div 
-                    className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+                    className="fixed inset-0 bg-neutral-800/50 backdrop-blur-sm z-40 md:hidden"
                     onClick={() => setIsSidebarOpen(false)}
                 ></div>
             )}
@@ -111,33 +84,31 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
                 fixed inset-y-0 left-0 z-50 transform 
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
                 md:relative md:translate-x-0 transition-transform duration-300 ease-in-out
-                w-64 bg-neutral-900 text-white flex flex-col p-4 md:p-6 rounded-t-xl md:rounded-l-xl md:rounded-tr-none shadow-2xl h-full md:min-h-full
+                w-72 bg-white border-r border-neutral-100 flex flex-col p-6 h-full md:h-auto
             `}>
                 
-                {/* Tombol Tutup Sidebar (Mobile) */}
+                {/* Tombol Tutup (Mobile) */}
                 <button 
                     onClick={() => setIsSidebarOpen(false)}
-                    className="absolute top-4 right-4 text-white md:hidden"
+                    className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-800 md:hidden"
                 >
                     <X className="w-6 h-6" />
                 </button>
 
-                {/* Header Profil */}
-                <div className="flex items-center space-x-3 mb-8 border-b border-primary-500 pb-5">
-                    <div className="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-xl font-bold text-white mb-0">
+                {/* Header Profil Sidebar */}
+                <div className="flex items-center space-x-4 mb-8 pb-6 border-b border-neutral-100">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-xl font-bold text-blue-700 shadow-sm">
                         {profileInitial}
                     </div>
-                    <div>
-                        <p className="font-semibold text-lg">{profileName}</p>
-                        <p className="text-sm text-primary-100">{profileEmail}</p>
+                    <div className="overflow-hidden">
+                        <p className="font-bold text-neutral-800 truncate">{profileName}</p>
+                        <p className="text-xs text-neutral-500 truncate">{profileEmail}</p>
                     </div>
                 </div>
 
-                {/* Navigasi Utama */}
-                <div 
-                    className="space-y-2 flex-grow overflow-y-auto pr-2 sidebar-nav"
-                    style={scrollbarHideStyle}
-                > 
+                {/* Navigasi */}
+                <div className="space-y-1 flex-grow overflow-y-auto sidebar-nav"> 
+                    <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3 px-3">Menu Utama</p>
                     {menuItems.map((item) => (
                         <NavItem
                             key={item.tab}
@@ -151,35 +122,23 @@ export default function Sidebar({ activeTab, setActiveTab, profileData, isComple
                             setIsSidebarOpen={setIsSidebarOpen}
                         />
                     ))}
-
-                    <div className="pt-4 border-t border-primary-500 mt-2">
-                        <h3 className="text-sm font-semibold text-primary-100 mb-1">Fitur Utama</h3>
-                        <NavItem 
-                            icon={Send} 
-                            label="Mulai Reservasi" 
-                            tab="reservasi" 
-                            activeTab={activeTab} 
-                            setActiveTab={setActiveTab} 
-                            isComplete={isComplete} 
-                            href="/user/reservasi" // Diubah
-                            setIsSidebarOpen={setIsSidebarOpen}
-                        />
-                    </div>
+                    
+                    {/* Bagian "Layanan" (Buat Reservasi) TELAH DIHAPUS */}
                 </div>
 
                 {/* Logout */}
-                <div className="pt-4 border-t border-primary-500 mt-auto">
+                <div className="pt-4 border-t border-neutral-100 mt-auto">
                     <button
                         onClick={() => { 
                             if (typeof window !== 'undefined') {
                                 setIsSidebarOpen(false); 
-                                window.location.href = '/login'; 
+                                window.location.href = '/auth/login'; 
                             }
                         }}
-                        className="flex items-center space-x-3 p-3 w-full rounded-lg text-red-300 hover:bg-red-700/70 transition duration-150"
+                        className="flex items-center space-x-3 p-3 w-full rounded-xl text-red-500 hover:bg-red-50 transition duration-200"
                     >
                         <LogOut className="w-5 h-5" />
-                        <span className="font-medium">Keluar</span>
+                        <span className="font-semibold text-sm">Keluar Aplikasi</span>
                     </button>
                 </div>
             </div>

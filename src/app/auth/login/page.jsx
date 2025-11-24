@@ -1,11 +1,12 @@
 "use client";
 
-import { Lock, LogIn, User } from "lucide-react";
+import { Lock, LogIn, Mail, Loader2 } from "lucide-react"; // Tambah Loader2 untuk ikon loading
 import { useState } from "react";
-import { useRouter } from 'next/navigation'; // 1. Impor useRouter
-import api from '../../../services/api'; // 2. Impor helper API Anda
+import { useRouter } from 'next/navigation';
+import Image from "next/image"; 
+import api from '../../../services/api';
 
-// --- Komponen InputField ---
+// --- Komponen InputField (Tidak ada perubahan) ---
 const InputField = ({ label, type, placeholder, required, icon: Icon, ...props }) => {
   return (
     <div className="space-y-1">
@@ -33,42 +34,42 @@ const InputField = ({ label, type, placeholder, required, icon: Icon, ...props }
 // -----------------------------------------------------------------------------------
 
 export default function LoginPage() {
-  const [emailOrKTP, setEmailOrKTP] = useState("");
+  const [email, setEmail] = useState(""); 
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const router = useRouter(); // 3. Inisialisasi router
+  const [isLoading, setIsLoading] = useState(false); // 1. Tambah state loading
+  const router = useRouter();
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Ini memastikan Enter men-trigger submit tanpa reload halaman
     setErrorMsg("");
+    setIsLoading(true); // Mulai loading
 
     try {
-      // 1️⃣ Coba login admin/superadmin (Axios akan error jika gagal)
-      // Perhatikan: Nama field 'Email' dan 'Password' harus SAMA PERSIS 
-      // dengan yang diharapkan backend admin Anda.
+      // 1️⃣ Coba login admin/superadmin
       const adminRes = await api.post("/login", {
-        Email: emailOrKTP, // Sesuaikan jika backend admin mengharapkan 'email'
-        Password: password, // Sesuaikan jika backend admin mengharapkan 'password'
+        Email: email, 
+        Password: password, 
       });
 
-      // Jika sukses (tidak error)
       localStorage.setItem("token", adminRes.data.access_token);
       localStorage.setItem("userRole", adminRes.data.role);
       localStorage.setItem("userName", adminRes.data.admin.nama);
       localStorage.setItem("userID", adminRes.data.admin.id);
-      router.push("/admin/dashboard"); // 4. Gunakan router.push
+      
+      router.push("/admin/dashboard");
+      // Jangan set isLoading(false) di sini agar tombol tetap loading saat redirect
       return;
 
     } catch (adminError) {
       // 2️⃣ Kalau login admin gagal, coba login user biasa
       try {
         const userRes = await api.post("/login-user", {
-          email: emailOrKTP,
+          email: email, 
           password: password,
         });
 
-        // Jika sukses
-        const userData = userRes.data; // Data ada di dalam `userRes.data`
+        const userData = userRes.data;
         localStorage.setItem("token", userData.access_token);
         localStorage.setItem("userRole", "user");
         localStorage.setItem("userID", userData.user.id);
@@ -76,17 +77,17 @@ export default function LoginPage() {
         localStorage.setItem("userEmail", userData.user.email);
         localStorage.setItem("userPhone", userData.user.nomor_telepon);
         
-        router.push("/user/dashboard"); // 4. Gunakan router.push
+        router.push("/user/dashboard");
         return;
 
       } catch (userError) {
-        // Kalau keduanya gagal
         console.error("Login gagal:", userError);
         if (userError.response && userError.response.data) {
-          setErrorMsg(userError.response.data.message || "Email/NIK atau password salah.");
+          setErrorMsg(userError.response.data.message || "Email atau password salah.");
         } else {
           setErrorMsg("Terjadi kesalahan server atau koneksi.");
         }
+        setIsLoading(false); // Matikan loading hanya jika GAGAL total
       }
     }
   };
@@ -94,8 +95,17 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4">
       <div className="bg-white shadow-2xl border-t-8 border-primary-600 rounded-2xl p-8 md:p-12 w-full max-w-md">
+        
+        {/* BAGIAN LOGO */}
         <div className="flex justify-center mb-6">
-          <LogIn className="w-10 h-10 text-primary-600" />
+          <Image 
+            src="/images/logo.svg" 
+            alt="Logo Aplikasi"
+            width={120}     
+            height={120}    
+            priority        
+            className="object-contain h-24 w-auto" 
+          />
         </div>
 
         <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">
@@ -105,15 +115,17 @@ export default function LoginPage() {
           Masuk untuk melanjutkan
         </p>
 
+        {/* Form handle onSubmit, jadi tekan ENTER otomatis submit */}
         <form onSubmit={handleLogin} className="space-y-6">
           <InputField
-            label="Email atau No. KTP"
-            type="text"
-            placeholder="Masukkan Email atau No. KTP"
-            icon={User}
+            label="Email"
+            type="email" 
+            placeholder="Masukkan Email Anda"
+            icon={Mail} 
             required
-            value={emailOrKTP}
-            onChange={(e) => setEmailOrKTP(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading} // Disable input saat loading
           />
           <InputField
             label="Password"
@@ -123,22 +135,37 @@ export default function LoginPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading} // Disable input saat loading
           />
 
-          {errorMsg && <p className="text-red-600 text-sm text-center">{errorMsg}</p>}
+          {errorMsg && <p className="text-red-600 text-sm text-center animate-pulse">{errorMsg}</p>}
 
           <button
             type="submit"
-            className="w-full bg-primary-600 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-primary-800 transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center space-x-2"
+            disabled={isLoading} // Matikan tombol saat loading
+            className={`w-full text-white font-semibold py-3 rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all duration-300 
+              ${isLoading 
+                ? "bg-neutral-400 cursor-not-allowed" 
+                : "bg-primary-600 hover:bg-primary-800 hover:scale-[1.01]"
+              }`}
           >
-            <LogIn className="w-5 h-5" />
-            <span>Masuk ke Akun</span>
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Memproses...</span>
+              </>
+            ) : (
+              <>
+                <LogIn className="w-5 h-5" />
+                <span>Masuk ke Akun</span>
+              </>
+            )}
           </button>
         </form>
 
         <p className="text-center text-sm mt-6 text-neutral-600">
           Belum punya akun?{" "}
-          <a href="/auth/register" className="text-primary-600 font-bold hover:text-primary-800">
+          <a href="/auth/register" className={`text-primary-600 font-bold hover:text-primary-800 ${isLoading ? "pointer-events-none text-neutral-400" : ""}`}>
             Daftar Sekarang
           </a>
         </p>
