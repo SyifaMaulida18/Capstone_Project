@@ -8,7 +8,7 @@ import {
   FunnelIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/superadmin/components/superadmin_layou";
+import AdminLayout from "../../superadmin/components/superadmin_layout";
 import { Dialog } from "@/app/superadmin/components/ui/dialog"; // Asumsi path Dialog benar
 import { Input } from "@/app/superadmin/components/ui/input"; // Asumsi path Input benar
 

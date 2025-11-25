@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 export default function TopNav() {
   const navItems = [
     { name: "Beranda", href: "/admin/dashboard" }, 
-    { name: "Manajemen User", href: "/admin/users" },
+    // { name: "Manajemen User", href: "/admin/users" },
     { name: "Manajemen Dokter", href: "/admin/dokter" },
     { name: "Manajemen Jadwal Dokter", href: "/admin/schedule" },
     { name: "Manajemen Pasien", href: "/admin/pasien" },
