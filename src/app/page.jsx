@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-// Impor komponen (Pastikan path ini sesuai dengan struktur project Anda)
+// Impor komponen UI
 import DoctorScheduleSection from "../components/guest/DoctorSchedule"; 
 import Footer from "../components/guest/Footer";
 import { Navbar, TopBar } from "../components/guest/Header";
@@ -22,7 +22,7 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState("beranda");
   const observer = useRef(null);
 
-  // --- Data Sesuai Gambar ---
+  // --- DATA STATIS (Frontend Only) ---
   const features = [
     {
       title: "Reservasi 24/7",
@@ -56,8 +56,11 @@ export default function Home() {
     },
   ];
 
+  // --- LOGIKA UI: SCROLL SPY (Untuk Navigasi) ---
   useEffect(() => {
+    // Observer untuk mendeteksi section mana yang sedang dilihat user
     const options = { root: null, rootMargin: "-40% 0px -60% 0px", threshold: 0 };
+    
     observer.current = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) setActiveSection(entry.target.id);
@@ -76,7 +79,7 @@ export default function Home() {
       <TopBar />
       <Navbar activeSection={activeSection} />
 
-      {/* --- 1. HERO SECTION (Warna Biru IHC) --- */}
+      {/* --- 1. HERO SECTION --- */}
       <section id="beranda" className="relative bg-[#003B73] text-white pt-24 pb-32 lg:pt-32 lg:pb-48 overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
           
@@ -89,7 +92,7 @@ export default function Home() {
               Bagi pasien Pribadi, Asuransi, dan Perusahaan. Akses layanan kesehatan prioritas kini dalam genggaman.
             </p>
             
-            {/* Widget Call Center (Sesuai Gambar) */}
+            {/* Widget Call Center */}
             <div className="bg-white text-[#003B73] p-4 rounded-2xl shadow-lg inline-flex items-center gap-4 max-w-md w-full">
               <div className="bg-[#8CC63F] p-3 rounded-full">
                 <Phone className="w-6 h-6 text-white" />
@@ -102,7 +105,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Gambar Kanan (Hero Section) - MENGGUNAKAN gambar1.svg */}
+          {/* Gambar Kanan (Hero Section) */}
           <div className="relative z-10 hidden md:block">
             <div className="relative rounded-3xl overflow-hidden border-4 border-white/20 shadow-2xl">
                <img 
@@ -119,7 +122,7 @@ export default function Home() {
         <div className="absolute top-0 right-0 w-2/3 h-full bg-white/5 skew-x-12 pointer-events-none"></div>
       </section>
 
-      {/* --- 2. FLOATING SEARCH SCHEDULE (Menumpuk Hero) --- */}
+      {/* --- 2. FLOATING SEARCH SCHEDULE --- */}
       <div className="max-w-6xl mx-auto px-4 relative z-20 -mt-20 lg:-mt-32 mb-16">
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
            {/* Header Form */}
@@ -128,15 +131,14 @@ export default function Home() {
               <p className="text-slate-500 text-sm mt-1">Temukan jadwal dokter, booking, dan atur janji dengan dokter ahli.</p>
            </div>
            
-           {/* Komponen Form Jadwal (Diimpor) */}
+           {/* Komponen Form Jadwal */}
            <div className="p-2 md:p-6">
-              {/* Pastikan DoctorScheduleSection responsif di dalamnya */}
               <DoctorScheduleSection /> 
            </div>
         </div>
       </div>
 
-      {/* --- 3. BANNER BIRU "PRIORITAS KAMI" --- */}
+      {/* --- 3. BANNER BIRU --- */}
       <section className="bg-[#003B73] py-12 px-6 text-center mb-20">
          <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
@@ -146,7 +148,7 @@ export default function Home() {
          </div>
       </section>
 
-      {/* --- 4. MENGAPA MEMILIH KAMI (List Card) --- */}
+      {/* --- 4. MENGAPA MEMILIH KAMI --- */}
       <section id="tentang" className="max-w-7xl mx-auto px-6 pb-24 scroll-mt-28">
         <div className="text-center mb-12">
            <h2 className="text-3xl font-bold text-[#003B73] mb-4">Mengapa Memilih RSPB?</h2>
@@ -171,10 +173,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --- 5. FASILITAS MODERN (Split Layout) --- */}
+      {/* --- 5. FASILITAS MODERN --- */}
       <section id="fasilitas" className="bg-white py-20 scroll-mt-28">
          <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
-            {/* Gambar Fasilitas - JUGA MENGGUNAKAN gambar1.svg */}
+            {/* Gambar Fasilitas */}
             <div className="order-2 lg:order-1">
                <div className="rounded-3xl overflow-hidden shadow-2xl">
                   <img 
@@ -213,7 +215,7 @@ export default function Home() {
          </div>
       </section>
 
-      {/* --- 6. CTA HIJAU (Siap Untuk Memulai?) --- */}
+      {/* --- 6. CTA HIJAU --- */}
       <section className="px-6 py-12">
          <div className="max-w-5xl mx-auto bg-[#8CC63F] rounded-3xl p-8 md:p-12 text-center shadow-xl relative overflow-hidden">
             <div className="relative z-10">

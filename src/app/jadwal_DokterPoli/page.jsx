@@ -13,11 +13,9 @@ import {
 import { useRouter } from "next/navigation";
 
 // --- IMPORTS KOMPONEN UI ---
-// Pastikan path ini sesuai dengan struktur folder Anda
 import Header from "../../components/user/Header";
 import Navbar from "../../components/user/Navbar";
 import Footer from "../../components/user/Footer";
-import api from "../../services/api";
 
 // --- DATA KONSTAN ---
 const ALL_POLI_OPTIONS = [
@@ -32,6 +30,60 @@ const ALL_POLI_OPTIONS = [
   "Poli Kandungan",
   "Poli THT",
   "Poli Saraf",
+];
+
+// --- DUMMY DATA JADWAL (Untuk Tampilan Frontend) ---
+const DUMMY_SCHEDULES = [
+  {
+    id: "1",
+    doctor: "dr. Andi Wijaya, Sp.PD",
+    poli: "Poli Penyakit Dalam",
+    dateKey: "2023-11-20", // Format YYYY-MM-DD
+    time: "08:00 - 12:00 (Pagi)",
+    quota: 5,
+    available: true,
+    keterangan: "Harap datang 15 menit sebelum jadwal.",
+  },
+  {
+    id: "2",
+    doctor: "dr. Siti Aminah, Sp.A",
+    poli: "Poli Anak",
+    dateKey: "2023-11-20",
+    time: "13:00 - 16:00 (Siang)",
+    quota: 0,
+    available: false,
+    keterangan: "Cuti mendadak digantikan dr. Budi.",
+  },
+  {
+    id: "3",
+    doctor: "dr. Budi Santoso, Sp.M",
+    poli: "Poli Mata",
+    dateKey: "2023-11-21",
+    time: "09:00 - 14:00 (Pagi)",
+    quota: 12,
+    available: true,
+    keterangan: null,
+  },
+  {
+    id: "4",
+    doctor: "dr. Citra Kirana, Sp.OG",
+    poli: "Poli Kandungan",
+    dateKey: "2023-11-22",
+    time: "08:00 - 11:00 (Pagi)",
+    quota: 3,
+    available: true,
+    keterangan: null,
+  },
+  {
+    id: "5",
+    doctor: "dr. Eko Prasetyo, Sp.JP",
+    poli: "Poli Jantung",
+    dateKey: "2023-11-22",
+    time: "15:00 - 18:00 (Sore)",
+    quota: 8,
+    available: true,
+    keterangan: null,
+  },
 ];
 
 // --- KOMPONEN KARTU JADWAL ---
@@ -99,7 +151,7 @@ const ScheduleDisplayCard = ({ schedule }) => {
           href="/user/reservasi"
           className="mt-4 w-full text-center py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-semibold transition"
         >
-          Buat  Reservasi
+          Buat Reservasi
         </a>
       )}
     </div>
@@ -113,99 +165,30 @@ export default function JadwalDokterPoliPage() {
   const [selectedPoli, setSelectedPoli] = useState("Semua Poli");
   const [schedules, setSchedules] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Konfigurasi Navigasi (Agar tombol "Cek Jadwal" aktif)
+  // Konfigurasi Navigasi
   const navItems = [
     { name: "Beranda", href: "/user/dashboard", isActive: false },
     {
       name: "Cek Jadwal Poli & Dokter",
       href: "/user/jadwal_DokterPoli",
       isActive: true,
-    }, // Aktif
+    },
     { name: "Reservasi", href: "/user/reservasi", isActive: false },
   ];
 
-  // --- LOGIKA KONVERSI DATA ---
-  const generateUpcomingSchedules = (backendData) => {
-    const generatedList = [];
-    const today = new Date();
-    const daysLookahead = 14; // Lihat 2 minggu ke depan
-
-    const dayKeys = [
-      "minggu",
-      "senin",
-      "selasa",
-      "rabu",
-      "kamis",
-      "jumat",
-      "sabtu",
-    ];
-
-    for (let i = 0; i < daysLookahead; i++) {
-      const currentDate = new Date(today);
-      currentDate.setDate(today.getDate() + i);
-
-      const dayIndex = currentDate.getDay();
-      const dayName = dayKeys[dayIndex];
-      const dateString = currentDate.toISOString().split("T")[0];
-
-      backendData.forEach((record) => {
-        if (record[`${dayName}_praktek`] === "Y") {
-          const sessions = ["pagi", "siang", "sore"];
-
-          sessions.forEach((session) => {
-            const jamMulai = record[`${dayName}_${session}_dari`];
-            const jamSelesai = record[`${dayName}_${session}_sampai`];
-            const kuota = record[`${dayName}_${session}_kuota`];
-
-            if (jamMulai) {
-              generatedList.push({
-                id: `${record.dokter_id}-${record.poli_id}-${dateString}-${session}`,
-                doctor: record.dokter?.nama_dokter || "Dokter",
-                poli: record.poli?.poli_name || "Poli",
-                dateKey: dateString,
-                time: `${jamMulai.substring(0, 5)} - ${
-                  jamSelesai ? jamSelesai.substring(0, 5) : "Selesai"
-                } (${session.charAt(0).toUpperCase() + session.slice(1)})`,
-                quota: kuota || 0,
-                available: kuota > 0,
-                keterangan: record[`${dayName}_keterangan`],
-              });
-            }
-          });
-        }
-      });
-    }
-    return generatedList;
-  };
-
-  // --- FETCH DATA ---
+  // --- SIMULASI FETCH DATA ---
   useEffect(() => {
-    const fetchJadwal = async () => {
-      try {
-        setIsLoading(true);
-        // Menggunakan endpoint publik yang kita buat sebelumnya
-        const response = await api.get("/jadwal-dokter-public");
+    // Timer ini hanya untuk meniru loading agar UI terlihat natural
+    const timer = setTimeout(() => {
+      setSchedules(DUMMY_SCHEDULES);
+      setIsLoading(false);
+    }, 1500); // Loading selama 1.5 detik
 
-        if (response.data && response.data.data) {
-          const formattedData = generateUpcomingSchedules(response.data.data);
-          setSchedules(formattedData);
-        }
-      } catch (err) {
-        console.error("Gagal mengambil jadwal:", err);
-        setError(
-          "Gagal memuat jadwal dokter. Pastikan koneksi internet lancar."
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchJadwal();
+    return () => clearTimeout(timer);
   }, []);
 
-  // --- FILTER LOGIC ---
+  // --- FILTER LOGIC (Tetap berjalan di Frontend) ---
   const filteredSchedules = useMemo(() => {
     return schedules
       .filter((schedule) => {
@@ -236,10 +219,10 @@ export default function JadwalDokterPoliPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-neutral-100 font-sans">
-      {/* 1. HEADER (Mengambil data user sendiri) */}
+      {/* 1. HEADER */}
       <Header />
 
-      {/* 2. NAVBAR (Navigasi aktif di Cek Jadwal) */}
+      {/* 2. NAVBAR */}
       <Navbar navItems={navItems} />
 
       {/* 3. KONTEN UTAMA */}
@@ -293,11 +276,6 @@ export default function JadwalDokterPoliPage() {
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-10 h-10 text-primary-600 animate-spin mb-4" />
             <p className="text-neutral-600">Memuat jadwal terbaru...</p>
-          </div>
-        ) : error ? (
-          <div className="p-8 bg-red-50 rounded-xl text-center text-red-600 border border-red-200">
-            <AlertTriangle className="w-10 h-10 mx-auto mb-2" />
-            <p>{error}</p>
           </div>
         ) : filteredSchedules.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

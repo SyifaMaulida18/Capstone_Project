@@ -2,7 +2,7 @@
 
 import { Building, HeartHandshake, Lightbulb, Target, Users } from "lucide-react";
 
-// Memperbaiki path relatif untuk mengimpor komponen (sesuaikan jika perlu)
+// Memperbaiki path relatif untuk mengimpor komponen
 import CallToAction from "../../../components/guest/CallToAction"; 
 import Footer from "../../../components/guest/Footer";
 import { Navbar, TopBar } from "../../../components/guest/Header";
@@ -35,18 +35,19 @@ export default function TentangPage() {
   return (
     <main className="bg-slate-50 min-h-screen flex flex-col font-sans text-slate-800">
       <TopBar />
-      <Navbar activeSection="tentang" /> {/* Mengaktifkan state 'tentang' di Navbar */}
+      <Navbar activeSection="tentang" /> 
 
-      {/* --- 1. HERO SECTION (Konsisten dengan Home: Biru Solid) --- */}
+      {/* --- 1. HERO SECTION (Diperbarui) --- */}
       <section className="relative bg-[#003B73] text-white py-20 md:py-32 text-center overflow-hidden">
         {/* Background Pattern Halus */}
         <div className="absolute top-0 right-0 w-full h-full bg-white/5 opacity-30 skew-y-12 pointer-events-none"></div>
 
         <div className="relative z-10 max-w-4xl mx-auto px-6">
-          <span className="text-[#8CC63F] font-bold tracking-wider uppercase text-sm mb-4 block">Profil Rumah Sakit</span>
+          {/* PERUBAHAN DI SINI: Menghapus "Profil Rumah Sakit" */}
           <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6">
             Tentang Kami
           </h1>
+          
           <p className="text-blue-100 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
             Dedikasi kami untuk memberikan layanan kesehatan prioritas yang mudah diakses, modern, dan terpercaya bagi keluarga Indonesia.
           </p>
@@ -168,7 +169,6 @@ export default function TentangPage() {
         </div>
       </section>
 
-      {/* Pastikan path ini benar sesuai struktur folder kamu */}
       <CallToAction /> 
       <Footer />
     </main>

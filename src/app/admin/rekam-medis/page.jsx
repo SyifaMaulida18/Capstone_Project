@@ -5,128 +5,241 @@ import {
   FunnelIcon,
   PencilIcon,
   PlusIcon,
+  TrashIcon, // Impor TrashIcon
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/admin/components/admin_layout"; // Path AdminLayout
-import { Dialog } from "@/app/admin/components/ui/dialog"; // Path Dialog
+import AdminLayout from "@/app/admin/components/admin_layout";
+import { Dialog } from "@/app/admin/components/ui/dialog";
+import { Input } from "@/app/admin/components/ui/input"; // Impor Input untuk form
+
+// --- DATA DUMMY (Saya tambahkan ID unik ke rekam medis) ---
+const initialPatients = [
+  { id: 1, name: "Ayu Gideon", hasRecord: true },
+  { id: 2, name: "Syifa Maulida", hasRecord: false },
+  { id: 3, name: "Sheva Rebecca", hasRecord: false },
+];
+
+const initialMedicalRecords = {
+  1: [
+    { id: "rec100", date: "2025-02-29", treatment: "Pemeriksaan Umum" },
+    { id: "rec101", date: "2025-05-18", treatment: "Kontrol Jantung" },
+  ],
+  2: [],
+  3: [],
+};
+// ---------------------------------------------------------
 
 export default function MedicalRecordsPage() {
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [showDialog, setShowDialog] = useState(false);
+  const [patients, setPatients] = useState(initialPatients);
+  const [medicalRecords, setMedicalRecords] = useState(initialMedicalRecords);
 
-  // Data dummy pasien dan rekam medis
-  const patients = [
-    { id: 1, name: "Ayu Gideon", hasRecord: true },
-    { id: 2, name: "Syifa Maulida", hasRecord: false },
-    { id: 3, name: "Sheva Rebecca", hasRecord: false },
-  ];
+  // --- STATE UNTUK DIALOG ---
+  const [showViewDialog, setShowViewDialog] = useState(false); // Dialog untuk Melihat Riwayat
+  const [isFormOpen, setIsFormOpen] = useState(false); // Dialog for Form Add/Edit
 
-  const medicalRecords = {
-    1: [
-      { date: "29 Februari 2025", treatment: "Pemeriksaan Umum" },
-      { date: "18 Mei 2025", treatment: "Kontrol Jantung" },
-    ],
-    2: [],
-    3: [],
-  };
+  // --- STATE UNTUK FORM ---
+  const [editingRecord, setEditingRecord] = useState(null); // null = Add, Object = Edit
+  const [recordForm, setRecordForm] = useState({
+    date: "",
+    treatment: "",
+  });
+
+  // --- HANDLER ---
 
   const handleSelectPatient = (patient) => {
     setSelectedPatient(patient);
-    setShowDialog(true);
+  };
+
+  // Membuka dialog VIEW riwayat
+  const handleOpenViewDialog = () => {
+    if (!selectedPatient) {
+      alert("Pilih pasien terlebih dahulu.");
+      return;
+    }
+    setShowViewDialog(true);
+  };
+
+  // Membuka dialog FORM (mode ADD)
+  const handleOpenAddForm = () => {
+    if (!selectedPatient) {
+      alert("Pilih pasien terlebih dahulu untuk menambahkan rekam medis.");
+      return;
+    }
+    setEditingRecord(null); // Mode Add
+    setRecordForm({ date: "", treatment: "" }); // Reset form
+    setIsFormOpen(true);
+  };
+
+  // Membuka dialog FORM (mode EDIT)
+  const handleOpenEditForm = (record) => {
+    setEditingRecord(record);
+    setRecordForm({
+      date: record.date,
+      treatment: record.treatment,
+    });
+    setShowViewDialog(false); // Tutup dialog view
+    setIsFormOpen(true); // Buka dialog form
+  };
+
+  // Menghapus rekam medis
+  const handleDeleteRecord = (recordId) => {
+    if (
+      !selectedPatient ||
+      !window.confirm("Yakin ingin menghapus entri rekam medis ini?")
+    ) {
+      return;
+    }
+
+    const patientId = selectedPatient.id;
+    const updatedRecords = medicalRecords[patientId].filter(
+      (r) => r.id !== recordId
+    );
+
+    setMedicalRecords({
+      ...medicalRecords,
+      [patientId]: updatedRecords,
+    });
+  };
+
+  // Submit form (Add / Edit)
+  const handleSubmitForm = (e) => {
+    e.preventDefault();
+    if (!selectedPatient) return;
+
+    const patientId = selectedPatient.id;
+
+    if (editingRecord) {
+      // --- Logika UPDATE ---
+      const updatedRecords = medicalRecords[patientId].map((r) =>
+        r.id === editingRecord.id ? { ...r, ...recordForm } : r
+      );
+      setMedicalRecords({
+        ...medicalRecords,
+        [patientId]: updatedRecords,
+      });
+    } else {
+      // --- Logika ADD ---
+      const newRecord = {
+        id: `rec${Date.now()}`, // ID unik dummy
+        ...recordForm,
+      };
+      const updatedRecords = [...medicalRecords[patientId], newRecord];
+      setMedicalRecords({
+        ...medicalRecords,
+        [patientId]: updatedRecords,
+      });
+      // Update status 'hasRecord' jika ini data pertama
+      if (!selectedPatient.hasRecord) {
+        setPatients(
+          patients.map((p) =>
+            p.id === patientId ? { ...p, hasRecord: true } : p
+          )
+        );
+      }
+    }
+
+    setIsFormOpen(false);
+    setEditingRecord(null);
   };
 
   return (
     <AdminLayout>
-      {/* UBAH: Menggunakan border-primary-200 */}
       <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
-        {/* UBAH: Menggunakan text-neutral-800 */}
         <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
           Manajemen Rekam Medis
         </h1>
 
-        {/* Header buttons */}
         <div className="flex justify-end mb-6 space-x-3">
-          {/* UBAH: Menggunakan neutral */}
           <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
             <FunnelIcon className="h-5 w-5 text-neutral-600" />
             <span>Filter</span>
           </button>
 
-          {/* UBAH: Menggunakan neutral */}
-          <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
-            <PencilIcon className="h-5 w-5 text-neutral-600" />
-            <span>Edit</span>
-          </button>
-
-          {/* UBAH: Menggunakan secondary */}
-          <button className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold">
+          {/* Tombol Add Buka Form Dialog */}
+          <button
+            onClick={handleOpenAddForm} // --- UBAH DI SINI ---
+            className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
+          >
             <PlusIcon className="h-5 w-5" />
-            <span>Add</span>
+            <span>Add Record</span>
           </button>
         </div>
 
-        {/* Dua kolom utama */}
         <div className="grid grid-cols-2 gap-6">
           {/* Kolom kiri: daftar pasien */}
-          {/* UBAH: Menggunakan bg-neutral-100 dan border-neutral-200 */}
           <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
             <ul className="space-y-3">
               {patients.map((p) => (
                 <li
                   key={p.id}
-                  /* UBAH: Menggunakan hover:bg-primary-50 dan border-primary-500 */
                   className={`flex items-center justify-between bg-white p-3 rounded-lg shadow-sm border hover:bg-primary-50 cursor-pointer transition ${
                     p.id === selectedPatient?.id
                       ? "border-primary-500"
-                      : "border-transparent" // Border default transparan
+                      : "border-transparent"
                   }`}
                   onClick={() => handleSelectPatient(p)}
                 >
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      // UBAH: Menggunakan accent-primary-500
                       className="accent-primary-500"
                       checked={p.id === selectedPatient?.id}
                       readOnly
                     />
-                    {/* UBAH: Menggunakan text-neutral-800 */}
                     <span className="text-neutral-800 font-medium">
                       {p.name}
                     </span>
                   </label>
-                  {p.hasRecord && <span className="text-sm">📁</span>}
+                  {p.hasRecord && (
+                    <span
+                      className="text-sm cursor-pointer hover:text-primary-600"
+                      onClick={(e) => {
+                        e.stopPropagation(); // Hindari trigger handleSelectPatient
+                        handleSelectPatient(p); // Pilih pasien
+                        handleOpenViewDialog(); // Langsung buka dialog
+                      }}
+                    >
+                      📁
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
           </div>
 
           {/* Kolom kanan: daftar tanggal rekam medis */}
-          {/* UBAH: Menggunakan bg-neutral-100 dan border-neutral-200 */}
           <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
             {selectedPatient ? (
               <>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-semibold text-neutral-700">
+                    Riwayat: {selectedPatient.name}
+                  </h3>
+                  <button
+                    onClick={handleOpenViewDialog}
+                    className="text-sm text-primary-600 hover:underline"
+                  >
+                    Lihat Semua
+                  </button>
+                </div>
                 {medicalRecords[selectedPatient.id]?.length > 0 ? (
                   <ul className="space-y-3">
                     {medicalRecords[selectedPatient.id].map((r, i) => (
                       <li
                         key={i}
-                        // UBAH: Menggunakan border-neutral-100 dan hover:bg-neutral-50
                         className="bg-white p-3 rounded-lg border border-neutral-100 shadow-sm hover:bg-neutral-50"
                       >
-                        {/* UBAH: Menggunakan text-neutral-700 */}
                         <span className="text-neutral-700">{r.date}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  // UBAH: Menggunakan text-neutral-600
                   <p className="text-neutral-600 italic text-center mt-10">
-                    Belum ada rekam medis untuk pasien ini
+                    Belum ada rekam medis
                   </p>
                 )}
               </>
             ) : (
-              // UBAH: Menggunakan text-neutral-600
               <p className="text-neutral-600 italic text-center mt-10">
                 Pilih pasien untuk melihat rekam medis
               </p>
@@ -135,43 +248,56 @@ export default function MedicalRecordsPage() {
         </div>
       </div>
 
-      {/* Pop-up dialog detail rekam medis */}
-      <Dialog show={showDialog} onClose={() => setShowDialog(false)}>
+      {/* Pop-up dialog DETAIL/VIEW rekam medis */}
+      <Dialog show={showViewDialog} onClose={() => setShowViewDialog(false)}>
         {selectedPatient && (
           <div className="p-6 space-y-4">
-            {/* UBAH: Menggunakan text-neutral-800 */}
             <h2 className="text-xl font-semibold text-neutral-800 mb-2">
               Riwayat Perawatan — {selectedPatient.name}
             </h2>
 
             {medicalRecords[selectedPatient.id]?.length > 0 ? (
-              <ul className="space-y-2">
-                {medicalRecords[selectedPatient.id].map((record, index) => (
+              <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                {medicalRecords[selectedPatient.id].map((record) => (
                   <li
-                    key={index}
-                    // UBAH: Menggunakan bg-neutral-50 dan border-neutral-200
-                    className="p-3 bg-neutral-50 rounded-lg border border-neutral-200"
+                    key={record.id}
+                    className="p-3 bg-neutral-50 rounded-lg border border-neutral-200 flex justify-between items-start"
                   >
-                    {/* UBAH: Menggunakan text-neutral-700 */}
-                    <p className="font-medium text-neutral-700">
-                      {record.date}
-                    </p>
-                    {/* UBAH: Menggunakan text-neutral-600 */}
-                    <p className="text-sm text-neutral-600">
-                      {record.treatment}
-                    </p>
+                    <div>
+                      <p className="font-medium text-neutral-700">
+                        {record.date}
+                      </p>
+                      <p className="text-sm text-neutral-600">
+                        {record.treatment}
+                      </p>
+                    </div>
+                    {/* --- TOMBOL EDIT/DELETE DI SINI --- */}
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleOpenEditForm(record)}
+                        className="text-neutral-500 hover:text-primary-600 p-1"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecord(record.id)}
+                        className="text-neutral-500 hover:text-red-600 p-1"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
             ) : (
-              // UBAH: Menggunakan text-neutral-600
-              <p className="text-neutral-600 italic">Tidak ada riwayat perawatan</p>
+              <p className="text-neutral-600 italic">
+                Tidak ada riwayat perawatan
+              </p>
             )}
 
             <div className="flex justify-end pt-4">
               <button
-                onClick={() => setShowDialog(false)}
-                // UBAH: Menggunakan bg-primary-600 dan hover:bg-primary-800
+                onClick={() => setShowViewDialog(false)}
                 className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-800 transition"
               >
                 Tutup
@@ -179,6 +305,70 @@ export default function MedicalRecordsPage() {
             </div>
           </div>
         )}
+      </Dialog>
+
+      {/* --- DIALOG BARU UNTUK FORM ADD/EDIT --- */}
+      <Dialog show={isFormOpen} onClose={() => setIsFormOpen(false)}>
+        <form onSubmit={handleSubmitForm} className="p-6 space-y-4">
+          <h2 className="text-xl font-semibold text-neutral-700 mb-2">
+            {editingRecord ? "Edit" : "Tambah"} Rekam Medis untuk{" "}
+            {selectedPatient?.name}
+          </h2>
+
+          <div>
+            <label
+              htmlFor="date"
+              className="text-sm text-neutral-600 block mb-1"
+            >
+              Tanggal Perawatan
+            </label>
+            <Input
+              type="date"
+              id="date"
+              value={recordForm.date}
+              onChange={(e) =>
+                setRecordForm({ ...recordForm, date: e.target.value })
+              }
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="treatment"
+              className="text-sm text-neutral-600 block mb-1"
+            >
+              Keterangan (Perawatan/Diagnosa)
+            </label>
+            <textarea
+              id="treatment"
+              rows={4}
+              value={recordForm.treatment}
+              onChange={(e) =>
+                setRecordForm({ ...recordForm, treatment: e.target.value })
+              }
+              required
+              className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              placeholder="Contoh: Pemeriksaan umum, keluhan demam 3 hari."
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setIsFormOpen(false)}
+              className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg hover:bg-neutral-200 transition"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              className="bg-secondary-500 text-white px-4 py-2 rounded-lg hover:bg-secondary-600 transition"
+            >
+              {editingRecord ? "Simpan Perubahan" : "Simpan"}
+            </button>
+          </div>
+        </form>
       </Dialog>
     </AdminLayout>
   );

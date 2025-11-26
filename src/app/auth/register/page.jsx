@@ -1,18 +1,12 @@
 "use client";
 
-import {
-  UserPlus,
-  User,
-  Mail,
-  Smartphone,
-  Lock,
-  Loader2,
-} from "lucide-react";
+import { UserPlus, User, Mail, Smartphone, Lock, Loader2 } from "lucide-react";
 import React, { useState } from "react";
-import Image from "next/image"; // 1. Import Image dari Next.js
-import api from "../../../services/api"; 
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import api from "@/services/api"; // Pastikan path ini sesuai dengan file api.js kamu
 
-// --- Komponen InputField ---
+// --- Komponen InputField (TIDAK ADA PERUBAHAN) ---
 const InputField = ({
   label,
   type,
@@ -87,8 +81,8 @@ const InputField = ({
   );
 };
 
-// --- Komponen Modal (Tidak Berubah) ---
-const CompleteProfileModal = ({ isVisible, onClose, onConfirm }) => {
+// --- Komponen Modal (DIUPDATE PESANNYA) ---
+const CompleteProfileModal = ({ isVisible, onClose, onConfirm, email }) => {
   if (!isVisible) return null;
 
   return (
@@ -98,24 +92,19 @@ const CompleteProfileModal = ({ isVisible, onClose, onConfirm }) => {
           <UserPlus className="w-10 h-10" />
         </div>
         <h3 className="text-xl font-bold text-neutral-900 mb-3">
-          Lengkapi Data Diri Anda!
+          Registrasi Berhasil!
         </h3>
-        <p className="text-neutral-600 mb-6">
-          Untuk dapat melakukan **Reservasi Online**, Anda wajib mengisi data diri
-          lengkap (KTP, KK, Alamat, dll.).
+        <p className="text-neutral-600 mb-6 text-sm">
+          Kode OTP telah dikirim ke email <strong>{email}</strong>.
+          <br />
+          Silakan cek <strong>Inbox</strong> atau <strong>Spam</strong>, lalu login menggunakan kode tersebut.
         </p>
         <div className="flex justify-center space-x-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-neutral-200 rounded-full text-neutral-700 hover:bg-neutral-100 transition"
-          >
-            Nanti Saja
-          </button>
           <button
             onClick={onConfirm}
             className="flex-1 px-4 py-2 bg-primary-600 text-white font-semibold rounded-full hover:bg-primary-800 transition"
           >
-            Lengkapi Sekarang
+            Ke Halaman Login
           </button>
         </div>
       </div>
@@ -123,15 +112,19 @@ const CompleteProfileModal = ({ isVisible, onClose, onConfirm }) => {
   );
 };
 
-// --- Komponen Halaman Register ---
+// --- Komponen Halaman Register (LOGIC UTAMA) ---
 export default function RegisterPage() {
+  const router = useRouter();
+
+  // State disesuaikan dengan kolom database Laravel
   const [formData, setFormData] = useState({
-    namaLengkap: "",
-    email: "",
-    noTelepon: "",
-    password: "",
-    confirmPassword: "",
+    name: "",                  // Sesuai DB
+    email: "",                 // Sesuai DB
+    nomor_telepon: "",         // Sesuai DB
+    password: "",              // Sesuai DB
+    password_confirmation: "", // Dibutuhkan Laravel validation 'confirmed'
   });
+
   const [showModal, setShowModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -150,72 +143,58 @@ export default function RegisterPage() {
     setIsLoading(true);
     setErrors({});
 
-    if (formData.password !== formData.confirmPassword) {
-      setErrors({ confirmPassword: ["Konfirmasi Kata Sandi tidak cocok."] });
-      setIsLoading(false);
-      return;
-    }
-
-    const payload = {
-      name: formData.namaLengkap,
-      email: formData.email,
-      nomor_telepon: formData.noTelepon,
-      password: formData.password,
-      password_confirmation: formData.confirmPassword,
-    };
-
     try {
-      const response = await api.post('/api/register', payload);
-      console.log("Registrasi berhasil:", response.data);
-      setIsLoading(false);
-      setShowModal(true); 
+      // 1. Request Register ke Backend
+      const registerResponse = await api.post("/register", formData);
+
+      if (registerResponse.data.success) {
+        
+        // 2. Jika Register Sukses, Langsung Request OTP (Chaining)
+        try {
+            await api.post("/otp/request", { 
+                email: formData.email 
+            });
+            // Tidak perlu handling khusus jika sukses, langsung ke modal
+        } catch (otpError) {
+            console.error("Gagal mengirim trigger OTP otomatis:", otpError);
+            // Tetap tampilkan sukses register, user bisa request OTP manual nanti di login
+        }
+
+        // 3. Tampilkan Modal Sukses
+        setShowModal(true);
+      }
 
     } catch (error) {
-      setIsLoading(false);
-      
-      if (error.response && error.response.status === 422) {
-        const validationErrors = error.response.data.errors;
-        console.error("Error Validasi:", validationErrors);
+      console.error("Register Error:", error);
 
-        const frontendErrors = {};
-        for (const key in validationErrors) {
-          const frontendKey = {
-            name: "namaLengkap",
-            nomor_telepon: "noTelepon",
-            password: "password",
-            email: "email",
-            confirmPassword: "confirmPassword"
-          }[key];
-          
-          if (frontendKey) {
-            frontendErrors[frontendKey] = validationErrors[key];
-          } else {
-            frontendErrors[key] = validationErrors[key];
-          }
+      if (error.response) {
+        // Handle Error Validasi (422) dari Laravel
+        if (error.response.status === 422) {
+          setErrors(error.response.data.errors);
+        } else {
+          setErrors({ general: ["Terjadi kesalahan pada server. Silakan coba lagi."] });
         }
-        setErrors(frontendErrors);
-
       } else {
-        console.error("Error Server:", error.message);
-        setErrors({
-          general: ["Terjadi kesalahan pada server. Silakan coba lagi nanti."],
-        });
+        // Handle Network Error
+        setErrors({ general: ["Gagal terhubung ke server. Periksa koneksi internet Anda."] });
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleCompleteProfile = () => {
-    window.location.href = "/user/profile";
+    // Arahkan ke halaman login agar user bisa memasukkan OTP
+    router.push("/auth/login");
   };
 
   const handleCloseModal = () => {
-    setShowModal(false);
-    window.location.href = "/jadwal-dokter";
+    router.push("/auth/login");
   };
 
   const ErrorMessage = ({ field }) => {
     return errors[field] ? (
-      <p className="text-xs text-red-600 mt-1">{errors[field][0]}</p>
+      <p className="text-xs text-red-600 mt-1 text-left">{errors[field][0]}</p>
     ) : null;
   };
 
@@ -223,17 +202,16 @@ export default function RegisterPage() {
     <>
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4">
         <div className="bg-white shadow-2xl border-t-8 border-primary-600 rounded-2xl p-8 md:p-12 w-full max-w-lg transform transition-all duration-500 hover:shadow-3xl">
-          
-          {/* --- BAGIAN LOGO (Diperbarui) --- */}
+          {/* --- BAGIAN LOGO --- */}
           <div className="flex justify-center mb-6">
-             <Image 
-                src="/images/logo.svg" 
-                alt="Logo Aplikasi"
-                width={120}     
-                height={120}    
-                priority        
-                className="object-contain h-24 w-auto" 
-              />
+            <Image
+              src="/images/logo.svg"
+              alt="Logo Aplikasi"
+              width={120}
+              height={120}
+              priority
+              className="object-contain h-24 w-auto"
+            />
           </div>
 
           <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">
@@ -245,7 +223,7 @@ export default function RegisterPage() {
 
           <form onSubmit={handleRegister} className="space-y-6">
             {errors.general && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
+              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm text-center">
                 {errors.general[0]}
               </div>
             )}
@@ -254,22 +232,22 @@ export default function RegisterPage() {
               <InputField
                 label="Nama Lengkap"
                 type="text"
-                name="namaLengkap"
+                name="name" // Disesuaikan dengan DB
                 placeholder="Nama lengkap Anda"
                 required
                 icon={User}
-                value={formData.namaLengkap}
+                value={formData.name}
                 onChange={handleChange}
-                hasError={!!errors.namaLengkap}
+                hasError={!!errors.name}
               />
-              <ErrorMessage field="namaLengkap" />
+              <ErrorMessage field="name" />
             </div>
 
             <div>
               <InputField
                 label="Email"
                 type="email"
-                name="email"
+                name="email" // Disesuaikan dengan DB
                 placeholder="contoh@mail.com"
                 required
                 icon={Mail}
@@ -284,22 +262,22 @@ export default function RegisterPage() {
               <InputField
                 label="Nomor Telepon (WA)"
                 type="tel"
-                name="noTelepon"
+                name="nomor_telepon" // Disesuaikan dengan DB
                 placeholder="Contoh: 0812xxxxxxxx"
                 required
                 icon={Smartphone}
-                value={formData.noTelepon}
+                value={formData.nomor_telepon}
                 onChange={handleChange}
-                hasError={!!errors.noTelepon}
+                hasError={!!errors.nomor_telepon}
               />
-              <ErrorMessage field="noTelepon" />
+              <ErrorMessage field="nomor_telepon" />
             </div>
 
             <div>
               <InputField
                 label="Kata Sandi"
                 type="password"
-                name="password"
+                name="password" // Disesuaikan dengan DB
                 placeholder="Min. 6 Karakter"
                 required
                 icon={Lock}
@@ -314,15 +292,14 @@ export default function RegisterPage() {
               <InputField
                 label="Konfirmasi Kata Sandi"
                 type="password"
-                name="confirmPassword"
+                name="password_confirmation" // Disesuaikan untuk Laravel
                 placeholder="Ulangi Kata Sandi"
                 required
                 icon={Lock}
-                value={formData.confirmPassword}
+                value={formData.password_confirmation}
                 onChange={handleChange}
-                hasError={!!errors.confirmPassword}
+                hasError={!!errors.password} // Error biasanya gabung di field password
               />
-              <ErrorMessage field="confirmPassword" />
             </div>
 
             <button
@@ -353,6 +330,7 @@ export default function RegisterPage() {
 
       <CompleteProfileModal
         isVisible={showModal}
+        email={formData.email}
         onClose={handleCloseModal}
         onConfirm={handleCompleteProfile}
       />

@@ -5,12 +5,14 @@ import { usePathname } from "next/navigation";
 
 export default function TopNav() {
   const navItems = [
-    // FIX: Path href disesuaikan ke /admin/...
-    { name: "Beranda", href: "/admin/dashboard" }, // Asumsi halaman utama admin
+    { name: "Beranda", href: "/admin/dashboard" }, 
     { name: "Manajemen User", href: "/admin/users" },
-    { name: "Manajemen Poli & Dokter", href: "/admin/dokter" }, // Sesuaikan jika path berbeda
+    { name: "Manajemen Dokter", href: "/admin/dokter" },
+    { name: "Manajemen Jadwal Dokter", href: "/admin/schedule" },
+    { name: "Manajemen Pasien", href: "/admin/pasien" },
     { name: "Manajemen Reservasi", href: "/admin/reservasi" },
-    { name: "Riwayat Reservasi", href: "/admin/riwayat" }, // Sesuaikan jika path berbeda
+    { name: "Manajemen Antrian", href: "/admin/antrian" },
+    { name: "Manajemen Rekam Medis", href: "/admin/rekam-medis" },
   ];
 
   const pathname = usePathname();

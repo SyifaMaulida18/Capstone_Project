@@ -5,13 +5,35 @@ import {
   Calendar,
   User,
   Activity,
-  Clock,
-  MapPin,
   AlertCircle
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
-import api from "../../../services/api";
+import { useEffect, useState } from "react";
+
+// --- DUMMY DATA (Simulasi Backend) ---
+const DUMMY_RESERVATION = {
+  nomor_antrian: "A-12",
+  status: "confirmed",
+  tanggal_reservasi: new Date().toISOString(),
+  poli: { poli_name: "Poli Umum" },
+  dokter: { nama_dokter: "dr. Budi Santoso" }
+};
+
+const DUMMY_QUEUE_DATA = {
+  sedang_dipanggil: { nomor_antrian: "A-05" },
+  sisa_antrian: 6,
+  daftar_tunggu: [
+    { nomor_antrian: "A-05", status: "dipanggil" },
+    { nomor_antrian: "A-06", status: "menunggu" },
+    { nomor_antrian: "A-07", status: "menunggu" },
+    { nomor_antrian: "A-08", status: "menunggu" },
+    { nomor_antrian: "A-09", status: "menunggu" },
+    { nomor_antrian: "A-10", status: "menunggu" },
+    { nomor_antrian: "A-11", status: "menunggu" },
+    { nomor_antrian: "A-12", status: "menunggu" }, // Ini user
+    { nomor_antrian: "A-13", status: "menunggu" },
+  ],
+};
 
 export default function StatusAntrianPage() {
   const router = useRouter();
@@ -23,51 +45,19 @@ export default function StatusAntrianPage() {
     daftar_tunggu: [],
   });
 
-  // --- 1. Fungsi Fetch Data ---
-  const fetchData = useCallback(async () => {
-    try {
-      // A. Ambil Reservasi User Terlebih Dahulu
-      const resReservations = await api.get("/my-reservations");
-      const allReservations = resReservations.data;
-
-      // Cari reservasi yang statusnya confirmed hari ini atau masa depan
-      const todayStr = new Date().toISOString().split("T")[0];
-      const active = allReservations.find(
-        (r) => r.status === "confirmed" && r.tanggal_reservasi >= todayStr
-      );
-
-      setMyReservation(active);
-
-      if (active) {
-        // B. Jika ada reservasi, ambil data antrian spesifik poli & tanggal tersebut
-        const resQueue = await api.get("/antrian/dashboard", {
-          params: {
-            poli_id: active.poli_id,
-            tanggal: active.tanggal_reservasi,
-          },
-        });
-        setQueueData(resQueue.data.data);
-      }
-    } catch (error) {
-      console.error("Gagal memuat data antrian:", error);
-    } finally {
+  // --- 1. Simulasi Load Data ---
+  useEffect(() => {
+    // Simulasi delay jaringan 1.5 detik
+    const timer = setTimeout(() => {
+      setMyReservation(DUMMY_RESERVATION);
+      setQueueData(DUMMY_QUEUE_DATA);
       setIsLoading(false);
-    }
+    }, 1500);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  // --- 2. Initial Load & Auto Refresh ---
-  useEffect(() => {
-    fetchData();
-
-    // Refresh data setiap 30 detik agar realtime
-    const interval = setInterval(() => {
-      fetchData();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [fetchData]);
-
-  // --- 3. Format Tanggal Indonesia ---
+  // --- 2. Format Tanggal Indonesia ---
   const formatDate = (dateString) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -79,16 +69,10 @@ export default function StatusAntrianPage() {
     });
   };
 
-  // --- 4. Hitung Posisi User ---
+  // --- 3. Hitung Posisi User (Logic Frontend Tetap Ada) ---
   const getUserPosition = () => {
     if (!myReservation || !queueData.daftar_tunggu) return 0;
     
-    // Cari index user di daftar tunggu (status menunggu)
-    // Filter dulu yang statusnya menunggu & urutannya di bawah user
-    // Namun cara paling mudah: hitung berapa 'menunggu' yang nomor antriannya lebih kecil/awal dari user? 
-    // Atau backend 'sisa_antrian' mungkin global.
-    
-    // Kita hitung manual berdasarkan array daftar_tunggu agar akurat "X antrian lagi"
     let countAhead = 0;
     let foundMe = false;
 
@@ -97,6 +81,7 @@ export default function StatusAntrianPage() {
         foundMe = true;
         break; 
       }
+      // Hitung orang yang sedang dipanggil atau menunggu sebelum user
       if (q.status === 'menunggu' || q.status === 'dipanggil') {
         countAhead++;
       }
@@ -116,7 +101,7 @@ export default function StatusAntrianPage() {
     );
   }
 
-  // --- Render Jika Tidak Ada Reservasi ---
+  // --- Render Jika Tidak Ada Reservasi (Kondisi Dummy Null) ---
   if (!myReservation) {
     return (
       <div className="min-h-screen bg-neutral-50 flex flex-col">
@@ -141,6 +126,7 @@ export default function StatusAntrianPage() {
     );
   }
 
+  // --- Render Tampilan Utama ---
   return (
     <div className="min-h-screen bg-neutral-50 font-sans pb-10">
       
@@ -209,7 +195,7 @@ export default function StatusAntrianPage() {
                         <p className="font-medium text-neutral-800">
                             {formatDate(myReservation.tanggal_reservasi)}
                         </p>
-                        <p className="text-sm font-bold text-blue-600">09:00 WIB</p> {/* Jam bisa diambil dari jadwal jika ada */}
+                        <p className="text-sm font-bold text-blue-600">09:00 WIB</p>
                     </div>
                 </div>
             </div>
@@ -239,7 +225,6 @@ export default function StatusAntrianPage() {
                         const isServing = item.status === 'dipanggil';
                         const isDone = item.status === 'selesai';
 
-                        // Jangan tampilkan yang sudah selesai agar list tidak kepanjangan (opsional)
                         if (isDone) return null;
 
                         return (
@@ -258,7 +243,7 @@ export default function StatusAntrianPage() {
                                         isMe ? "bg-blue-600 text-white" : 
                                         isServing ? "bg-green-500 text-white" : "bg-neutral-300 text-neutral-600"
                                     }`}>
-                                        {item.nomor_antrian.split('-').pop()} {/* Ambil angka belakangnya saja misal A01 -> 01 */}
+                                        {item.nomor_antrian.split('-').pop()}
                                     </div>
                                     <div>
                                         <p className={`font-bold ${isMe ? "text-blue-800" : "text-neutral-700"}`}>

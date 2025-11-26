@@ -3,24 +3,36 @@
 import {
   Calendar,
   Clock,
-  History,
-  MessageSquare,
-  PlusCircle,
-  CheckCircle,
-  Bell,
-  ChevronRight,
-  MapPin,
   FileText,
-  LogOut // Ikon tambahan untuk logout jika perlu
+  History,
+  MessageSquare
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+// --- IMPORT KOMPONEN LAIN ---
 import Footer from "../../../components/user/Footer";
 import Header from "../../../components/user/Header";
 import Navbar from "../../../components/user/Navbar";
-import api from "../../../services/api";
+import StatusAntrian from "../../../components/user/StatusAntrian"; // Pastikan path ini benar
 
-// --- KOMPONEN UI BARU SESUAI DESAIN ---
+// --- DUMMY DATA ---
+const DUMMY_USER = "Syifa"; 
+const DUMMY_STATS = {
+  active: 1,
+  total: 12,
+  messages: 2,
+};
+const DUMMY_APPOINTMENT = {
+  id: 1,
+  poli: { poli_name: "Poli Umum" },
+  dokter: { nama_dokter: "Dr. Budi Santoso, Sp.PD" },
+  tanggal_reservasi: "Rabu, 5 November 2025",
+  nomor_antrian: "A12",
+  status: "confirmed",
+};
+
+// --- SUB-KOMPONEN UI ---
 
 // 1. Stat Box (Kotak Angka di Header Biru)
 const StatBox = ({ number, label, isActive = false }) => (
@@ -32,19 +44,15 @@ const StatBox = ({ number, label, isActive = false }) => (
   </div>
 );
 
-// 2. Kartu Reservasi Mendatang (Main Card) - DIPERBAIKI
-const UpcomingReservationCard = ({ appointment, loading }) => {
-  // --- TAMPILAN LOADING (SKELETON UI) ---
+// 2. Kartu Reservasi Mendatang
+const UpcomingReservationCard = ({ appointment, loading, onViewQueue }) => {
   if (loading) {
     return (
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 h-auto">
-        {/* Header Skeleton */}
         <div className="flex justify-between items-start mb-6">
           <div className="h-5 w-40 bg-neutral-200 rounded-md animate-pulse"></div>
           <div className="h-6 w-24 bg-neutral-200 rounded-full animate-pulse"></div>
         </div>
-
-        {/* Info Dokter Skeleton */}
         <div className="flex items-center space-x-3 mb-4">
           <div className="w-10 h-10 bg-neutral-200 rounded-lg animate-pulse"></div>
           <div className="space-y-2">
@@ -52,17 +60,12 @@ const UpcomingReservationCard = ({ appointment, loading }) => {
             <div className="h-3 w-24 bg-neutral-200 rounded animate-pulse"></div>
           </div>
         </div>
-
-        {/* Nomor Antrian Skeleton (Kotak Besar) */}
         <div className="bg-neutral-100 rounded-xl p-4 h-24 w-full animate-pulse mb-4"></div>
-
-        {/* Tombol Skeleton */}
         <div className="h-12 w-full bg-neutral-200 rounded-xl animate-pulse"></div>
       </div>
     );
   }
 
-  // --- TAMPILAN JIKA TIDAK ADA DATA ---
   if (!appointment) {
     return (
       <div className="bg-white p-6 rounded-3xl shadow-lg border border-neutral-100">
@@ -72,7 +75,7 @@ const UpcomingReservationCard = ({ appointment, loading }) => {
         <div className="text-center py-6 text-neutral-500">
           <Calendar className="w-12 h-12 mx-auto mb-3 text-neutral-300" />
           <p className="text-sm">Tidak ada reservasi aktif saat ini.</p>
-          <a href="/user/reservasi" className="text-primary-600 font-bold text-sm mt-2 block hover:underline">
+          <a href="/user/reservasi" className="text-blue-600 font-bold text-sm mt-2 block hover:underline">
             Buat Reservasi Baru
           </a>
         </div>
@@ -80,7 +83,6 @@ const UpcomingReservationCard = ({ appointment, loading }) => {
     );
   }
 
-  // --- TAMPILAN DATA ASLI ---
   return (
     <div className="bg-white p-6 rounded-3xl shadow-xl border border-neutral-100 relative overflow-hidden transition-all duration-500 ease-in-out">
       <div className="flex justify-between items-start mb-4">
@@ -111,7 +113,11 @@ const UpcomingReservationCard = ({ appointment, loading }) => {
         <span className="text-3xl font-extrabold text-blue-800 mt-1">{appointment.nomor_antrian}</span>
       </div>
 
-      <button className="w-full py-3 rounded-xl border border-neutral-200 font-semibold text-neutral-700 hover:bg-neutral-50 transition flex justify-center items-center">
+      {/* TOMBOL LIHAT STATUS */}
+      <button 
+        onClick={onViewQueue}
+        className="w-full py-3 rounded-xl border border-neutral-200 font-semibold text-neutral-700 hover:bg-neutral-50 transition flex justify-center items-center"
+      >
         Lihat Status Antrian
       </button>
     </div>
@@ -143,31 +149,21 @@ const NotificationItem = ({ title, time, isNew = false }) => (
 );
 
 
+// --- MAIN COMPONENT ---
 export default function DashboardPage() {
+  const router = useRouter();
+  
   const [isLoading, setIsLoading] = useState(true);
+  const [showAntrian, setShowAntrian] = useState(false);
+
   const [userName, setUserName] = useState("");
   const [nextAppointment, setNextAppointment] = useState(null);
-  const [stats, setStats] = useState({ active: 0, total: 0, messages: 2 }); // Messages hardcoded for demo
-  
-  // Notification Mock Data (Bisa diganti API nanti)
-  const notifications = [
+  const [stats, setStats] = useState({ active: 0, total: 0, messages: 0 });
+  const [notifications, setNotifications] = useState([
     { id: 1, title: "Jangan lupa bawa kartu identitas saat kunjungan", time: "5 jam lalu", isNew: true },
-    { id: 2, title: "Hasil lab Anda sudah tersedia", time: "1 hari lalu", isNew: true },
-  ];
+    { id: 2, title: "Hasil lab Anda sudah tersedia", time: "1 hari lalu", isNew: false },
+  ]);
 
-  // Jika ada appointment, tambahkan notifikasi dinamis
-  if (nextAppointment) {
-     notifications.unshift({
-        id: 0, 
-        title: `Reservasi Anda dikonfirmasi untuk ${nextAppointment.tanggal_reservasi}`, 
-        time: "Baru saja", 
-        isNew: true 
-     });
-  }
-
-  const router = useRouter();
-
-  // Navigasi tetap sama seperti kode lama
   const navItems = [
     { name: "Beranda", href: "/user/dashboard", isActive: true },
     { name: "Cek Jadwal Poli", href: "/jadwal_DokterPoli", isActive: false },
@@ -175,55 +171,37 @@ export default function DashboardPage() {
   ];
 
   useEffect(() => {
-    const loadDashboardData = async () => {
-      setIsLoading(true);
-      const token = localStorage.getItem("token");
-      const name = localStorage.getItem("userName");
-
-      if (!token) {
-        router.push("/auth/login");
-        return;
+    const timer = setTimeout(() => {
+      setUserName(DUMMY_USER);
+      setStats(DUMMY_STATS);
+      setNextAppointment(DUMMY_APPOINTMENT);
+      
+      if (DUMMY_APPOINTMENT) {
+         setNotifications(prev => [
+            { 
+               id: 0, 
+               title: `Reservasi Anda dikonfirmasi untuk ${DUMMY_APPOINTMENT.tanggal_reservasi}`, 
+               time: "Baru saja", 
+               isNew: true 
+            },
+            ...prev
+         ]);
       }
+      
+      setIsLoading(false);
+    }, 1500);
 
-      // Ambil nama depan saja agar fit di desain
-      const firstName = name ? name.split(" ")[0] : "Pasien";
-      setUserName(firstName);
+    return () => clearTimeout(timer);
+  }, []);
 
-      try {
-        // 1. Ambil semua reservasi user
-        const resReservations = await api.get("/my-reservations");
-        const allReservations = resReservations.data;
+  // --- RENDER FULL SCREEN STATUS ANTRIAN ---
+  if (showAntrian) {
+    return <StatusAntrian onBack={() => setShowAntrian(false)} />;
+  }
 
-        // 2. Cari reservasi aktif (confirmed & hari ini atau di masa depan)
-        const today = new Date(new Date().setHours(0, 0, 0, 0));
-        const confirmedApps = allReservations.filter(
-          (r) => r.status === "confirmed" && new Date(r.tanggal_reservasi) >= today
-        );
-
-        // Ambil yang paling dekat
-        const nextAppt = confirmedApps.length > 0 ? confirmedApps[0] : null;
-        setNextAppointment(nextAppt);
-
-        // 3. Hitung Stats
-        setStats(prev => ({
-            ...prev,
-            active: confirmedApps.length,
-            total: allReservations.length
-        }));
-
-      } catch (error) {
-        console.error("Gagal memuat data dashboard:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadDashboardData();
-  }, [router]);
-
+  // --- RENDER DASHBOARD UTAMA ---
   return (
     <div className="min-h-screen flex flex-col bg-neutral-50 font-sans">
-      {/* Header & Navbar Global (Tetap ada sesuai request) */}
       <Header />
       <Navbar navItems={navItems} />
 
@@ -231,11 +209,14 @@ export default function DashboardPage() {
         
         {/* --- BLUE HEADER SECTION --- */}
         <div className="bg-blue-600 px-6 pt-6 pb-24 rounded-b-[2.5rem] shadow-lg">
-            {/* Top Bar: Greeting & Icons */}
             <div className="flex justify-between items-start mb-8">
                 <div>
                     <p className="text-blue-100 text-sm mb-1">Selamat datang,</p>
-                    <h1 className="text-3xl font-bold text-white capitalize">{userName}</h1>
+                    {isLoading ? (
+                        <div className="h-8 w-32 bg-white/20 rounded animate-pulse"></div>
+                    ) : (
+                        <h1 className="text-3xl font-bold text-white capitalize">{userName}</h1>
+                    )}
                 </div>
             </div>
 
@@ -247,11 +228,15 @@ export default function DashboardPage() {
             </div>
         </div>
 
-        {/* --- MAIN CONTENT (Overlapping the blue header) --- */}
+        {/* --- MAIN CONTENT --- */}
         <div className="px-6 -mt-16 space-y-6">
             
             {/* 1. Main Card (Reservasi) */}
-            <UpcomingReservationCard appointment={nextAppointment} loading={isLoading} />
+            <UpcomingReservationCard 
+                appointment={nextAppointment} 
+                loading={isLoading} 
+                onViewQueue={() => setShowAntrian(true)} // Trigger Status Antrian
+            />
 
             {/* 2. Grid Menu */}
             <div className="grid grid-cols-2 gap-4">
@@ -259,7 +244,7 @@ export default function DashboardPage() {
                     icon={Clock} 
                     label="Buat Reservasi" 
                     href="/user/reservasi" 
-                    isActive={true} // Blue button
+                    isActive={true} 
                 />
                 <MenuButton 
                     icon={Calendar} 
@@ -275,7 +260,7 @@ export default function DashboardPage() {
                     icon={MessageSquare} 
                     label="Chat Admin" 
                     href="/user/chat"
-                    hasNotif={true}
+                    hasNotif={stats.messages > 0}
                 />
             </div>
 
@@ -283,14 +268,21 @@ export default function DashboardPage() {
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
                 <h3 className="text-lg font-bold text-neutral-800 mb-4">Notifikasi</h3>
                 <div>
-                    {notifications.map((notif) => (
-                        <NotificationItem 
-                            key={notif.id} 
-                            title={notif.title} 
-                            time={notif.time} 
-                            isNew={notif.isNew} 
-                        />
-                    ))}
+                    {isLoading ? (
+                        <div className="space-y-3">
+                            <div className="h-14 w-full bg-neutral-100 rounded-xl animate-pulse"></div>
+                            <div className="h-14 w-full bg-neutral-100 rounded-xl animate-pulse"></div>
+                        </div>
+                    ) : (
+                        notifications.map((notif) => (
+                            <NotificationItem 
+                                key={notif.id} 
+                                title={notif.title} 
+                                time={notif.time} 
+                                isNew={notif.isNew} 
+                            />
+                        ))
+                    )}
                 </div>
             </div>
             

@@ -4,102 +4,79 @@ import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, MessageSquare, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import ChatInterface from "../../../components/ChatInterface"; 
-import api from "../../../services/api"; // Pastikan path ini benar
 
-// ID Admin tujuan chat (Misal: Admin Utama ID = 1)
-// Nanti bisa dibuat dinamis jika ada fitur pilih admin
-const TARGET_ADMIN_ID = 1; 
+// --- DUMMY DATA (Data Awal Chat) ---
+const INITIAL_MESSAGES = [
+  {
+    id: 1,
+    text: "Halo, selamat datang di layanan support RS. Ada yang bisa kami bantu?",
+    sender: "admin",
+    time: "08:00",
+  },
+  {
+    id: 2,
+    text: "Saya ingin bertanya jadwal dokter mata hari ini.",
+    sender: "user",
+    time: "08:05",
+  },
+  {
+    id: 3,
+    text: "Untuk Dokter Mata hari ini praktek pukul 09.00 - 12.00 WIB, Kak.",
+    sender: "admin",
+    time: "08:07",
+  },
+];
 
 export default function UserChatPage() {
   const router = useRouter();
-  const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [isSending, setIsSending] = useState(false);
-  
-  // Ref untuk interval polling agar bisa dibersihkan
-  const pollingInterval = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // --- 1. Fungsi Mengambil Pesan dari API ---
-  const fetchMessages = async () => {
-    try {
-      // Panggil endpoint: GET /api/chat/{receiverType}/{receiverId}
-      const response = await api.get(`/chat/admin/${TARGET_ADMIN_ID}`);
-      
-      if (response.data.success) {
-        const rawMessages = response.data.data;
-
-        // Format data dari Database Laravel ke Format UI React
-        const formattedMessages = rawMessages.map((msg) => ({
-          id: msg.id,
-          text: msg.message,
-          // Logika: Jika senderable_type mengandung 'User', maka itu 'user', selain itu 'admin'
-          sender: msg.senderable_type.includes("User") ? "user" : "admin",
-          time: new Date(msg.created_at).toLocaleTimeString("id-ID", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        }));
-
-        setMessages(formattedMessages);
-      }
-    } catch (error) {
-      console.error("Gagal memuat pesan:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // --- 2. useEffect untuk Load Awal & Polling ---
+  // --- 1. Simulasi Load Awal ---
   useEffect(() => {
-    // Load pertama kali
-    fetchMessages();
+    // Simulasi loading sebentar saat halaman dibuka
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
 
-    // Set interval untuk mengecek pesan baru setiap 3 detik (Polling)
-    pollingInterval.current = setInterval(() => {
-      fetchMessages();
-    }, 3000);
-
-    // Bersihkan interval saat komponen di-unmount (pindah halaman)
-    return () => {
-      if (pollingInterval.current) clearInterval(pollingInterval.current);
-    };
+    return () => clearTimeout(timer);
   }, []);
 
-  // --- 3. Fungsi Mengirim Pesan ---
-  const handleSendMessage = async (text) => {
+  // --- 2. Fungsi Mengirim Pesan (Simulasi Lokal) ---
+  const handleSendMessage = (text) => {
     if (!text.trim()) return;
 
     setIsSending(true);
 
-    // Optimistic UI: Tampilkan pesan di layar sebelum sukses masuk DB (agar terasa cepat)
-    const tempId = Date.now();
-    const newMessage = {
-      id: tempId,
-      text,
+    // 1. Tambahkan pesan User ke list
+    const userMsgId = Date.now();
+    const newUserMessage = {
+      id: userMsgId,
+      text: text,
       sender: "user",
       time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-      isPending: true, // Flag opsional untuk indikator loading
     };
-    setMessages((prev) => [...prev, newMessage]);
 
-    try {
-      // Panggil endpoint: POST /api/chat/send
-      await api.post("/chat/send", {
-        receiver_type: "admin",
-        receiver_id: TARGET_ADMIN_ID,
-        message: text,
-      });
+    setMessages((prev) => [...prev, newUserMessage]);
 
-      // Setelah sukses, refresh data dari server untuk sinkronisasi ID dan waktu server
-      fetchMessages(); 
-    } catch (error) {
-      console.error("Gagal mengirim pesan:", error);
-      // Opsional: Beri notifikasi gagal atau hapus pesan dari UI
-      alert("Gagal mengirim pesan. Silakan coba lagi.");
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
-    } finally {
+    // 2. Simulasi "Sending..." delay dan Balasan Admin Otomatis
+    setTimeout(() => {
       setIsSending(false);
-    }
+
+      // Simulasi Admin membalas setelah 1.5 detik user mengirim pesan
+      setTimeout(() => {
+        const adminMsgId = Date.now() + 1;
+        const autoReply = {
+          id: adminMsgId,
+          text: "Terima kasih atas pesannya. Admin kami akan segera merespons pertanyaan Anda.",
+          sender: "admin",
+          time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        };
+        setMessages((prev) => [...prev, autoReply]);
+      }, 1500);
+
+    }, 500); // Delay tombol kirim
   };
 
   return (
@@ -127,7 +104,7 @@ export default function UserChatPage() {
         </div>
 
         {/* Loading State Awal */}
-        {isLoading && messages.length === 0 ? (
+        {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center text-neutral-400">
             <Loader2 className="w-8 h-8 animate-spin mb-2" />
             <p>Memuat percakapan...</p>
@@ -138,7 +115,7 @@ export default function UserChatPage() {
             messages={messages}
             onSendMessage={handleSendMessage}
             currentUserRole="user"
-            isSending={isSending} // Props tambahan jika ChatInterface mendukung loading state tombol kirim
+            isSending={isSending} 
           />
         )}
       </div>

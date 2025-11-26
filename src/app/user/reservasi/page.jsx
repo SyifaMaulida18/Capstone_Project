@@ -1,420 +1,431 @@
-// app/user/reservasi/page.js
-// VERSI UNTUK MENDAFTARKAN ORANG LAIN
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api from "../../../services/api";
 import {
-  Stethoscope,
-  ClipboardList,
   Activity,
   ArrowRight,
   ArrowLeft,
-  X,
   Loader2,
   AlertCircle,
-  Users, // Ganti ikon
+  Check,
+  CheckCircle,
+  ClipboardList,
+  User,
+  Users,
+  History,
+  Calendar,
+  Stethoscope,
+  Plus
 } from "lucide-react";
+
+// --- DUMMY DATA ---
+// 1. Profil User Utama
+const DUMMY_USER_PROFILE = {
+  id: "u1",
+  name: "Syifa",
+  relation: "self", // Penanda Diri Sendiri
+  email: "syifa@example.com",
+  nomor_telepon: "081234567890",
+  noKTP: "6471000000000001",
+  tempat_lahir: "Balikpapan",
+  tanggal_lahir: "1999-05-20",
+};
+
+// 2. Daftar Keluarga yang tersimpan (Family Folder)
+const DUMMY_FAMILY_MEMBERS = [
+  {
+    id: "f1",
+    name: "Bapak Joko",
+    relation: "Ayah",
+    nomor_telepon: "08111111111",
+    noKTP: "6471000000000002",
+    tempat_lahir: "Surabaya",
+    tanggal_lahir: "1965-01-01",
+  },
+  {
+    id: "f2",
+    name: "Adik Budi",
+    relation: "Anak",
+    nomor_telepon: "-",
+    noKTP: "-",
+    tempat_lahir: "Balikpapan",
+    tanggal_lahir: "2015-06-10",
+  }
+];
+
+const DUMMY_POLIS = [
+  { poli_id: 1, poli_name: "Poli Umum" },
+  { poli_id: 2, poli_name: "Poli Gigi" },
+  { poli_id: 3, poli_name: "Poli Jantung" },
+  { poli_id: 4, poli_name: "Poli Mata" },
+];
+
+// 3. Rekam Medis (Dicampur user & keluarga)
+const DUMMY_MEDICAL_RECORDS = [
+  {
+    id: 101,
+    patient_id: "u1", // Milik Syifa
+    tanggal: "2023-10-15",
+    poli_id: 2,
+    poli_name: "Poli Gigi",
+    dokter: "drg. Budi",
+    diagnosa: "Perawatan Saluran Akar",
+  },
+  {
+    id: 102,
+    patient_id: "u1", // Milik Syifa
+    tanggal: "2023-11-01",
+    poli_id: 3,
+    poli_name: "Poli Jantung",
+    dokter: "dr. Hartono",
+    diagnosa: "Hipertensi Rutin",
+  },
+  {
+    id: 103,
+    patient_id: "f1", // Milik Ayah
+    tanggal: "2023-09-01",
+    poli_id: 3,
+    poli_name: "Poli Jantung",
+    dokter: "dr. Hartono",
+    diagnosa: "Kontrol Jantung",
+  }
+];
 
 export default function ReservasiPage() {
   const router = useRouter();
+
+  // --- STATE ---
+  const [currentStep, setCurrentStep] = useState(1);
+  
+  // State Pasien
+  const [selectedPatientId, setSelectedPatientId] = useState("u1"); // Default diri sendiri
+  const [patientList] = useState([DUMMY_USER_PROFILE, ...DUMMY_FAMILY_MEMBERS]); // Gabung list
+  
+  const [isControl, setIsControl] = useState(false); 
+  const [selectedRecordId, setSelectedRecordId] = useState(null);
+
   const [formData, setFormData] = useState({
-    // 1. SEMUA DATA PASIEN SEKARANG KOSONG (UNTUK DIISI MANUAL)
-    nama: "",
-    email: "",
-    nomor_whatsapp: "",
-    nomor_ktp: "",
-    tempat_lahir: "",
-    tanggal_lahir: "",
+    nama: DUMMY_USER_PROFILE.name, // Default isi nama user
+    email: DUMMY_USER_PROFILE.email,
+    nomor_whatsapp: DUMMY_USER_PROFILE.nomor_telepon,
+    nomor_ktp: DUMMY_USER_PROFILE.noKTP,
+    tempat_lahir: DUMMY_USER_PROFILE.tempat_lahir,
+    tanggal_lahir: DUMMY_USER_PROFILE.tanggal_lahir,
     penjaminan: "cash",
     keluhan: "",
-    poli_id: "", 
+    poli_id: "",
+    poli_nama: "",
     tanggal_reservasi: "",
   });
 
-  const [polis, setPolis] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [loadingDiagnosa, setLoadingDiagnosa] = useState(false);
   const [error, setError] = useState("");
-  const [diagnosis, setDiagnosis] = useState(""); 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // 2. useEffect SEKARANG HANYA MENGAMBIL POLI
-  useEffect(() => {
-    // Ambil data poli (untuk "model AI")
-    const fetchPolis = async () => {
-      try {
-        const response = await api.get("/polis-public");
-        setPolis(response.data);
-      } catch (err) {
-        console.error("Gagal mengambil data poli:", err);
-        setError(
-          "Gagal memuat model AI (poli). Silakan refresh halaman."
-        );
+  // Filter Rekam Medis berdasarkan pasien yang dipilih
+  const filteredMedicalRecords = DUMMY_MEDICAL_RECORDS.filter(r => r.patient_id === selectedPatientId);
+
+  // --- HANDLER GANTI PASIEN ---
+  const handlePatientChange = (e) => {
+    const newId = e.target.value;
+    setSelectedPatientId(newId);
+    setIsControl(false); // Reset kontrol
+    setSelectedRecordId(null);
+
+    if (newId === "new") {
+      // Reset form kosong untuk orang baru
+      setFormData(prev => ({
+        ...prev,
+        nama: "", email: "", nomor_whatsapp: "", nomor_ktp: "", tempat_lahir: "", tanggal_lahir: "",
+        poli_id: "", poli_nama: "", keluhan: ""
+      }));
+    } else {
+      // Isi form sesuai data keluarga yg dipilih
+      const patient = patientList.find(p => p.id === newId);
+      if (patient) {
+        setFormData(prev => ({
+          ...prev,
+          nama: patient.name,
+          email: patient.email || "",
+          nomor_whatsapp: patient.nomor_telepon || "",
+          nomor_ktp: patient.noKTP || "",
+          tempat_lahir: patient.tempat_lahir || "",
+          tanggal_lahir: patient.tanggal_lahir || "",
+          poli_id: "", poli_nama: "", keluhan: "" // Reset poli & keluhan
+        }));
       }
-    };
+    }
+  };
 
-    fetchPolis();
-  }, []); // <-- Logika localStorage.getItem() sudah dihapus
-
-  // Handle perubahan di setiap input
+  // --- HANDLER LAINNYA ---
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleControlCheck = (e) => {
+    setIsControl(e.target.checked);
+    // Reset poli saat mode berubah
+    setFormData(prev => ({ ...prev, keluhan: "", poli_id: "", poli_nama: "" }));
+    setSelectedRecordId(null);
+  };
+
+  const handleSelectRecord = (record) => {
+    setSelectedRecordId(record.id);
+    setFormData(prev => ({
       ...prev,
-      [name]: value,
+      poli_id: record.poli_id,
+      poli_nama: record.poli_name,
+      keluhan: `Kontrol Rutin: ${record.diagnosa} (Dokter sebelumnya: ${record.dokter})`,
     }));
   };
 
-  // Fungsi "Diagnosa Otomatis" (Tetap sama)
   const handleDiagnosis = () => {
     setLoadingDiagnosa(true);
-    setError("");
-    setDiagnosis("");
-
-    const keluhan = formData.keluhan;
-    if (keluhan.trim() === "") {
-      setError("Mohon isi keluhan / gejala terlebih dahulu.");
-      setLoadingDiagnosa(false);
-      return;
-    }
-
-    if (polis.length === 0) {
-      setError("Data poli (model AI) belum siap. Coba beberapa saat lagi.");
-      setLoadingDiagnosa(false);
-      return;
-    }
-
-    // --- Logika AI Palsu (Simulasi) ---
-    const keluhanLower = keluhan.toLowerCase();
-    let foundPoli = null;
-
-    const poliJantung = polis.find(p => p.poli_name.toLowerCase().includes("jantung"));
-    const poliGigi = polis.find(p => p.poli_name.toLowerCase().includes("gigi"));
-    const poliAnak = polis.find(p => p.poli_name.toLowerCase().includes("anak"));
-
-    if ((keluhanLower.includes("jantung") || keluhanLower.includes("dada sesak")) && poliJantung) {
-      foundPoli = poliJantung;
-    } else if ((keluhanLower.includes("gigi") || keluhanLower.includes("gusi")) && poliGigi) {
-      foundPoli = poliGigi;
-    } else if ((keluhanLower.includes("anak") || keluhanLower.includes("bayi")) && poliAnak) {
-      foundPoli = poliAnak;
-    }
-
-    if (!foundPoli) {
-      foundPoli = polis.find(p => p.poli_name.toLowerCase().includes("umum"));
-    }
-    if (!foundPoli && polis.length > 0) {
-      foundPoli = polis[0];
-    }
-    // ---------------------------------
-
     setTimeout(() => {
-      if (foundPoli) {
-        setFormData(prev => ({
+        // Dummy logic: Selalu ke Poli Umum
+        const foundPoli = DUMMY_POLIS[0]; 
+        setFormData((prev) => ({
           ...prev,
-          poli_id: foundPoli.poli_id 
+          poli_id: foundPoli.poli_id,
+          poli_nama: foundPoli.poli_name,
         }));
-        setDiagnosis(`Analisis AI: Keluhan Anda disarankan untuk ke ${foundPoli.poli_name}.`);
-      } else {
-        setError("Tidak dapat menentukan poli. Silakan hubungi admin.");
-      }
-      setLoadingDiagnosa(false);
-    }, 1000); 
+        setLoadingDiagnosa(false);
+    }, 1500);
   };
 
+  const nextStep = () => {
+    setError("");
+    if (currentStep === 1) {
+      if (!formData.poli_id) return setError("Silakan pilih Poli / Riwayat Kontrol.");
+      if (!formData.keluhan) return setError("Silakan isi keluhan.");
+    }
+    if (currentStep === 2) {
+      if (!formData.nama || !formData.tanggal_lahir) return setError("Lengkapi data diri pasien.");
+    }
+    setCurrentStep(prev => prev + 1);
+  };
 
-  // Handle submit form ke backend
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
-
-    // Validasi frontend (sekarang cek semua data pasien)
-    if (!formData.nama || !formData.nomor_ktp || !formData.nomor_whatsapp || !formData.tempat_lahir || !formData.tanggal_lahir) {
-        setError("Data pasien (Nama, KTP, No. HP, Tempat & Tgl. Lahir) wajib diisi.");
+    setTimeout(() => {
         setLoading(false);
-        return;
-    }
-    if (!formData.poli_id) {
-        setError("Harap jalankan \"Diagnosa Otomatis\" terlebih dahulu.");
-        setLoading(false);
-        return;
-    }
-    if (!formData.tanggal_reservasi || !formData.keluhan) {
-      setError("Tanggal Reservasi dan Keluhan wajib diisi.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await api.post("/reservations", formData);
-
-      if (response.status === 201) {
         setShowSuccessModal(true);
-      }
-    } catch (err) {
-      console.error("Error submit reservasi:", err);
-      if (err.response && err.response.status === 422) {
-        const validationErrors = err.response.data.errors;
-        const firstError = Object.values(validationErrors)[0][0];
-        setError(`Validasi gagal: ${firstError}`);
-      } else {
-        setError("Terjadi kesalahan saat mengirim reservasi. Silakan coba lagi.");
-      }
-    } finally {
-      setLoading(false);
-    }
+    }, 2000);
   };
 
-  const handleBack = () => {
-    router.back();
-  };
-
-  const handleCloseModal = () => {
-    setShowSuccessModal(false);
-    router.push("/user/dashboard");
-  };
+  const Stepper = () => (
+    <div className="w-full max-w-3xl mx-auto mb-8 px-4 relative">
+        <div className="absolute top-5 left-0 w-full h-1 bg-gray-200 -z-10"></div>
+        <div className="flex justify-between items-start w-full">
+          {["Tujuan", "Data Pasien", "Konfirmasi"].map((label, index) => {
+            const stepNum = index + 1;
+            const active = stepNum === currentStep;
+            const done = stepNum < currentStep;
+            return (
+              <div key={index} className="flex flex-col items-center">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-4 bg-white ${active ? "border-[#8CC63F] text-[#003B73]" : done ? "bg-[#003B73] text-white border-[#003B73]" : "border-gray-200 text-gray-400"}`}>
+                  {done ? <Check size={16} /> : stepNum}
+                </div>
+                <span className={`text-xs mt-1 font-medium ${active ? "text-[#003B73]" : "text-gray-400"}`}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+    </div>
+  );
 
   return (
-    <div className="relative min-h-screen bg-neutral-50 flex justify-center items-start py-10 px-4">
-      <div className="w-full max-w-3xl bg-white shadow-lg rounded-2xl p-8 border border-neutral-200">
-        {/* ... Header ... */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <Users className="text-primary-600 w-6 h-6" /> {/* Ikon diubah */}
-            <h1 className="text-2xl font-semibold text-neutral-800">
-              Formulir Pendaftaran Pasien
-            </h1>
-          </div>
-          <button
-            onClick={handleBack}
-            className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            aria-label="Kembali"
-          >
-            <ArrowLeft size={22} />
-          </button>
+    <div className="min-h-screen bg-neutral-50 flex justify-center items-start py-8 md:py-12 px-4">
+      <div className="w-full max-w-4xl bg-white shadow-xl rounded-3xl overflow-hidden border border-neutral-100">
+        <div className="bg-[#003B73] px-6 py-5 flex items-center gap-4 text-white">
+          <button onClick={() => router.back()}><ArrowLeft /></button>
+          <h1 className="text-xl font-bold">Buat Reservasi</h1>
         </div>
 
-        {/* Form Utama */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <h2 className="text-lg font-semibold text-neutral-700 border-b pb-2">
-            Data Pasien (Keluarga Anda)
-          </h2>
-          {/* 3. SEMUA FIELD PASIEN SEKARANG EDITABLE */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField
-              label="Nama Lengkap Pasien"
-              name="nama"
-              value={formData.nama}
-              onChange={handleChange}
-              placeholder="Contoh: Budi Gunawan"
-              required
-            />
-            <InputField 
-              label="Email Pasien (Opsional)" 
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="email@pasien.com"
-            />
-            <InputField
-              label="No. HP (WhatsApp) Pasien"
-              name="nomor_whatsapp"
-              value={formData.nomor_whatsapp}
-              onChange={handleChange}
-              placeholder="0812..."
-              required
-            />
-            <InputField
-              label="NIK (Nomor KTP) Pasien"
-              name="nomor_ktp"
-              value={formData.nomor_ktp}
-              onChange={handleChange}
-              placeholder="Wajib diisi (16 digit)"
-              required
-            />
-            <InputField
-              label="Tempat Lahir Pasien"
-              name="tempat_lahir"
-              value={formData.tempat_lahir}
-              onChange={handleChange}
-              placeholder="Wajib diisi"
-              required
-            />
-            <InputField
-              label="Tanggal Lahir Pasien"
-              name="tanggal_lahir"
-              type="date"
-              value={formData.tanggal_lahir}
-              onChange={handleChange}
-              required
-            />
-          </div>
+        <div className="p-6 md:p-8">
+          <Stepper />
+          {error && <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex gap-2"><AlertCircle size={18}/>{error}</div>}
 
-          <hr className="my-4" />
-          
-          <h2 className="text-lg font-semibold text-neutral-700 border-b pb-2">
-            Data Kunjungan
-          </h2>
-          {/* Data Reservasi (Tetap sama) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-            <div className="flex flex-col">
-              <label className="text-sm text-neutral-700 font-medium mb-1.5">
-                Penjaminan
-              </label>
-              <select
-                name="penjaminan"
-                value={formData.penjaminan}
-                onChange={handleChange}
-                className="w-full border border-neutral-200 rounded-lg p-2.5 text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="cash">Pribadi (Cash)</option>
-                <option value="asuransi">Asuransi</option>
-              </select>
+          <form onSubmit={handleSubmit}>
+            {/* STEP 1 */}
+            {currentStep === 1 && (
+              <div className="space-y-6 animate-fadeIn">
+                
+                {/* 1. PILIH PASIEN (Fitur Baru) */}
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <label className="text-sm font-bold text-[#003B73] mb-2 flex items-center gap-2">
+                        <Users size={18} /> Reservasi Untuk Siapa?
+                    </label>
+                    <select 
+                        value={selectedPatientId} 
+                        onChange={handlePatientChange}
+                        className="w-full p-3 rounded-lg border border-blue-200 focus:ring-2 focus:ring-blue-500 outline-none bg-white font-medium text-gray-700"
+                    >
+                        {patientList.map(p => (
+                            <option key={p.id} value={p.id}>
+                                {p.relation === 'self' ? `${p.name} (Saya Sendiri)` : `${p.name} (${p.relation})`}
+                            </option>
+                        ))}
+                        <option value="new">+ Tambah Pasien Baru</option>
+                    </select>
+                </div>
+
+                {/* 2. KONTROL CHECKBOX (Hanya muncul jika bukan pasien baru & ada history) */}
+                {selectedPatientId !== "new" && (
+                    <div className="flex items-center gap-3 p-4 border rounded-xl hover:bg-gray-50 cursor-pointer" onClick={() => !filteredMedicalRecords.length ? null : document.getElementById('ctrl').click()}>
+                        <input 
+                            id="ctrl" type="checkbox" checked={isControl} onChange={handleControlCheck} 
+                            disabled={filteredMedicalRecords.length === 0}
+                            className="w-5 h-5 accent-[#003B73]" 
+                        />
+                        <div className="flex-1">
+                            <span className={`font-bold block ${filteredMedicalRecords.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>Kunjungan Kontrol</span>
+                            {filteredMedicalRecords.length === 0 && <span className="text-xs text-red-400">Tidak ada riwayat medis untuk pasien ini.</span>}
+                        </div>
+                    </div>
+                )}
+
+                {/* 3. KONTEN DINAMIS */}
+                {isControl ? (
+                    <div className="space-y-3">
+                        <p className="text-sm font-bold text-gray-700">Pilih Riwayat {patientList.find(p=>p.id===selectedPatientId)?.name}:</p>
+                        <div className="grid md:grid-cols-2 gap-3">
+                            {filteredMedicalRecords.map(rec => (
+                                <div key={rec.id} onClick={() => handleSelectRecord(rec)} className={`p-4 border rounded-xl cursor-pointer relative ${selectedRecordId === rec.id ? "border-[#8CC63F] bg-green-50" : "hover:bg-gray-50"}`}>
+                                    {selectedRecordId === rec.id && <CheckCircle size={18} className="absolute top-2 right-2 text-[#8CC63F]" />}
+                                    <p className="text-xs text-gray-500 mb-1">{rec.tanggal}</p>
+                                    <p className="font-bold text-[#003B73]">{rec.poli_name}</p>
+                                    <p className="text-xs text-gray-600 mt-1">{rec.dokter}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Keluhan</label>
+                        <textarea 
+                            value={formData.keluhan} 
+                            onChange={(e) => setFormData({...formData, keluhan: e.target.value})}
+                            className="w-full p-4 border rounded-xl mb-4 focus:ring-2 focus:ring-blue-500 outline-none" 
+                            rows={3} placeholder="Ceritakan keluhan pasien..." 
+                        />
+                        <div className="flex gap-2">
+                            <button type="button" onClick={handleDiagnosis} disabled={loadingDiagnosa} className="flex-1 py-3 bg-[#003B73] text-white rounded-xl font-bold flex justify-center items-center gap-2">
+                                {loadingDiagnosa ? <Loader2 className="animate-spin"/> : <Activity size={18}/>} Analisa AI
+                            </button>
+                        </div>
+                        {/* Manual Select */}
+                        <div className="mt-4">
+                             <label className="block text-sm font-bold text-gray-700 mb-2">Atau Pilih Poli Manual</label>
+                             <select 
+                                value={formData.poli_id}
+                                onChange={(e) => {
+                                    const p = DUMMY_POLIS.find(x => x.poli_id == e.target.value);
+                                    setFormData(prev => ({...prev, poli_id: p.poli_id, poli_nama: p.poli_name}));
+                                }}
+                                className="w-full p-3 border rounded-xl bg-white"
+                             >
+                                <option value="">-- Pilih Poli --</option>
+                                {DUMMY_POLIS.map(p => <option key={p.poli_id} value={p.poli_id}>{p.poli_name}</option>)}
+                             </select>
+                        </div>
+                    </div>
+                )}
+
+                {/* Result Display */}
+                {formData.poli_id && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex justify-between items-center">
+                        <div>
+                            <p className="text-xs text-green-600 font-bold uppercase">Poli Tujuan</p>
+                            <p className="text-lg font-bold text-[#003B73]">{formData.poli_nama}</p>
+                        </div>
+                        <CheckCircle className="text-green-600" />
+                    </div>
+                )}
+              </div>
+            )}
+
+            {/* STEP 2: DATA DIRI (Otomatis Terisi / Manual jika Pasien Baru) */}
+            {currentStep === 2 && (
+                <div className="space-y-4 animate-fadeIn">
+                    <div className="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100 flex items-center gap-3">
+                        <div className="bg-blue-200 p-2 rounded-full text-[#003B73]"><User size={20}/></div>
+                        <div>
+                            <p className="text-xs text-gray-500">Data Pasien:</p>
+                            <p className="font-bold text-[#003B73]">{selectedPatientId === 'new' ? "Pasien Baru" : formData.nama}</p>
+                        </div>
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <InputField label="Nama Lengkap" value={formData.nama} onChange={handleChange} name="nama" required />
+                        <InputField label="NIK / KTP" value={formData.nomor_ktp} onChange={handleChange} name="nomor_ktp" required />
+                        <InputField label="Tempat Lahir" value={formData.tempat_lahir} onChange={handleChange} name="tempat_lahir" required />
+                        <InputField label="Tanggal Lahir" value={formData.tanggal_lahir} onChange={handleChange} name="tanggal_lahir" type="date" required />
+                        <InputField label="No. HP / WA" value={formData.nomor_whatsapp} onChange={handleChange} name="nomor_whatsapp" required />
+                        <InputField label="Email (Opsional)" value={formData.email} onChange={handleChange} name="email" />
+                    </div>
+                </div>
+            )}
+
+            {/* STEP 3: JADWAL */}
+            {currentStep === 3 && (
+                <div className="space-y-4 animate-fadeIn">
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Metode Bayar</label>
+                            <select name="penjaminan" value={formData.penjaminan} onChange={handleChange} className="w-full p-3 border rounded-xl bg-white">
+                                <option value="cash">Umum / Cash</option>
+                                <option value="bpjs">BPJS Kesehatan</option>
+                                <option value="asuransi">Asuransi Lain</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Kunjungan</label>
+                            <input type="date" name="tanggal_reservasi" value={formData.tanggal_reservasi} onChange={handleChange} className="w-full p-3 border rounded-xl" required />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* BUTTONS */}
+            <div className="mt-8 pt-6 border-t flex justify-between">
+                {currentStep > 1 ? <button type="button" onClick={() => setCurrentStep(prev => prev - 1)} className="px-6 py-3 text-gray-500 font-bold">Kembali</button> : <div/>}
+                {currentStep < 3 ? (
+                    <button type="button" onClick={nextStep} className="bg-[#8CC63F] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#7ab332] transition flex items-center gap-2">Lanjut <ArrowRight size={18}/></button>
+                ) : (
+                    <button type="submit" disabled={loading} className="bg-[#003B73] text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-900 transition flex items-center gap-2">
+                        {loading ? <Loader2 className="animate-spin"/> : "Kirim Reservasi"}
+                    </button>
+                )}
             </div>
-            <div className="flex flex-col">
-              <label className="text-sm text-neutral-700 font-medium mb-1.5">
-                Pilih Tanggal Reservasi
-              </label>
-              <input
-                type="date"
-                name="tanggal_reservasi"
-                value={formData.tanggal_reservasi}
-                onChange={handleChange}
-                min={new Date().toISOString().split("T")[0]}
-                required
-                className="w-full border border-neutral-200 rounded-lg p-2.5 text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
-          </div>
 
-          {/* Gejala (Tetap sama) */}
-          <div className="mt-4">
-            <label className="block text-neutral-700 font-medium mb-2">
-              Keluhan / Gejala yang Dirasakan Pasien
-            </label>
-            <textarea
-              name="keluhan"
-              className="w-full border border-neutral-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-primary-500 text-neutral-700"
-              rows={4}
-              placeholder="Ceritakan keluhan atau gejala yang dirasakan pasien..."
-              value={formData.keluhan}
-              onChange={handleChange}
-              required
-            ></textarea>
-          </div>
-
-          {/* Tombol Diagnosa (Tetap sama) */}
-          <div className="mt-4">
-            <button
-              type="button" 
-              onClick={handleDiagnosis}
-              disabled={loadingDiagnosa}
-              className="bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg flex items-center gap-2 transition-colors disabled:bg-neutral-400"
-            >
-              {loadingDiagnosa ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <Stethoscope size={18} />
-              )}
-              {loadingDiagnosa ? "Menganalisis..." : "Diagnosa Otomatis (Cek Poli)"}
-            </button>
-          </div>
-
-          {/* Error & Hasil Diagnosa (Tetap sama) */}
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
-              <AlertCircle className="text-red-600 w-5 h-5" />
-              <p className="text-red-800 text-sm font-medium">{error}</p>
-            </div>
-          )}
-          {diagnosis && !error && (
-            <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-lg flex items-center gap-3">
-              <Activity className="text-primary-600 w-5 h-5" />
-              <p className="text-primary-800 text-sm font-medium">{diagnosis}</p>
-            </div>
-          )}
-
-          {/* Tombol Submit (Tetap sama) */}
-          <div className="flex justify-end mt-6">
-            <button
-              type="submit"
-              disabled={loading || loadingDiagnosa}
-              className="bg-primary-800 hover:bg-secondary-600 text-white font-semibold py-2 px-5 rounded-lg flex items-center gap-2 transition-colors disabled:bg-neutral-400"
-            >
-              {loading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <ArrowRight size={18} />
-              )}
-              {loading ? "Mengirim..." : "Daftar Reservasi"}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
-      {/* Modal Sukses (Tetap sama) */}
+      {/* Success Modal */}
       {showSuccessModal && (
-        <div className="absolute inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center relative">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-              <ClipboardList className="h-6 w-6 text-green-600" />
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center p-4 z-50">
+            <div className="bg-white p-8 rounded-3xl max-w-sm w-full text-center animate-fadeIn">
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600"><ClipboardList size={32}/></div>
+                <h3 className="text-xl font-bold text-[#003B73] mb-2">Reservasi Berhasil!</h3>
+                <p className="text-gray-500 text-sm mb-6">Reservasi untuk <b>{formData.nama}</b> telah dibuat.</p>
+                <button onClick={() => router.push("/user/dashboard")} className="w-full py-3 bg-[#003B73] text-white rounded-xl font-bold">Ke Dashboard</button>
             </div>
-            <h3 className="text-lg font-semibold text-neutral-800 mb-2">
-              Reservasi Terkirim
-            </h3>
-            <p className="text-neutral-600 text-sm">
-              Permintaan reservasi Anda telah terkirim dan sedang menunggu
-              konfirmasi dari admin. Silakan cek statusnya secara berkala.
-            </p>
-            <button
-              onClick={handleCloseModal}
-              className="mt-6 w-full bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-            >
-              Kembali ke Dashboard
-            </button>
-          </div>
         </div>
       )}
     </div>
   );
 }
 
-// Komponen InputField (Tetap sama, tidak perlu diubah)
-function InputField({
-  label,
-  value,
-  name,
-  type = "text",
-  placeholder = "",
-  readOnly = false,
-  required = false,
-  onChange = () => {},
-}) {
-  return (
-    <div className="flex flex-col">
-      <label className="text-sm text-neutral-700 font-medium mb-1.5">
-        {label}
-        {required && !readOnly && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      <input
-        type={type}
-        name={name}
-        value={value}
-        readOnly={readOnly}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        className={`w-full border border-neutral-200 rounded-lg p-2.5 text-neutral-700 ${
-          readOnly
-            ? "bg-neutral-100 cursor-not-allowed"
-            : "focus:outline-none focus:ring-2 focus:ring-primary-500"
-        } transition-colors`}
-      />
-    </div>
-  );
+function InputField({ label, name, value, onChange, type="text", required }) {
+    return (
+        <div>
+            <label className="block text-sm font-bold text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
+            <input type={type} name={name} value={value} onChange={onChange} required={required} className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" />
+        </div>
+    )
 }

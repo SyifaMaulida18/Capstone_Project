@@ -15,8 +15,8 @@ import {
   MailOpen
 } from "lucide-react";
 
-// --- 1. DATA MOCKUP (Database Pura-pura) ---
-const initialData = [
+// --- DUMMY DATA (Simulasi Data Notifikasi) ---
+const INITIAL_NOTIFICATIONS = [
   {
     id: 1,
     type: "success", // success | warning | info
@@ -62,14 +62,14 @@ const initialData = [
 export default function NotifikasiPage() {
   const router = useRouter();
   
-  // --- 2. STATE MANAGEMENT (Logika Frontend) ---
-  const [notifications, setNotifications] = useState(initialData);
+  // --- STATE MANAGEMENT ---
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [activeTab, setActiveTab] = useState("all"); // 'all' | 'unread'
 
   // Hitung jumlah belum dibaca
   const unreadCount = notifications.filter((n) => n.isUnread).length;
 
-  // --- 3. ACTIONS / FUNGSI LOGIKA ---
+  // --- HANDLERS (Logika Frontend) ---
 
   // Tandai satu notifikasi sudah dibaca
   const handleRead = (id) => {
@@ -85,7 +85,7 @@ export default function NotifikasiPage() {
     );
   };
 
-  // Hapus notifikasi
+  // Hapus satu notifikasi
   const handleDelete = (id, e) => {
     e.stopPropagation(); // Mencegah trigger klik card (handleRead)
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -93,10 +93,11 @@ export default function NotifikasiPage() {
 
   // Hapus semua notifikasi
   const handleClearAll = () => {
-      if(confirm("Hapus semua notifikasi?")) {
-          setNotifications([]);
-      }
-  }
+    // Cek window untuk menghindari error saat server-side rendering
+    if (typeof window !== "undefined" && window.confirm("Hapus semua notifikasi?")) {
+      setNotifications([]);
+    }
+  };
 
   // Filter notifikasi berdasarkan Tab
   const filteredNotifs = notifications.filter((n) => {
@@ -104,7 +105,7 @@ export default function NotifikasiPage() {
     return true;
   });
 
-  // Helper untuk Icon & Warna berdasarkan tipe
+  // Helper untuk Icon & Warna berdasarkan tipe notifikasi
   const getIconStyle = (type) => {
     switch (type) {
       case "success":
