@@ -1,9 +1,9 @@
 "use client";
 
-import { MagnifyingGlassIcon, PencilIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import SuperAdminLayout from "../components/superadmin_layout";
+import { TrashIcon, PencilIcon, PlusIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import SuperAdminLayout from "../components/superadmin_layout"; 
 
 export default function DokterManagementPage() {
   const [dokters, setDokters] = useState([]);
