@@ -76,16 +76,12 @@ export default function LoginAdminPage() {
     setIsLoading(true);
 
     try {
-      // PENTING: Key harus huruf Besar sesuai Controller Laravel ($request->Email)
       const payload = {
         Email: email,
         Password: password,
       };
 
-      // Tembak endpoint /api/login
       const response = await api.post("/login", payload);
-
-      // Destructure response dari AuthController Laravel
       const { access_token, role, admin } = response.data;
 
       if (access_token) {
@@ -94,14 +90,19 @@ export default function LoginAdminPage() {
         localStorage.setItem("user_role", role);
         localStorage.setItem("admin_data", JSON.stringify(admin));
 
-        // 2. Redirect Berdasarkan Role (Opsional, saat ini semua ke dashboard admin)
-        // Jika nanti superadmin punya dashboard beda, bisa pakai if(role === 'superadmin') ...
-        router.push("/superadmin/admins");
+        // 2. Redirect Berdasarkan Role
+        if (role === 'superadmin') {
+          router.push("/superadmin/admins");
+        } else if (role === 'admin') {
+          router.push("/admin/dashboard");
+        } else {
+          // Fallback jika role tidak dikenali (opsional)
+          setErrorMsg("Role tidak dikenali.");
+        }
       }
     } catch (error) {
       console.error("Login Error:", error);
       if (error.response) {
-        // Tangkap pesan error spesifik dari Laravel (return response()->json(['message' => ...]))
         setErrorMsg(
           error.response.data.message || "Email atau Password salah."
         );
@@ -119,22 +120,10 @@ export default function LoginAdminPage() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4">
       <div className="bg-white shadow-2xl border-t-8 border-primary-600 rounded-2xl p-8 md:p-12 w-full max-w-md">
         
-        {/* BAGIAN LOGO (Pastikan file ada di public/images/logo.svg) */}
         <div className="flex justify-center mb-6">
-          {/* Fallback text jika gambar tidak ada, atau gunakan placeholder sementara */}
            <div className="bg-primary-100 p-4 rounded-full">
               <LogIn className="w-12 h-12 text-primary-600" />
            </div>
-           {/* Hapus komentar di bawah jika logo sudah siap
-          <Image
-            src="/images/logo.svg"
-            alt="Logo Rumah Sakit"
-            width={120}
-            height={120}
-            priority
-            className="object-contain h-24 w-auto"
-          /> 
-          */}
         </div>
 
         <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">
@@ -147,8 +136,8 @@ export default function LoginAdminPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           
           <InputField
-            id="email" // Penting untuk label htmlFor
-            name="email" // Penting untuk Browser Autofill
+            id="email"
+            name="email"
             label="Email"
             type="email"
             placeholder="admin@rumahsakit.com"
@@ -157,12 +146,12 @@ export default function LoginAdminPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            autoComplete="username" // Hint untuk browser
+            autoComplete="username"
           />
 
           <InputField
             id="password"
-            name="password" // Penting untuk Browser Autofill
+            name="password"
             label="Password"
             type={showPassword ? "text" : "password"}
             placeholder="Masukkan kata sandi"
@@ -171,7 +160,7 @@ export default function LoginAdminPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={isLoading}
-            autoComplete="current-password" // Hint untuk browser
+            autoComplete="current-password"
             endIcon={showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
             onEndIconClick={() => setShowPassword(!showPassword)}
           />

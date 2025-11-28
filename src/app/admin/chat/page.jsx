@@ -1,74 +1,122 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Search, User } from "lucide-react";
+// Tambahkan MessageSquare di dalam kurung kurawal
+import { ArrowLeft, Search, User, Loader2, MessageSquare } from "lucide-react"; 
 import { useRouter } from "next/navigation";
-import ChatInterface from "../../../components/ChatInterface"; // <-- Impor komponen
-
-// --- DATA MOCKUP UNTUK ADMIN ---
-const allConversations = {
-  "1": {
-    name: "Syifa Maulida",
-    messages: [
-      { id: 1, text: "Selamat pagi, Dok.", sender: "user", time: "09:00" },
-      { id: 2, text: "Pagi, ada yang bisa dibantu?", sender: "admin", time: "09:01" },
-    ],
-  },
-  "2": {
-    name: "Dila Wahyu",
-    messages: [
-      { id: 1, text: "Saya mau konfirmasi reservasi.", sender: "user", time: "11:00" },
-    ],
-  },
-  "3": {
-    name: "Budi Santoso",
-    messages: [
-       { id: 1, text: "Hasil lab saya bagaimana?", sender: "user", time: "Kemarin" },
-       { id: 2, text: "Sedang kami periksa.", sender: "admin", time: "Kemarin" },
-       { id: 3, text: "Oke.", sender: "user", time: "Kemarin" },
-    ],
-  }
-};
-// ------------------------------
+import ChatInterface from "../../../components/ChatInterface";
+import api from "@/services/api";
 
 export default function AdminChatPage() {
   const router = useRouter();
-  const [activeChatId, setActiveChatId] = useState("1"); // Chat yg aktif pertama
+  
+  const [contacts, setContacts] = useState([]); // List User
+  const [activeChatId, setActiveChatId] = useState(null); // ID User yang sedang dibuka
   const [activeMessages, setActiveMessages] = useState([]);
   const [activeChatName, setActiveChatName] = useState("");
+  
+  const [isLoadingContacts, setIsLoadingContacts] = useState(true);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
 
-  // Efek untuk memuat data chat saat 'activeChatId' berubah
+  // --- 1. Fetch Daftar Kontak (User yang pernah chat) ---
+  const fetchContacts = async () => {
+    try {
+      const response = await api.get("/chat/contacts");
+      if (response.data.success) {
+        setContacts(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetch contacts:", error);
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchContacts();
+    // Polling kontak tiap 5 detik (cek user baru chat)
+    const interval = setInterval(fetchContacts, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // --- 2. Fetch Isi Percakapan (Ketika Admin klik User) ---
+  const fetchConversation = async (userId) => {
+    if (!userId) return;
+    try {
+      // Ambil chat dengan tipe 'user' dan id specific
+      const response = await api.get(`/chat/user/${userId}`);
+      
+      if (response.data.success) {
+        const formatted = response.data.data.map((msg) => ({
+          id: msg.id || msg.chatId,
+          text: msg.message,
+          // Jika tipe pengirim Admin = 'me' (kanan), User = 'user' (kiri)
+          sender: msg.senderable_type.includes("Admin") ? "admin" : "user",
+          time: new Date(msg.created_at).toLocaleTimeString("id-ID", {
+             hour: "2-digit", minute: "2-digit" 
+          }),
+        }));
+        setActiveMessages(formatted);
+      }
+    } catch (error) {
+      console.error("Error fetch chat:", error);
+    } finally {
+      setIsLoadingChat(false);
+    }
+  };
+
+  // Efek ganti chat
   useEffect(() => {
     if (activeChatId) {
-      setActiveMessages(allConversations[activeChatId].messages);
-      setActiveChatName(allConversations[activeChatId].name);
+      setIsLoadingChat(true);
+      fetchConversation(activeChatId);
+      
+      // Polling pesan aktif tiap 3 detik
+      const interval = setInterval(() => {
+        fetchConversation(activeChatId);
+      }, 3000);
+      
+      return () => clearInterval(interval);
     }
   }, [activeChatId]);
 
-  // Fungsi untuk mengirim pesan (dari Admin)
-  const handleSendMessage = (text) => {
-    const newMessage = {
-      id: activeMessages.length + 1,
-      text,
-      sender: "admin", // Pengirim adalah 'admin'
-      time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
-    };
-    
-    // Update state lokal (di aplikasi nyata, ini dikirim ke DB)
-    const updatedMessages = [...activeMessages, newMessage];
-    setActiveMessages(updatedMessages);
-    
-    // Update data mockup (agar tetap ada saat ganti chat)
-    allConversations[activeChatId].messages = updatedMessages;
+  // Handle Klik Kontak di Sidebar
+  const handleContactClick = (contact) => {
+    setActiveChatId(contact.id);
+    setActiveChatName(contact.name);
+  };
+
+  // --- 3. Kirim Pesan (Admin ke User) ---
+  const handleSendMessage = async (text) => {
+    if(!activeChatId) return;
+
+    try {
+      const payload = {
+        receiver_type: "user",
+        receiver_id: activeChatId, // ID User yang sedang dibuka
+        message: text,
+      };
+
+      await api.post("/chat/send", payload);
+      
+      // Refresh chat langsung
+      fetchConversation(activeChatId);
+      // Refresh list kontak (update last message)
+      fetchContacts();
+
+    } catch (error) {
+      console.error("Gagal kirim:", error);
+      alert("Gagal mengirim pesan.");
+    }
   };
 
   return (
     <div className="min-h-screen bg-neutral-100 flex justify-center p-4 md:p-10">
       <div className="w-full max-w-6xl h-[80vh] flex bg-white shadow-2xl rounded-2xl border border-neutral-200 overflow-hidden">
         
-        {/* KOLOM 1: Daftar Kontak / Percakapan */}
+        {/* KOLOM 1: Daftar Kontak */}
         <div className="w-1/3 border-r border-neutral-200 flex flex-col">
-          {/* Header Daftar Kontak */}
+          {/* Header */}
           <div className="p-4 border-b border-neutral-200 flex-shrink-0">
              <button
                 onClick={() => router.back()}
@@ -89,58 +137,74 @@ export default function AdminChatPage() {
           
           {/* List Kontak */}
           <div className="flex-grow overflow-y-auto">
-            {Object.keys(allConversations).map((id) => {
-              const chat = allConversations[id];
-              const isActive = id === activeChatId;
-              const lastMessage = chat.messages[chat.messages.length - 1];
-              
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActiveChatId(id)}
-                  className={`w-full text-left p-4 flex items-center gap-3 border-b border-neutral-100 ${isActive ? 'bg-primary-50' : 'hover:bg-neutral-50'}`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center flex-shrink-0">
-                    <User size={20} />
-                  </div>
-                  <div className="flex-grow overflow-hidden">
-                    <h3 className={`font-semibold ${isActive ? 'text-primary-700' : 'text-neutral-800'}`}>
-                      {chat.name}
-                    </h3>
-                    <p className="text-sm text-neutral-500 truncate">
-                      {lastMessage.text}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+            {isLoadingContacts ? (
+                 <div className="flex justify-center p-4"><Loader2 className="animate-spin text-neutral-400"/></div>
+            ) : contacts.length === 0 ? (
+                 <div className="p-4 text-center text-neutral-500 text-sm">Belum ada pesan masuk.</div>
+            ) : (
+                contacts.map((contact) => {
+                  const isActive = contact.id === activeChatId;
+                  return (
+                    <button
+                      key={`${contact.type}-${contact.id}`} // Unique key
+                      onClick={() => handleContactClick(contact)}
+                      className={`w-full text-left p-4 flex items-center gap-3 border-b border-neutral-100 transition ${isActive ? 'bg-primary-50' : 'hover:bg-neutral-50'}`}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center flex-shrink-0">
+                        <User size={20} />
+                      </div>
+                      <div className="flex-grow overflow-hidden">
+                        <div className="flex justify-between items-center">
+                            <h3 className={`font-semibold ${isActive ? 'text-primary-700' : 'text-neutral-800'}`}>
+                            {contact.name}
+                            </h3>
+                            <span className="text-xs text-neutral-400">
+                                {new Date(contact.last_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                        </div>
+                        <p className="text-sm text-neutral-500 truncate">
+                          {contact.last_message}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })
+            )}
           </div>
         </div>
 
-        {/* KOLOM 2: Jendela Chat Aktif */}
+        {/* KOLOM 2: Chat Interface */}
         <div className="w-2/3 flex flex-col">
           {activeChatId ? (
             <>
-              {/* Header Chat Aktif */}
-              <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-neutral-200">
+              {/* Header Chat */}
+              <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-neutral-200 bg-neutral-50">
                 <div className="w-10 h-10 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center">
                     <User size={20} />
                 </div>
-                <h2 className="text-lg font-semibold text-neutral-800">
-                  {activeChatName}
-                </h2>
+                <div>
+                    <h2 className="text-lg font-semibold text-neutral-800">
+                    {activeChatName}
+                    </h2>
+                    <p className="text-xs text-green-600">Active Now</p>
+                </div>
               </div>
               
-              {/* Render Komponen Chat Interface */}
-              <ChatInterface
-                messages={activeMessages}
-                onSendMessage={handleSendMessage}
-                currentUserRole="admin" // <-- Role saat ini adalah 'admin'
-              />
+              {/* Pesan */}
+              {isLoadingChat && activeMessages.length === 0 ? (
+                   <div className="flex-1 flex items-center justify-center"><Loader2 className="animate-spin text-neutral-400"/></div>
+              ) : (
+                  <ChatInterface
+                    messages={activeMessages}
+                    onSendMessage={handleSendMessage}
+                    currentUserRole="admin" // Admin bubble di kanan
+                  />
+              )}
             </>
           ) : (
-            <div className="flex items-center justify-center h-full text-neutral-500">
-              Pilih percakapan untuk memulai.
+            <div className="flex flex-col items-center justify-center h-full text-neutral-400">
+              <MessageSquare className="w-16 h-16 mb-4 opacity-20" />
+              <p>Pilih percakapan untuk melihat detail.</p>
             </div>
           )}
         </div>

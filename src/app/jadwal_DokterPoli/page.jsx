@@ -1,21 +1,23 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import axios from "axios";
 import {
-  Search,
-  Heart,
+  AlertTriangle,
   Calendar,
   Clock,
-  User,
-  AlertTriangle,
+  Heart,
   Loader2,
+  Search,
+  User,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 // --- IMPORTS KOMPONEN UI ---
+// Pastikan path ini sesuai dengan struktur folder project kamu
+import Footer from "../../components/user/Footer";
 import Header from "../../components/user/Header";
 import Navbar from "../../components/user/Navbar";
-import Footer from "../../components/user/Footer";
 
 // --- DATA KONSTAN ---
 const ALL_POLI_OPTIONS = [
@@ -32,59 +34,28 @@ const ALL_POLI_OPTIONS = [
   "Poli Saraf",
 ];
 
-// --- DUMMY DATA JADWAL (Untuk Tampilan Frontend) ---
-const DUMMY_SCHEDULES = [
-  {
-    id: "1",
-    doctor: "dr. Andi Wijaya, Sp.PD",
-    poli: "Poli Penyakit Dalam",
-    dateKey: "2023-11-20", // Format YYYY-MM-DD
-    time: "08:00 - 12:00 (Pagi)",
-    quota: 5,
-    available: true,
-    keterangan: "Harap datang 15 menit sebelum jadwal.",
-  },
-  {
-    id: "2",
-    doctor: "dr. Siti Aminah, Sp.A",
-    poli: "Poli Anak",
-    dateKey: "2023-11-20",
-    time: "13:00 - 16:00 (Siang)",
-    quota: 0,
-    available: false,
-    keterangan: "Cuti mendadak digantikan dr. Budi.",
-  },
-  {
-    id: "3",
-    doctor: "dr. Budi Santoso, Sp.M",
-    poli: "Poli Mata",
-    dateKey: "2023-11-21",
-    time: "09:00 - 14:00 (Pagi)",
-    quota: 12,
-    available: true,
-    keterangan: null,
-  },
-  {
-    id: "4",
-    doctor: "dr. Citra Kirana, Sp.OG",
-    poli: "Poli Kandungan",
-    dateKey: "2023-11-22",
-    time: "08:00 - 11:00 (Pagi)",
-    quota: 3,
-    available: true,
-    keterangan: null,
-  },
-  {
-    id: "5",
-    doctor: "dr. Eko Prasetyo, Sp.JP",
-    poli: "Poli Jantung",
-    dateKey: "2023-11-22",
-    time: "15:00 - 18:00 (Sore)",
-    quota: 8,
-    available: true,
-    keterangan: null,
-  },
-];
+// --- HELPER: Mengubah Nama Hari ke Tanggal Terdekat ---
+const getNextDateForDay = (dayName) => {
+  const daysMap = {
+    minggu: 0, senin: 1, selasa: 2, rabu: 3,
+    kamis: 4, jumat: 5, sabtu: 6
+  };
+  
+  const targetDay = daysMap[dayName.toLowerCase()];
+  if (targetDay === undefined) return null;
+
+  const date = new Date();
+  const currentDay = date.getDay();
+  
+  // Hitung selisih hari untuk mendapatkan tanggal target terdekat
+  let daysUntilTarget = targetDay - currentDay;
+  if (daysUntilTarget < 0) {
+    daysUntilTarget += 7; // Jika hari sudah lewat minggu ini, ambil minggu depan
+  }
+  
+  date.setDate(date.getDate() + daysUntilTarget);
+  return date.toISOString().split('T')[0]; // Format YYYY-MM-DD
+};
 
 // --- KOMPONEN KARTU JADWAL ---
 const ScheduleDisplayCard = ({ schedule }) => {
@@ -107,6 +78,7 @@ const ScheduleDisplayCard = ({ schedule }) => {
       }`}
     >
       <div>
+        {/* Header Kartu: Dokter & Poli */}
         <div className="flex justify-between items-start mb-2">
           <div>
             <h3 className="font-bold text-lg text-primary-800 flex items-center">
@@ -118,6 +90,7 @@ const ScheduleDisplayCard = ({ schedule }) => {
               {schedule.poli}
             </p>
           </div>
+          {/* Badge Kuota */}
           <p
             className={`text-xs font-semibold px-2 py-1 rounded-full ${
               schedule.available
@@ -129,6 +102,7 @@ const ScheduleDisplayCard = ({ schedule }) => {
           </p>
         </div>
 
+        {/* Info Waktu & Tanggal */}
         <div className="text-sm text-neutral-600 space-y-1 border-t pt-2 mt-2">
           <p className="flex items-center">
             <Calendar className="w-4 h-4 mr-2 text-neutral-500" />{" "}
@@ -136,7 +110,7 @@ const ScheduleDisplayCard = ({ schedule }) => {
           </p>
           <p className="flex items-center">
             <Clock className="w-4 h-4 mr-2 text-neutral-500" />
-            {schedule.time}
+            {schedule.time} <span className="ml-1 font-semibold text-primary-600">({schedule.session})</span>
           </p>
           {schedule.keterangan && (
             <p className="text-xs italic text-neutral-500 mt-1">
@@ -146,9 +120,10 @@ const ScheduleDisplayCard = ({ schedule }) => {
         </div>
       </div>
 
+      {/* Tombol Reservasi - Mengirim Data via URL Query */}
       {schedule.available && (
         <a
-          href="/user/reservasi"
+          href={`/user/reservasi?dokter_id=${schedule.raw_dokter_id}&poli_id=${schedule.raw_poli_id}&tanggal=${schedule.dateKey}&sesi=${schedule.session}`}
           className="mt-4 w-full text-center py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-semibold transition"
         >
           Buat Reservasi
@@ -166,41 +141,108 @@ export default function JadwalDokterPoliPage() {
   const [schedules, setSchedules] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Konfigurasi Navigasi
+  // Konfigurasi Navigasi Navbar
   const navItems = [
     { name: "Beranda", href: "/user/dashboard", isActive: false },
-    {
-      name: "Cek Jadwal Poli & Dokter",
-      href: "/user/jadwal_DokterPoli",
-      isActive: true,
-    },
+    { name: "Cek Jadwal Poli & Dokter", href: "/user/jadwal_DokterPoli", isActive: true },
     { name: "Reservasi", href: "/user/reservasi", isActive: false },
   ];
 
-  // --- SIMULASI FETCH DATA ---
+  // --- FETCH DATA (useEffect) ---
   useEffect(() => {
-    // Timer ini hanya untuk meniru loading agar UI terlihat natural
-    const timer = setTimeout(() => {
-      setSchedules(DUMMY_SCHEDULES);
-      setIsLoading(false);
-    }, 1500); // Loading selama 1.5 detik
+    const fetchSchedules = async () => {
+      try {
+        // 1. Ambil Token dari LocalStorage (Sesuai Login)
+        const token = localStorage.getItem("token");
 
-    return () => clearTimeout(timer);
+        // 2. Siapkan Header Authorization
+        const config = {
+          headers: {
+             Authorization: token ? `Bearer ${token}` : "",
+          }
+        };
+
+        // 3. Request ke Backend
+        const response = await axios.get("http://localhost:8000/api/jadwal-dokter", config);
+        
+        if (response.data.success) {
+          const backendData = response.data.data;
+          const formattedList = [];
+
+          // Array bantuan untuk looping kolom dinamis database
+          const days = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu'];
+          const sessions = ['pagi', 'siang', 'sore'];
+
+          // --- LOGIKA TRANSFORMASI DATA (Horizontal -> Vertikal) ---
+          backendData.forEach((record) => {
+            // Loop setiap hari (Senin s/d Minggu)
+            days.forEach((day) => {
+              // Cek apakah dokter praktek di hari tersebut (Y/N)
+              const isPraktek = record[`${day}_praktek`] === 'Y';
+
+              if (isPraktek) {
+                // Loop setiap sesi (Pagi, Siang, Sore)
+                sessions.forEach((session) => {
+                   // Ambil data dinamis: senin_pagi_dari, senin_pagi_sampai, dst.
+                   const startTime = record[`${day}_${session}_dari`];
+                   const endTime = record[`${day}_${session}_sampai`];
+                   const quota = record[`${day}_${session}_kuota`];
+
+                   // Hanya tampilkan jika jam mulai & selesai valid (tidak null)
+                   if (startTime && endTime) {
+                     const dateKey = getNextDateForDay(day);
+
+                     formattedList.push({
+                        // ID unik kombinasi dokter-poli-hari-sesi
+                        id: `${record.dokter_id}-${record.poli_id}-${day}-${session}`,
+                        
+                        // Data Mentah untuk URL Param
+                        raw_dokter_id: record.dokter_id,
+                        raw_poli_id: record.poli_id,
+                        
+                        // Data Tampilan
+                        doctor: record.dokter?.nama_dokter || "Dokter Tidak Diketahui",
+                        poli: record.poli?.poli_name || "Poli Tidak Diketahui",
+                        dateKey: dateKey,
+                        time: `${startTime.substring(0, 5)} - ${endTime.substring(0, 5)}`,
+                        session: session.charAt(0).toUpperCase() + session.slice(1), // Capitalize
+                        quota: quota,
+                        available: quota > 0, // Logic ketersediaan
+                        keterangan: record[`${day}_keterangan`],
+                     });
+                   }
+                });
+              }
+            });
+          });
+
+          setSchedules(formattedList);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil jadwal:", error);
+        // Jika token expired (401), redirect ke login (opsional)
+        if (error.response && error.response.status === 401) {
+            // router.push("/login"); // Uncomment jika ingin auto redirect
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSchedules();
   }, []);
 
-  // --- FILTER LOGIC (Tetap berjalan di Frontend) ---
+  // --- LOGIKA FILTER (Search & Dropdown) ---
   const filteredSchedules = useMemo(() => {
     return schedules
       .filter((schedule) => {
-        // Filter Poli (Case insensitive)
+        // Filter Poli
         const matchPoli =
           selectedPoli === "Semua Poli" ||
           (schedule.poli &&
-            schedule.poli
-              .toLowerCase()
-              .includes(
+            schedule.poli.toLowerCase().includes(
                 selectedPoli.toLowerCase().replace("poli ", "").trim()
-              ));
+            ));
 
         // Filter Search Nama Dokter
         const matchSearch = schedule.doctor
@@ -210,6 +252,7 @@ export default function JadwalDokterPoliPage() {
         return matchPoli && matchSearch;
       })
       .sort((a, b) => {
+        // Urutkan berdasarkan Tanggal dulu, baru Jam
         if (a.dateKey !== b.dateKey) {
           return a.dateKey.localeCompare(b.dateKey);
         }
@@ -217,29 +260,26 @@ export default function JadwalDokterPoliPage() {
       });
   }, [searchTerm, selectedPoli, schedules]);
 
+  // --- RENDER UI ---
   return (
     <div className="min-h-screen flex flex-col bg-neutral-100 font-sans">
-      {/* 1. HEADER */}
+      {/* 1. Header & Navbar */}
       <Header />
-
-      {/* 2. NAVBAR */}
       <Navbar navItems={navItems} />
 
-      {/* 3. KONTEN UTAMA */}
+      {/* 2. Konten Utama */}
       <main className="flex-1 container mx-auto px-4 py-8 md:py-12">
         <header className="text-center mb-8 md:mb-12">
           <h1 className="text-3xl md:text-4xl font-extrabold text-neutral-900 flex items-center justify-center">
-            <Calendar className="w-8 h-8 mr-3 text-primary-600" /> Jadwal Dokter
-            & Poli
+            <Calendar className="w-8 h-8 mr-3 text-primary-600" /> Jadwal Dokter & Poli
           </h1>
           <p className="mt-2 text-neutral-600">
-            Temukan jadwal praktek dokter untuk 14 hari ke depan.
+            Temukan jadwal praktek dokter terbaru untuk minggu ini.
           </p>
         </header>
 
-        {/* Filter Section */}
+        {/* Filter Section (Search & Dropdown) */}
         <div className="mb-8 p-6 bg-white rounded-xl shadow-md border border-neutral-200 flex flex-col md:flex-row gap-4 items-center">
-          {/* Search Input */}
           <div className="relative flex-1 w-full md:w-auto">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-neutral-500" aria-hidden="true" />
@@ -252,7 +292,6 @@ export default function JadwalDokterPoliPage() {
               className="block w-full rounded-lg border border-neutral-200 py-2 pl-10 pr-3 text-neutral-900 placeholder-neutral-500 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
             />
           </div>
-          {/* Poli Dropdown */}
           <div className="relative w-full md:w-64">
             <select
               value={selectedPoli}
@@ -271,7 +310,7 @@ export default function JadwalDokterPoliPage() {
           </div>
         </div>
 
-        {/* Content Grid */}
+        {/* Grid Jadwal */}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-10 h-10 text-primary-600 animate-spin mb-4" />
@@ -288,14 +327,13 @@ export default function JadwalDokterPoliPage() {
             <AlertTriangle className="w-10 h-10 mx-auto mb-4 text-yellow-500" />
             <p className="font-semibold">Jadwal tidak ditemukan.</p>
             <p className="text-sm mt-1">
-              Tidak ada jadwal dokter yang sesuai dengan pencarian atau filter
-              Anda.
+              Tidak ada jadwal dokter yang sesuai dengan pencarian atau filter Anda saat ini.
             </p>
           </div>
         )}
       </main>
 
-      {/* 4. FOOTER */}
+      {/* 3. Footer */}
       <Footer />
     </div>
   );
