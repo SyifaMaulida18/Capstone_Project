@@ -9,7 +9,9 @@ export default function DokterManagementPage() {
   const [dokters, setDokters] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch Data (GET /dokters)
+  // 🔍 state search
+  const [searchTerm, setSearchTerm] = useState("");
+
   useEffect(() => {
     const fetchDokters = async () => {
       try {
@@ -25,7 +27,6 @@ export default function DokterManagementPage() {
 
         if (response.ok) {
           const data = await response.json();
-          // Sesuaikan dengan format response backend (array atau object)
           setDokters(Array.isArray(data) ? data : data.data || []); 
         } else {
           console.error("Gagal mengambil data dokter");
@@ -40,7 +41,6 @@ export default function DokterManagementPage() {
     fetchDokters();
   }, []);
 
-  // Delete Data (DELETE /dokters/{id})
   const handleDelete = async (id) => {
     if (window.confirm(`Yakin hapus Dokter ID: ${id}?`)) {
       try {
@@ -67,22 +67,45 @@ export default function DokterManagementPage() {
     }
   };
 
+  // 🔎 fungsi search
+  const filteredDokters = dokters.filter((dokter) => {
+    const term = searchTerm.toLowerCase().trim();
+
+    return (
+      dokter.nama_dokter?.toLowerCase().includes(term) ||
+      dokter.bidang_keahlian?.toLowerCase().includes(term) ||
+      dokter.aktif?.toLowerCase().includes(term) ||
+      String(dokter.dokter_id).includes(term)
+    );
+  });
+
   return (
     <SuperAdminLayout>
       <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
+        
         <div className="flex justify-between items-center mb-8">
             <h1 className="text-2xl font-bold text-neutral-800">Manajemen Dokter</h1>
+
             <div className="flex space-x-3">
+                {/* 🔍 Search Bar */}
                 <div className="relative w-full max-w-xs">
-                    <input type="text" placeholder="Cari Dokter..." className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:ring-primary-500" />
-                    <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-600" />
+                    <input 
+                      type="text" 
+                      placeholder="Cari Dokter..." 
+                      className="w-full pl-10 pr-4 py-5 border border-neutral-200 rounded-lg focus:ring-primary-500"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <MagnifyingGlassIcon className="h-5 w-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"/>
+
                 </div>
+
                 <Link
-                href="/superadmin/dokter/add"
-                className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
+                  href="/superadmin/dokter/add"
+                  className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
                 >
-                <PlusIcon className="h-5 w-5" />
-                <span>Tambah Dokter</span>
+                  <PlusIcon className="h-5 w-5" />
+                  <span>Tambah Dokter</span>
                 </Link>
             </div>
         </div>
@@ -98,11 +121,12 @@ export default function DokterManagementPage() {
                 <th className="px-6 py-3 text-left text-sm font-semibold text-white uppercase last:rounded-tr-lg">Aksi</th>
               </tr>
             </thead>
+
             <tbody className="bg-white divide-y divide-neutral-100">
               {isLoading ? (
                 <tr><td colSpan="5" className="text-center py-8 text-neutral-500">Memuat data...</td></tr>
-              ) : dokters.length > 0 ? (
-                dokters.map((dokter, index) => (
+              ) : filteredDokters.length > 0 ? (
+                filteredDokters.map((dokter, index) => (
                   <tr key={dokter.dokter_id} className={index % 2 === 1 ? "bg-neutral-50" : "bg-white"}>
                     <td className="px-6 py-4 text-sm font-medium text-neutral-900">{dokter.dokter_id}</td>
                     <td className="px-6 py-4 text-sm text-neutral-800 font-semibold">{dokter.nama_dokter}</td>
@@ -113,17 +137,21 @@ export default function DokterManagementPage() {
                         </span>
                     </td>
                     <td className="px-6 py-4 text-sm font-medium flex space-x-3">
-                      <button onClick={() => handleDelete(dokter.dokter_id)} className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50" title="Hapus">
+                      <button onClick={() => handleDelete(dokter.dokter_id)} className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50">
                         <TrashIcon className="h-5 w-5" />
                       </button>
-                      <Link href={`/superadmin/dokter/edit/${dokter.dokter_id}`} className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50" title="Edit Lengkap">
+
+                      <Link 
+                        href={`/superadmin/dokter/edit/${dokter.dokter_id}`} 
+                        className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
+                      >
                         <PencilIcon className="h-5 w-5" />
                       </Link>
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="5" className="text-center py-8 text-neutral-500">Belum ada data dokter.</td></tr>
+                <tr><td colSpan="5" className="text-center py-8 text-neutral-500">Tidak ada dokter ditemukan.</td></tr>
               )}
             </tbody>
           </table>

@@ -10,6 +10,7 @@ const API_BASE =
 
 export default function AddRekamMedisPage() {
   const router = useRouter();
+
   const [reservations, setReservations] = useState([]);
   const [loadingReservasi, setLoadingReservasi] = useState(true);
 
@@ -22,16 +23,38 @@ export default function AddRekamMedisPage() {
     tanggal_diperiksa: "",
   });
 
+  // ✅ Ambil daftar reservasi berdasarkan user yang login
   useEffect(() => {
     const fetchReservasi = async () => {
       try {
-        const res = await fetch(`${API_BASE}/reservasi`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+        const token = localStorage.getItem("token");
+        const userId = localStorage.getItem("user_id");
+
+        if (!token || !userId) {
+          console.error("Token atau user_id tidak ditemukan");
+          setLoadingReservasi(false);
+          return;
+        }
+
+        const res = await fetch(
+          `${API_BASE}/reservasi?user_id=${userId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
         const json = await res.json();
-        setReservations(json.data || json); // sesuaikan tergantung response
+
+        if (!res.ok) {
+          console.error("Gagal fetch reservasi:", json);
+          setLoadingReservasi(false);
+          return;
+        }
+
+        setReservations(json.data || json); // sesuaikan shape backend
       } catch (err) {
         console.error("Gagal fetch reservasi:", err);
       } finally {
@@ -50,19 +73,36 @@ export default function AddRekamMedisPage() {
     e.preventDefault();
 
     try {
-      const res = await fetch(`${API_BASE}/rekam-medis`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(form),
-      });
+      const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("user_id");
+
+      if (!token || !userId) {
+        alert("Token atau user tidak ditemukan");
+        return;
+      }
+
+      // ✅ kalau backend perlu user_id di body, kita tambahkan di payload
+      const payload = {
+        ...form,
+        user_id: userId,
+      };
+
+      const res = await fetch(
+        `${API_BASE}/rekam-medis?user_id=${userId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const json = await res.json();
 
       if (!res.ok) {
-        console.error(json);
+        console.error("Gagal menyimpan rekam medis:", json);
         alert("Gagal menyimpan rekam medis");
         return;
       }
@@ -71,6 +111,7 @@ export default function AddRekamMedisPage() {
       router.push("/superadmin/rekam-medis");
     } catch (err) {
       console.error("Error submit:", err);
+      alert("Terjadi kesalahan saat menyimpan rekam medis");
     }
   };
 
@@ -88,7 +129,9 @@ export default function AddRekamMedisPage() {
               Reservasi
             </label>
             {loadingReservasi ? (
-              <p className="text-neutral-500 text-sm">Memuat daftar reservasi...</p>
+              <p className="text-neutral-500 text-sm">
+                Memuat daftar reservasi...
+              </p>
             ) : (
               <select
                 value={form.reservasi_id}

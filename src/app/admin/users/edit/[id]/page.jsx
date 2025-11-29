@@ -2,52 +2,79 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import AdminLayout from "@/app/admin/components/admin_layout";
-import FormUser from "../../../components/form/formusers"; // Impor FormUser
-
-// --- Simulasi pengambilan data ---
-// Ganti ini dengan API call Anda
-const fetchUserById = async (id) => {
-  console.log(`Fetching data user untuk ID: ${id}`);
-  const dummyData = {
-    "1": { id: 1, nama: "Saputra", email: "saputra123@gmail.com", telp: "081254345678" },
-    "2": { id: 2, nama: "Muhammad Ole", email: "oleganz123@gmail.com", telp: "0822123212321" },
-  };
-  return new Promise((resolve) =>
-    setTimeout(() => resolve(dummyData[id] || null), 300)
-  );
-};
-// ---------------------------------
+import AdminLayout from "../../../components/admin_layout"; 
+import FormUser from "../../../components/form/formusers"; 
 
 export default function EditUserPage() {
   const params = useParams();
   const { id } = params;
+  
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (id) {
-      const loadData = async () => {
+    const fetchUser = async () => {
+      if (!id) return;
+
+      try {
         setIsLoading(true);
-        const data = await fetchUserById(id);
-        setUserData(data);
+        const token = localStorage.getItem("token");
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+        const response = await fetch(`${baseUrl}/users/${id}`, {
+          method: 'GET',
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Accept": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Gagal mengambil data user");
+        }
+
+        const result = await response.json();
+        const apiData = result.data; // Data asli dari Laravel (name, email, nomor_telepon)
+
+        const formattedData = {
+            id: apiData.userid,
+            nama: apiData.name,             // Mapping: name -> nama
+            email: apiData.email,           // Mapping: email -> email
+            telp: apiData.nomor_telepon,    // Mapping: nomor_telepon -> telp
+        };
+
+        setUserData(formattedData);
+      } catch (err) {
+        console.error("Error:", err);
+        setError(err.message);
+      } finally {
         setIsLoading(false);
-      };
-      loadData();
-    }
+      }
+    };
+
+    fetchUser();
   }, [id]);
 
   return (
     <AdminLayout>
-      {isLoading ? (
-        <div className="text-center p-10">Memuat data user...</div>
-      ) : !userData ? (
-        <div className="text-center p-10 text-red-600">
-          Data user tidak ditemukan.
-        </div>
-      ) : (
-        <FormUser initialData={userData} />
-      )}
+      <div className="p-6">
+        {isLoading ? (
+          <div className="flex justify-center items-center min-h-[50vh]">
+            <div className="text-neutral-600 font-medium animate-pulse">Memuat data user...</div>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-center">
+            {error}
+          </div>
+        ) : !userData ? (
+          <div className="text-center p-10 text-neutral-600">
+            Data user tidak ditemukan.
+          </div>
+        ) : (
+          <FormUser initialData={userData} />
+        )}
+      </div>
     </AdminLayout>
   );
 }

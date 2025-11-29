@@ -8,13 +8,17 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   PlusIcon,
-  UserIcon, 
+  UserIcon,
 } from "@heroicons/react/24/outline";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 
 export default function AdminManagementPage() {
   const [admins, setAdmins] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 🔍 state untuk search & filter
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   useEffect(() => {
     const fetchAdmins = async () => {
@@ -29,7 +33,7 @@ export default function AdminManagementPage() {
 
         if (response.ok) {
           const data = await response.json();
-          setAdmins(data); 
+          setAdmins(data);
         } else {
           console.error("Gagal mengambil data admin");
         }
@@ -55,7 +59,7 @@ export default function AdminManagementPage() {
         });
 
         if (response.ok) {
-          setAdmins(admins.filter((admin) => admin.adminID !== id));
+          setAdmins((prev) => prev.filter((admin) => admin.adminID !== id));
           alert("Admin berhasil dihapus");
         } else {
           alert("Gagal menghapus admin");
@@ -66,41 +70,76 @@ export default function AdminManagementPage() {
     }
   };
 
+  // 🔄 ambil daftar role unik untuk opsi filter
+  const roleOptions = ["all", ...new Set(admins.map((a) => a.role))];
+
+  // 🧠 logika filter: berdasarkan searchTerm + roleFilter
+  const filteredAdmins = admins.filter((admin) => {
+    const term = searchTerm.toLowerCase().trim();
+
+    const matchesSearch =
+      term === "" ||
+      admin.Nama?.toLowerCase().includes(term) ||
+      admin.Email?.toLowerCase().includes(term) ||
+      String(admin.adminID).includes(term);
+
+    const matchesRole = roleFilter === "all" || admin.role === roleFilter;
+
+    return matchesSearch && matchesRole;
+  });
+
   return (
     <AdminLayout>
-      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
-        
+      <div className="bg-white px-4 py-6 sm:p-6 lg:p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
         {/* Header */}
-        <div className="flex items-center justify-center mb-8 space-x-3">
-            <UserIcon className="h-8 w-8 text-primary-600" />
-            <h1 className="text-2xl font-bold text-neutral-800">
+        <div className="flex flex-col items-center justify-center mb-6 sm:mb-8 space-y-2">
+          <UserIcon className="h-8 w-8 text-primary-600" />
+          <h1 className="text-xl sm:text-2xl font-bold text-neutral-800 text-center">
             Manajemen Admin
-            </h1>
+          </h1>
         </div>
 
-        {/* Toolbar (Search, Filter, Add) */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center space-x-3 ml-auto">
+        {/* Toolbar */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6 sm:mb-8">
+          <div />
+
+          <div className="flex flex-col gap-3 w-full md:flex-row md:items-center md:justify-end">
             {/* Search */}
-            <div className="relative w-full max-w-xs">
+            <div className="relative w-full md:max-w-xs">
               <input
                 type="text"
-                placeholder="Cari Admin..."
-                className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Cari Admin (nama, email, ID)..."
+                className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-600" />
+              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
             </div>
 
             {/* Filter */}
-            <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
-              <FunnelIcon className="h-5 w-5 text-neutral-600" />
-              <span>Filter</span>
-            </button>
+            <div className="w-full md:w-auto">
+              <div className="flex items-center justify-between md:justify-start space-x-2 bg-white text-neutral-700 border border-neutral-200 px-3 py-2 rounded-lg shadow-sm">
+                <FunnelIcon className="h-5 w-5 text-neutral-600" />
+                <select
+                  className="bg-transparent outline-none text-sm font-semibold w-full"
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                >
+                  {roleOptions.map((role) => (
+                    <option key={role} value={role}>
+                      {role === "all"
+                        ? "Semua Role"
+                        : role.charAt(0).toUpperCase() + role.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-            {/* Tombol Add (Link ke Halaman Tambah Admin) */}
+            {/* Add Admin */}
             <Link
-              href="/superadmin/admins/add" 
-              className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
+              href="/superadmin/admins/add"
+              className="w-full md:w-auto flex items-center justify-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold text-sm"
             >
               <PlusIcon className="h-5 w-5" />
               <span>Tambah Admin</span>
@@ -108,16 +147,16 @@ export default function AdminManagementPage() {
           </div>
         </div>
 
-        {/* Tabel Data */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
+        {/* Tabel + Scrollbar */}
+        <div className="w-full overflow-x-auto overflow-y-hidden border rounded-lg scrollbar-thin scrollbar-thumb-neutral-400 scrollbar-track-neutral-200">
+          <table className="min-w-full divide-y divide-neutral-200 text-xs sm:text-sm">
             <thead className="bg-primary-600 rounded-t-lg">
               <tr>
                 {["ID", "Nama Admin", "Email", "Role", "Bergabung", "Aksi"].map(
                   (header) => (
                     <th
                       key={header}
-                      className="px-6 py-3 text-left text-sm font-semibold text-white uppercase tracking-wider first:rounded-tl-lg last:rounded-tr-lg"
+                      className="px-3 py-2 sm:px-6 sm:py-3 text-left font-semibold text-white uppercase tracking-wider first:rounded-tl-lg last:rounded-tr-lg"
                     >
                       {header}
                     </th>
@@ -128,55 +167,58 @@ export default function AdminManagementPage() {
             <tbody className="bg-white divide-y divide-neutral-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-10 text-gray-500">
+                  <td
+                    colSpan="6"
+                    className="text-center py-10 text-gray-500 text-sm"
+                  >
                     Memuat data admin...
                   </td>
                 </tr>
-              ) : admins.length > 0 ? (
-                admins.map((admin, index) => (
+              ) : filteredAdmins.length > 0 ? (
+                filteredAdmins.map((admin, index) => (
                   <tr
-                    key={admin.adminID} // Gunakan adminID sesuai database Anda
+                    key={admin.adminID}
                     className={index % 2 === 1 ? "bg-neutral-50" : "bg-white"}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">
+                    <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap font-medium text-neutral-900">
                       {admin.adminID}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800 font-semibold">
-                      {admin.Nama} {/* Huruf Besar sesuai Backend */}
+                    <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-neutral-800 font-semibold">
+                      {admin.Nama}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                      {admin.Email} {/* Huruf Besar sesuai Backend */}
+                    <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-neutral-600">
+                      {admin.Email}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                            admin.role === 'superadmin' 
-                            ? 'bg-purple-100 text-purple-800' 
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                            {admin.role}
-                        </span>
+                    <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 rounded-full text-[10px] sm:text-xs font-semibold ${
+                          admin.role === "superadmin"
+                            ? "bg-purple-100 text-purple-800"
+                            : "bg-blue-100 text-blue-800"
+                        }`}
+                      >
+                        {admin.role}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-500">
+                    <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-neutral-500">
                       {new Date(admin.created_at).toLocaleDateString("id-ID")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-3">
-                        {/* Tombol Delete */}
+                    <td className="px-3 py-2 sm:px-6 sm:py-4 whitespace-nowrap font-medium">
+                      <div className="flex space-x-2 sm:space-x-3">
                         <button
                           onClick={() => handleDelete(admin.adminID)}
                           className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
                           title="Hapus Admin"
                         >
-                          <TrashIcon className="h-5 w-5" />
+                          <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                         </button>
 
-                        {/* Tombol Edit */}
                         <Link
                           href={`/superadmin/admins/edit/${admin.adminID}`}
                           className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
                           title="Edit Admin"
                         >
-                          <PencilIcon className="h-5 w-5" />
+                          <PencilIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                         </Link>
                       </div>
                     </td>
@@ -184,8 +226,11 @@ export default function AdminManagementPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="text-center py-10 text-gray-500">
-                    Belum ada data admin.
+                  <td
+                    colSpan="6"
+                    className="text-center py-10 text-gray-500 text-sm"
+                  >
+                    Tidak ada admin yang cocok dengan pencarian / filter.
                   </td>
                 </tr>
               )}

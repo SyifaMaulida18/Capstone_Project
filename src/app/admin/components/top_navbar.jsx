@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  ArrowRightOnRectangleIcon,
+  BellIcon,
+} from "@heroicons/react/24/outline";
 
 export default function TopNav() {
   const navItems = [
-    { name: "Beranda", href: "/admin/dashboard" }, 
-    // { name: "Manajemen User", href: "/admin/users" },
+    { name: "Beranda", href: "/admin/dashboard" },
     { name: "Manajemen Dokter", href: "/admin/dokter" },
     { name: "Manajemen Jadwal Dokter", href: "/admin/schedule" },
     { name: "Manajemen Pasien", href: "/admin/pasien" },
@@ -16,36 +19,47 @@ export default function TopNav() {
   ];
 
   const pathname = usePathname();
+  const router = useRouter();
+
+  // 🔐 Tombol Logout
+  const handleLogout = () => {
+    if (window.confirm("Keluar dari akun admin?")) {
+      localStorage.removeItem("token");
+      router.push("/"); // redirect ke login/home
+    }
+  };
 
   return (
-    // UBAH: Menggunakan border-neutral-200
     <nav className="bg-white border-b border-neutral-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-start h-12 space-x-6 text-sm">
-          {navItems.map((item) => {
-            // Cek rute aktif (lebih sederhana sekarang karena path konsisten)
-            const isActive = pathname === item.href;
+        {/* Flex kiri = nav items, kanan = bell + logout */}
+        <div className="flex items-center justify-between h-12 w-full">
 
-            return (
-              <Link key={item.name} href={item.href}>
-                <p
-                  className={`
-                    font-medium transition-colors duration-200 cursor-pointer
-                    ${
-                      isActive
-                        ? /* UBAH: Menggunakan text-primary-600 dan border-primary-600 */
-                          "text-primary-600 border-b-2 border-primary-600 font-semibold"
-                        : /* UBAH: Menggunakan text-neutral-600 dan hover:text-neutral-900 */
-                          "text-neutral-600 hover:text-neutral-900"
-                    }
-                    h-full flex items-center
-                  `}
-                >
-                  {item.name}
-                </p>
-              </Link>
-            );
-          })}
+          {/* ➤ NAV ITEMS (kiri) */}
+          <div className="flex items-center space-x-6 text-sm overflow-x-auto no-scrollbar">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+
+              return (
+                <Link key={item.name} href={item.href}>
+                  <p
+                    className={`
+                      font-medium cursor-pointer transition-colors duration-200
+                      ${
+                        isActive
+                          ? "text-primary-600 border-b-2 border-primary-600 font-semibold"
+                          : "text-neutral-600 hover:text-neutral-900"
+                      }
+                      h-full flex items-center
+                    `}
+                  >
+                    {item.name}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+          
         </div>
       </div>
     </nav>

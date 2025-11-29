@@ -1,120 +1,223 @@
 "use client"; // Diperlukan untuk useState dan onClick
 
-import { useState } from "react"; // Impor useState
-import Link from "next/link"; // Impor Link
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   TrashIcon,
   PencilIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-  PlusIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "@/app/admin/components/admin_layout";
-
-const initialUsers = [
-  { id: 1, nama: "Saputra", email: "saputra123@gmail.com", telp: "081254345678" },
-  { id: 2, nama: "Muhammad Ole", email: "oleganz123@gmail.com", telp: "0822123212321" },
-];
+import AdminLayout from "../../admin/components/admin_layout";
 
 export default function UserManagementPage() {
-  const [users, setUsers] = useState(initialUsers);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fungsi untuk simulasi delete
-  const handleDelete = (id) => {
+  // 🔍 State untuk search & filter
+  const [searchTerm, setSearchTerm] = useState("");
+  const [phoneFilter, setPhoneFilter] = useState("all"); // "all" | "with-phone" | "without-phone"
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+        const response = await fetch(`${baseUrl}/users`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          setUsers(result.data || []);
+        } else {
+          console.error("Gagal mengambil data user");
+        }
+      } catch (error) {
+        console.error("Terjadi kesalahan:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  const handleDelete = async (id) => {
     if (window.confirm("Apakah Anda yakin ingin menghapus data user ini?")) {
-      // Logika API delete (simulasi)
-      setUsers(users.filter((u) => u.id !== id));
-      console.log(`Delete user with id: ${id}`);
+      try {
+        const token = localStorage.getItem("token");
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+        const response = await fetch(`${baseUrl}/users/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          setUsers((prev) => prev.filter((u) => u.userid !== id));
+          alert("User berhasil dihapus.");
+        } else {
+          alert("Gagal menghapus user.");
+        }
+      } catch (error) {
+        console.error("Error deleting user:", error);
+      }
     }
   };
 
+  // 🧠 Logika filter: search + filter no telp
+  const filteredUsers = users.filter((user) => {
+    const term = searchTerm.toLowerCase().trim();
+
+    const matchesSearch =
+      term === "" ||
+      user.name?.toLowerCase().includes(term) ||
+      user.email?.toLowerCase().includes(term) ||
+      user.nomor_telepon?.toLowerCase().includes(term) ||
+      String(user.userid).includes(term);
+
+    const hasPhone =
+      user.nomor_telepon && user.nomor_telepon.toString().trim() !== "";
+
+    const matchesPhoneFilter =
+      phoneFilter === "all" ||
+      (phoneFilter === "with-phone" && hasPhone) ||
+      (phoneFilter === "without-phone" && !hasPhone);
+
+    return matchesSearch && matchesPhoneFilter;
+  });
+
   return (
     <AdminLayout>
-      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
-        <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
+      <div className="bg-white px-4 py-6 sm:p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
+        <h1 className="text-xl sm:text-2xl font-bold text-center mb-6 sm:mb-8 text-neutral-800">
           Manajemen User
         </h1>
 
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center space-x-3 ml-auto">
-            <div className="relative w-full max-w-xs">
+        {/* Toolbar */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
+          {/* (opsional) Info kecil di mobile, bisa kamu hapus kalau nggak perlu */}
+          <p className="text-xs text-neutral-500 sm:hidden">
+            Total user: {filteredUsers.length}
+          </p>
+
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:ml-auto">
+            {/* 🔍 Search */}
+            <div className="relative w-full sm:w-64 md:w-72">
               <input
                 type="text"
-                placeholder="Search..."
-                className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Cari user (nama, email, id, no telp)..."
+                className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
               <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-600" />
             </div>
 
-            <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
-              <FunnelIcon className="h-5 w-5 text-neutral-600" />
-              <span>Filter</span>
-            </button>
-
-            {/* === UBAH DI SINI: Tombol Add menjadi Link === */}
-            <Link
-              href="/admin/users/add" // Path ke halaman add user
-              className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add</span>
-            </Link>
+            {/* 🎯 Filter No Telp */}
+            <div className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-3 py-2 rounded-lg shadow-sm w-full sm:w-auto justify-between sm:justify-start">
+              <div className="flex items-center space-x-2">
+                <FunnelIcon className="h-5 w-5 text-neutral-600" />
+                <span className="text-sm font-semibold hidden sm:inline">
+                  Filter
+                </span>
+              </div>
+              <select
+                className="bg-transparent outline-none text-xs sm:text-sm font-semibold ml-2"
+                value={phoneFilter}
+                onChange={(e) => setPhoneFilter(e.target.value)}
+              >
+                <option value="all">Semua User</option>
+                <option value="with-phone">Dengan No Telp</option>
+                <option value="without-phone">Tanpa No Telp</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
+        {/* Tabel */}
+        <div className="w-full overflow-x-auto pb-4">
+          <table className="min-w-[720px] sm:min-w-full divide-y divide-neutral-200">
             <thead className="bg-primary-600 rounded-t-lg">
               <tr>
                 {["Id", "Nama", "Email", "No Telp", "Aksi"].map((header) => (
                   <th
                     key={header}
-                    className="px-6 py-3 text-left text-sm font-semibold text-white uppercase tracking-wider rounded-t-lg first:rounded-tl-lg last:rounded-tr-lg"
+                    className="px-4 sm:px-6 py-3 text-left text-xs sm:text-sm font-semibold text-white uppercase tracking-wider first:rounded-tl-lg last:rounded-tr-lg"
                   >
                     {header}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-neutral-100">
-              {users.map((user, index) => (
-                <tr
-                  key={user.id}
-                  className={index % 2 === 1 ? "bg-neutral-50" : "bg-white"}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">
-                    {user.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.nama}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {user.telp}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-3">
-                      {/* === UBAH DI SINI: Tambah onClick === */}
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-
-                      {/* === UBAH DI SINI: Tombol Edit menjadi Link === */}
-                      <Link
-                        href={`/admin/users/edit/${user.id}`} // Path ke halaman edit user
-                        className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </Link>
-                    </div>
+            <tbody className="bg-white divide-y divide-neutral-100 text-xs sm:text-sm">
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-center py-10 text-neutral-500 text-sm"
+                  >
+                    Memuat data user...
                   </td>
                 </tr>
-              ))}
+              ) : filteredUsers.length > 0 ? (
+                filteredUsers.map((user, index) => (
+                  <tr
+                    key={user.userid || index}
+                    className={index % 2 === 1 ? "bg-neutral-50" : "bg-white"}
+                  >
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap font-medium text-neutral-900">
+                      {user.userid}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-neutral-800">
+                      {user.name}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-neutral-800">
+                      {user.email}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-neutral-800">
+                      {user.nomor_telepon || "-"}
+                    </td>
+                    <td className="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap font-medium">
+                      <div className="flex space-x-2 sm:space-x-3">
+                        <button
+                          onClick={() => handleDelete(user.userid)}
+                          className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
+                          title="Hapus User"
+                        >
+                          <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                        </button>
+
+                        <Link
+                          href={`/admin/users/edit/${user.userid}`}
+                          className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
+                          title="Edit User"
+                        >
+                          <PencilIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="text-center py-10 text-neutral-500 text-sm"
+                  >
+                    Tidak ada user yang cocok dengan pencarian / filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

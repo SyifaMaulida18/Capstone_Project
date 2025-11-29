@@ -1,150 +1,73 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
-import { Input } from "@/app/superadmin/components/ui/input";
 
-// dummy data pasien & rekam medis, nanti ganti API
-const patients = [
-  { id: 1, name: "Ayu Gideon" },
-  { id: 2, name: "Syifa Maulida" },
-  { id: 3, name: "Sheva Rebecca" },
-];
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
-const medicalRecords = {
-  1: [
-    { id: "rec100", date: "2025-02-29", treatment: "Pemeriksaan Umum" },
-    { id: "rec101", date: "2025-05-18", treatment: "Kontrol Jantung" },
-  ],
-  2: [],
-  3: [],
-};
-
-export default function EditMedicalRecordPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const patientId = searchParams.get("patientId");
-  const recordId = searchParams.get("recordId");
-
-  const patient = useMemo(
-    () => patients.find((p) => String(p.id) === String(patientId)),
-    [patientId]
-  );
-
-  const originalRecord = useMemo(() => {
-    if (!patientId || !recordId) return null;
-    const list = medicalRecords[patientId] || [];
-    return list.find((r) => r.id === recordId) || null;
-  }, [patientId, recordId]);
-
-  const [form, setForm] = useState({
-    date: "",
-    treatment: "",
-  });
+export default function RekamMedisListPage() {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (originalRecord) {
-      setForm({
-        date: originalRecord.date,
-        treatment: originalRecord.treatment,
-      });
-    }
-  }, [originalRecord]);
+    const fetchList = async () => {
+      try {
+        const token = localStorage.getItem("token");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+        const res = await fetch(`${API_BASE}/rekam-medis`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-    // di sini nanti panggil API PUT/PATCH
-    console.log("Update rekam medis:", {
-      patientId,
-      recordId,
-      ...form,
-    });
+        const json = await res.json();
+        setRecords(json.data || []);
+      } catch (err) {
+        console.error("Error fetch list:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    alert("Perubahan rekam medis tersimpan (dummy).");
-    router.push("/superadmin/rekam-medis");
-  };
-
-  const isNotFound = !patient || !originalRecord;
+    fetchList();
+  }, []);
 
   return (
     <AdminLayout>
-      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-3xl mx-auto mt-8">
-        <h1 className="text-2xl font-bold mb-6 text-neutral-800">
-          Edit Rekam Medis
-        </h1>
+      <div className="bg-white p-8 rounded-xl shadow-lg border max-w-4xl mx-auto mt-8">
+        <h1 className="text-2xl font-bold mb-6">Rekam Medis</h1>
 
-        {isNotFound && (
-          <p className="text-red-600 mb-4">
-            Data rekam medis tidak ditemukan. Pastikan membuka halaman ini
-            dari daftar rekam medis.
-          </p>
-        )}
-
-        {!isNotFound && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <p className="text-sm text-neutral-500 mb-1">Pasien</p>
-              <p className="font-semibold text-neutral-800">
-                {patient.name}
-              </p>
-            </div>
-
-            <div>
-              <label
-                htmlFor="date"
-                className="text-sm text-neutral-600 block mb-1"
-              >
-                Tanggal Perawatan
-              </label>
-              <Input
-                type="date"
-                id="date"
-                value={form.date}
-                onChange={(e) =>
-                  setForm({ ...form, date: e.target.value })
-                }
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="treatment"
-                className="text-sm text-neutral-600 block mb-1"
-              >
-                Keterangan (Perawatan/Diagnosa)
-              </label>
-              <textarea
-                id="treatment"
-                rows={4}
-                value={form.treatment}
-                onChange={(e) =>
-                  setForm({ ...form, treatment: e.target.value })
-                }
-                required
-                className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={() => router.push("/superadmin/rekam-medis")}
-                className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg hover:bg-neutral-200 transition"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                className="bg-secondary-500 text-white px-4 py-2 rounded-lg hover:bg-secondary-600 transition"
-              >
-                Simpan Perubahan
-              </button>
-            </div>
-          </form>
+        {loading ? (
+          <p>Memuat data...</p>
+        ) : records.length === 0 ? (
+          <p className="text-neutral-500">Belum ada rekam medis.</p>
+        ) : (
+          <table className="min-w-full border">
+            <thead>
+              <tr className="bg-primary-600 text-white">
+                <th className="p-3">No Medrec</th>
+                <th className="p-3">Diagnosis</th>
+                <th className="p-3">Tanggal</th>
+                <th className="p-3">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((rec) => (
+                <tr key={rec.id} className="border-b">
+                  <td className="p-3">{rec.no_medrec}</td>
+                  <td className="p-3">{rec.diagnosis}</td>
+                  <td className="p-3">{rec.tanggal_diperiksa?.slice(0, 10)}</td>
+                  <td className="p-3">
+                    <Link
+                      href={`/superadmin/rekam-medis/${rec.id}`}
+                      className="text-primary-600 hover:underline"
+                    >
+                      Edit
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </AdminLayout>
