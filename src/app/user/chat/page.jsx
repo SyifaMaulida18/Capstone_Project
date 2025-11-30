@@ -66,13 +66,45 @@ export default function UserChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex justify-center py-10 px-4">
-      <div className="w-full max-w-2xl h-[700px] flex flex-col bg-white shadow-lg rounded-2xl border border-neutral-200 overflow-hidden">
+    <div className="h-screen bg-neutral-50 flex items-center justify-center p-4">
+      {/* CSS Scrollbar (Auto Hide) */}
+      <style>{`
+        .custom-scroll-area *::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scroll-area *::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scroll-area *::-webkit-scrollbar-thumb {
+          background-color: transparent;
+          border-radius: 20px;
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        .custom-scroll-area:hover *::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+        }
+        .custom-scroll-area * {
+          scrollbar-width: thin;
+          scrollbar-color: transparent transparent;
+        }
+        .custom-scroll-area:hover * {
+          scrollbar-color: #cbd5e1 transparent;
+        }
+      `}</style>
+
+      {/* PERUBAHAN DI SINI:
+          1. max-w-2xl diganti jadi max-w-6xl (supaya jauh lebih lebar)
+          2. h-[85vh] diganti jadi h-[90vh] (supaya lebih tinggi sedikit, lebih immersive)
+          3. md:h-[700px] dihapus agar tingginya dinamis mengikuti layar (90vh)
+      */}
+      <div className="w-full max-w-6xl h-[90vh] flex flex-col bg-white shadow-xl rounded-2xl border border-neutral-200 overflow-hidden">
         
-        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-neutral-200 bg-white">
+        {/* Header */}
+        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-neutral-200 bg-white z-10 relative shadow-sm">
           <button
             onClick={() => router.back()}
-            className="p-2 rounded-full text-neutral-500 hover:bg-neutral-100"
+            className="p-2 rounded-full text-neutral-500 hover:bg-neutral-100 transition"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
@@ -86,18 +118,21 @@ export default function UserChatPage() {
           </div>
         </div>
 
-        {isLoading ? (
-          <div className="flex-1 flex items-center justify-center text-neutral-400">
-            <Loader2 className="animate-spin w-8 h-8" />
-          </div>
-        ) : (
-          <ChatInterface
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            currentUserRole="user"
-            isSending={isSending}
-          />
-        )}
+        {/* Area Konten Chat */}
+        <div className="flex-1 overflow-hidden relative flex flex-col bg-neutral-50/30 custom-scroll-area">
+          {isLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center text-neutral-400 bg-white/80 z-20">
+              <Loader2 className="animate-spin w-8 h-8" />
+            </div>
+          ) : (
+            <ChatInterface
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              currentUserRole="user"
+              isSending={isSending}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

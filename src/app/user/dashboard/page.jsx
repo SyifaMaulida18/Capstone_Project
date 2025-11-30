@@ -5,36 +5,71 @@ import {
   Clock,
   FileText,
   History,
-  MessageSquare
+  MessageSquare,
+  Stethoscope,
+  ChevronRight,
+  User
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import api from "@/services/api"; // Import API helper
 
 // --- IMPORT KOMPONEN LAIN ---
 import Footer from "../../../components/user/Footer";
 import Header from "../../../components/user/Header";
 import Navbar from "../../../components/user/Navbar";
-import StatusAntrian from "../../../components/user/StatusAntrian"; // Pastikan path ini benar
+import StatusAntrian from "../../../components/user/StatusAntrian";
 
-// --- DUMMY DATA ---
-const DUMMY_USER = "Syifa"; 
-const DUMMY_STATS = {
-  active: 1,
-  total: 12,
-  messages: 2,
+// --- HELPER: Format Tanggal Indonesia ---
+const formatDateIndo = (dateString) => {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
 };
-const DUMMY_APPOINTMENT = {
-  id: 1,
-  poli: { poli_name: "Poli Umum" },
-  dokter: { nama_dokter: "Dr. Budi Santoso, Sp.PD" },
-  tanggal_reservasi: "Rabu, 5 November 2025",
-  nomor_antrian: "A12",
-  status: "confirmed",
+
+// --- HELPER: Get Today's Schedule Data ---
+const getTodayScheduleInfo = (schedule) => {
+  const days = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+  const todayIndex = new Date().getDay(); // 0 = Minggu, 1 = Senin, dst.
+  const todayName = days[todayIndex];
+
+  // 1. Cek apakah praktek hari ini aktif
+  const praktekKey = `${todayName}_praktek`;
+  const isActive = schedule[praktekKey] == '1' || schedule[praktekKey] == 'Y';
+
+  if (!isActive) return null;
+
+  // 2. Ambil Jam Praktek (Gabungkan Pagi, Siang, Sore jika ada)
+  let times = [];
+  
+  // Pagi
+  if (schedule[`${todayName}_pagi_kuota`] > 0) {
+      times.push(`${schedule[`${todayName}_pagi_dari`]} - ${schedule[`${todayName}_pagi_sampai`]}`);
+  }
+  // Siang (jika pagi kosong, atau mau ditampilkan semua, disini kita ambil semua yg ada)
+  if (schedule[`${todayName}_siang_kuota`] > 0) {
+      times.push(`${schedule[`${todayName}_siang_dari`]} - ${schedule[`${todayName}_siang_sampai`]}`);
+  }
+  // Sore
+  if (schedule[`${todayName}_sore_kuota`] > 0) {
+      times.push(`${schedule[`${todayName}_sore_dari`]} - ${schedule[`${todayName}_sore_sampai`]}`);
+  }
+
+  // Jika tidak ada jam spesifik tapi status aktif (fallback)
+  if (times.length === 0) times.push("Jadwal Tersedia");
+
+  return times.join(", ");
 };
+
 
 // --- SUB-KOMPONEN UI ---
 
-// 1. Stat Box (Kotak Angka di Header Biru)
+// 1. Stat Box
 const StatBox = ({ number, label, isActive = false }) => (
   <div className={`p-4 rounded-2xl flex flex-col justify-between h-24 w-full ${
     isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-white'
@@ -53,14 +88,6 @@ const UpcomingReservationCard = ({ appointment, loading, onViewQueue }) => {
           <div className="h-5 w-40 bg-neutral-200 rounded-md animate-pulse"></div>
           <div className="h-6 w-24 bg-neutral-200 rounded-full animate-pulse"></div>
         </div>
-        <div className="flex items-center space-x-3 mb-4">
-          <div className="w-10 h-10 bg-neutral-200 rounded-lg animate-pulse"></div>
-          <div className="space-y-2">
-            <div className="h-4 w-32 bg-neutral-200 rounded animate-pulse"></div>
-            <div className="h-3 w-24 bg-neutral-200 rounded animate-pulse"></div>
-          </div>
-        </div>
-        <div className="bg-neutral-100 rounded-xl p-4 h-24 w-full animate-pulse mb-4"></div>
         <div className="h-12 w-full bg-neutral-200 rounded-xl animate-pulse"></div>
       </div>
     );
@@ -83,12 +110,16 @@ const UpcomingReservationCard = ({ appointment, loading, onViewQueue }) => {
     );
   }
 
+  const isConfirmed = appointment.status === 'confirmed';
+  const statusColor = isConfirmed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+  const statusLabel = isConfirmed ? 'Terkonfirmasi' : 'Menunggu Verifikasi';
+
   return (
     <div className="bg-white p-6 rounded-3xl shadow-xl border border-neutral-100 relative overflow-hidden transition-all duration-500 ease-in-out">
       <div className="flex justify-between items-start mb-4">
         <h3 className="text-lg font-bold text-neutral-800">Reservasi Mendatang</h3>
-        <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full">
-          Terkonfirmasi
+        <span className={`${statusColor} text-xs font-bold px-3 py-1 rounded-full uppercase`}>
+          {statusLabel}
         </span>
       </div>
 
@@ -97,29 +128,34 @@ const UpcomingReservationCard = ({ appointment, loading, onViewQueue }) => {
            <FileText className="w-5 h-5 text-blue-600" />
         </div>
         <div>
-          <p className="font-bold text-neutral-800 text-lg">{appointment.poli.poli_name}</p>
-          <p className="text-sm text-neutral-500">{appointment.dokter.nama_dokter}</p>
+          <p className="font-bold text-neutral-800 text-lg">{appointment.poli?.poli_name || 'Poli Umum'}</p>
+          <p className="text-sm text-neutral-500">{appointment.dokter?.nama_dokter || 'Dokter belum ditentukan'}</p>
         </div>
       </div>
 
       <div className="flex items-center space-x-2 mb-6 text-sm text-neutral-600 pl-[3.25rem]">
         <Clock className="w-4 h-4" />
-        <span>{appointment.tanggal_reservasi}</span>
+        <span>{formatDateIndo(appointment.tanggal_reservasi)}</span>
       </div>
 
-      {/* Kotak Nomor Antrian */}
       <div className="bg-blue-50 rounded-xl p-4 flex flex-col items-center justify-center mb-4 border border-blue-100">
         <span className="text-sm text-blue-600 font-medium">Nomor Antrian Anda</span>
-        <span className="text-3xl font-extrabold text-blue-800 mt-1">{appointment.nomor_antrian}</span>
+        <span className="text-3xl font-extrabold text-blue-800 mt-1">
+            {appointment.nomor_antrian || "-"}
+        </span>
+        {!appointment.nomor_antrian && (
+            <span className="text-xs text-blue-400 mt-1">(Akan muncul setelah diverifikasi)</span>
+        )}
       </div>
 
-      {/* TOMBOL LIHAT STATUS */}
-      <button 
-        onClick={onViewQueue}
-        className="w-full py-3 rounded-xl border border-neutral-200 font-semibold text-neutral-700 hover:bg-neutral-50 transition flex justify-center items-center"
-      >
-        Lihat Status Antrian
-      </button>
+      {isConfirmed && (
+          <button 
+            onClick={onViewQueue}
+            className="w-full py-3 rounded-xl border border-neutral-200 font-semibold text-neutral-700 hover:bg-neutral-50 transition flex justify-center items-center"
+          >
+            Lihat Status Antrian
+          </button>
+      )}
     </div>
   );
 };
@@ -137,17 +173,21 @@ const MenuButton = ({ icon: Icon, label, href, isActive = false, hasNotif = fals
   </a>
 );
 
-// 4. Notification Item
-const NotificationItem = ({ title, time, isNew = false }) => (
-  <div className="flex items-start space-x-4 p-4 bg-neutral-50 rounded-2xl mb-3">
-    <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isNew ? 'bg-blue-600' : 'bg-neutral-300'}`}></div>
-    <div className="flex-1">
-      <p className="text-sm font-semibold text-neutral-800">{title}</p>
-      <p className="text-xs text-neutral-500 mt-1">{time}</p>
+// 4. Item Jadwal Dokter Hari Ini
+const DoctorScheduleItem = ({ doctorName, poliName, time }) => (
+    <div className="flex items-center gap-4 p-4 bg-white border border-neutral-100 rounded-2xl shadow-sm mb-3">
+        <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+            <User size={24} />
+        </div>
+        <div className="flex-1 min-w-0">
+            <p className="font-bold text-neutral-800 truncate">{doctorName}</p>
+            <p className="text-xs text-neutral-500 truncate">{poliName}</p>
+            <div className="flex items-center gap-1 mt-1 text-xs font-medium text-green-600 bg-green-50 w-fit px-2 py-0.5 rounded-md">
+                <Clock size={10} /> {time}
+            </div>
+        </div>
     </div>
-  </div>
 );
-
 
 // --- MAIN COMPONENT ---
 export default function DashboardPage() {
@@ -159,10 +199,7 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState("");
   const [nextAppointment, setNextAppointment] = useState(null);
   const [stats, setStats] = useState({ active: 0, total: 0, messages: 0 });
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "Jangan lupa bawa kartu identitas saat kunjungan", time: "5 jam lalu", isNew: true },
-    { id: 2, title: "Hasil lab Anda sudah tersedia", time: "1 hari lalu", isNew: false },
-  ]);
+  const [todayDoctors, setTodayDoctors] = useState([]); // State untuk jadwal dokter hari ini
 
   const navItems = [
     { name: "Beranda", href: "/user/dashboard", isActive: true },
@@ -171,35 +208,71 @@ export default function DashboardPage() {
   ];
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setUserName(DUMMY_USER);
-      setStats(DUMMY_STATS);
-      setNextAppointment(DUMMY_APPOINTMENT);
-      
-      if (DUMMY_APPOINTMENT) {
-         setNotifications(prev => [
-            { 
-               id: 0, 
-               title: `Reservasi Anda dikonfirmasi untuk ${DUMMY_APPOINTMENT.tanggal_reservasi}`, 
-               time: "Baru saja", 
-               isNew: true 
-            },
-            ...prev
-         ]);
-      }
-      
-      setIsLoading(false);
-    }, 1500);
+    const fetchDashboardData = async () => {
+        try {
+            // 1. Ambil Nama User
+            const storedUserStr = localStorage.getItem("user");
+            if (storedUserStr) {
+                const userObj = JSON.parse(storedUserStr);
+                setUserName(userObj.name || userObj.Nama || "Pasien");
+            }
 
-    return () => clearTimeout(timer);
+            // 2. Ambil Data Reservasi
+            const response = await api.get('/my-reservations');
+            const reservations = response.data;
+
+            const activeReservations = reservations.filter(r => 
+                ['pending', 'confirmed'].includes(r.status)
+            );
+            
+            const today = new Date().setHours(0,0,0,0);
+            const upcoming = activeReservations
+                .filter(r => new Date(r.tanggal_reservasi) >= today)
+                .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
+
+            setNextAppointment(upcoming[0] || null);
+            setStats({
+                active: activeReservations.length,
+                total: reservations.length,
+                messages: 0 
+            });
+
+            // 3. Ambil Jadwal Dokter & Filter Hari Ini
+            const jadwalRes = await api.get('/jadwal-dokter'); // Endpoint publik
+            if (jadwalRes.data && jadwalRes.data.success) {
+                const allSchedules = jadwalRes.data.data;
+                
+                // Filter di Frontend
+                const todayList = allSchedules.reduce((acc, schedule) => {
+                    const timeInfo = getTodayScheduleInfo(schedule);
+                    if (timeInfo) {
+                        acc.push({
+                            id: `${schedule.dokter_id}-${schedule.poli_id}`,
+                            doctorName: schedule.dokter?.nama_dokter || "Dokter",
+                            poliName: schedule.poli?.poli_name || "Poli",
+                            time: timeInfo
+                        });
+                    }
+                    return acc;
+                }, []);
+
+                setTodayDoctors(todayList);
+            }
+
+        } catch (error) {
+            console.error("Gagal memuat dashboard:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    fetchDashboardData();
   }, []);
 
-  // --- RENDER FULL SCREEN STATUS ANTRIAN ---
   if (showAntrian) {
-    return <StatusAntrian onBack={() => setShowAntrian(false)} />;
+    return <StatusAntrian onBack={() => setShowAntrian(false)} reservation={nextAppointment} />;
   }
 
-  // --- RENDER DASHBOARD UTAMA ---
   return (
     <div className="min-h-screen flex flex-col bg-neutral-50 font-sans">
       <Header />
@@ -220,7 +293,6 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Stats Row */}
             <div className="flex space-x-3">
                 <StatBox number={stats.active} label="Reservasi Aktif" isActive={true} />
                 <StatBox number={stats.total} label="Total Kunjungan" />
@@ -231,61 +303,63 @@ export default function DashboardPage() {
         {/* --- MAIN CONTENT --- */}
         <div className="px-6 -mt-16 space-y-6">
             
-            {/* 1. Main Card (Reservasi) */}
+            {/* 1. Main Card */}
             <UpcomingReservationCard 
                 appointment={nextAppointment} 
                 loading={isLoading} 
-                onViewQueue={() => setShowAntrian(true)} // Trigger Status Antrian
+                onViewQueue={() => setShowAntrian(true)} 
             />
 
             {/* 2. Grid Menu */}
             <div className="grid grid-cols-2 gap-4">
-                <MenuButton 
-                    icon={Clock} 
-                    label="Buat Reservasi" 
-                    href="/user/reservasi" 
-                    isActive={true} 
-                />
-                <MenuButton 
-                    icon={Calendar} 
-                    label="Jadwal Dokter" 
-                    href="/jadwal_DokterPoli" 
-                />
-                <MenuButton 
-                    icon={History} 
-                    label="Riwayat" 
-                    href="/user/riwayat" 
-                />
-                <MenuButton 
-                    icon={MessageSquare} 
-                    label="Chat Admin" 
-                    href="/user/chat"
-                    hasNotif={stats.messages > 0}
-                />
+                <MenuButton icon={Clock} label="Buat Reservasi" href="/user/reservasi" isActive={true} />
+                <MenuButton icon={Calendar} label="Jadwal Dokter" href="/jadwal_DokterPoli" />
+                <MenuButton icon={History} label="Riwayat" href="/user/riwayat" />
+                <MenuButton icon={MessageSquare} label="Chat Admin" href="/user/chat" hasNotif={stats.messages > 0} />
             </div>
 
-            {/* 3. Notifications Section */}
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
-                <h3 className="text-lg font-bold text-neutral-800 mb-4">Notifikasi</h3>
-                <div>
-                    {isLoading ? (
-                        <div className="space-y-3">
-                            <div className="h-14 w-full bg-neutral-100 rounded-xl animate-pulse"></div>
-                            <div className="h-14 w-full bg-neutral-100 rounded-xl animate-pulse"></div>
-                        </div>
-                    ) : (
-                        notifications.map((notif) => (
-                            <NotificationItem 
-                                key={notif.id} 
-                                title={notif.title} 
-                                time={notif.time} 
-                                isNew={notif.isNew} 
-                            />
-                        ))
-                    )}
+            {/* 3. Jadwal Dokter Hari Ini (Partial View) */}
+            <div className="pt-2">
+                <div className="flex justify-between items-center mb-4 px-1">
+                    <h3 className="text-lg font-bold text-neutral-800 flex items-center gap-2">
+                        <Stethoscope size={20} className="text-blue-600"/>
+                        Jadwal Hari Ini
+                    </h3>
+                    <a href="/jadwal_DokterPoli" className="text-sm font-semibold text-blue-600 flex items-center hover:underline">
+                        Lihat Semua <ChevronRight size={16} />
+                    </a>
                 </div>
+
+                {isLoading ? (
+                    <div className="space-y-3">
+                        <div className="h-20 bg-neutral-200 rounded-2xl animate-pulse"></div>
+                        <div className="h-20 bg-neutral-200 rounded-2xl animate-pulse"></div>
+                    </div>
+                ) : todayDoctors.length > 0 ? (
+                    <div>
+                        {todayDoctors.slice(0, 3).map((doc) => (
+                            <DoctorScheduleItem 
+                                key={doc.id}
+                                doctorName={doc.doctorName}
+                                poliName={doc.poliName}
+                                time={doc.time}
+                            />
+                        ))}
+                        {todayDoctors.length > 3 && (
+                            <div className="text-center mt-2">
+                                <span className="text-xs text-gray-400">
+                                    + {todayDoctors.length - 3} dokter lainnya tersedia hari ini
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="p-6 bg-white rounded-2xl border border-dashed border-neutral-300 text-center text-neutral-400 text-sm">
+                        Tidak ada jadwal praktek hari ini.
+                    </div>
+                )}
             </div>
-            
+
         </div>
       </main>
 

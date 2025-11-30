@@ -7,7 +7,7 @@ export default function Navbar({ navItems }) {
     /* UBAH: Background putih bersih */
     <div className="bg-white hidden md:block">
       <div className="container mx-auto px-4">
-        <nav className="flex space-x-8 py-1"> 
+        <nav className="flex space-x-8 py-1">
           {navItems.map((item) => (
             <a
               key={item.name}

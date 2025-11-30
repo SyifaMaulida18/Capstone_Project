@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Search, User, Loader2, MessageSquare } from "lucide-react"; 
-import { useRouter } from "next/navigation";
-// Pastikan path component ini benar sesuai struktur folder projectmu
-import ChatInterface from "../../../components/ChatInterface"; 
 import api from "@/services/api";
+import { ArrowLeft, Loader2, MessageSquare, Search, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import ChatInterface from "../../../components/ChatInterface";
 
 export default function AdminChatPage() {
   const router = useRouter();
@@ -19,13 +18,34 @@ export default function AdminChatPage() {
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  // --- 1. Fetch Daftar Kontak ---
+  // --- 1. Helper: Cek Status Unread di Frontend ---
+  const checkUnreadStatus = (contactId, lastMessageTime) => {
+    if (!lastMessageTime) return false;
+    
+    // Ambil waktu terakhir dibaca dari Local Storage
+    const lastReadTime = localStorage.getItem(`chat_last_read_${contactId}`);
+    
+    // Jika belum pernah dibuka, anggap unread
+    if (!lastReadTime) return true;
+
+    // Bandingkan waktu: Jika pesan API > pesan disimpan, berarti unread
+    return new Date(lastMessageTime) > new Date(lastReadTime);
+  };
+
+  // --- 2. Fetch Daftar Kontak ---
   const fetchContacts = async () => {
     try {
       const response = await api.get("/admin/chat/contacts");
       if (response.data.success) {
-        // Backend mengembalikan array di response.data.data
-        setContacts(response.data.data);
+        const rawContacts = response.data.data;
+
+        // Map data untuk menambahkan flag 'isUnread' berdasarkan Local Storage
+        const processedContacts = rawContacts.map((contact) => ({
+          ...contact,
+          isUnread: checkUnreadStatus(contact.contact_id, contact.time),
+        }));
+
+        setContacts(processedContacts);
       }
     } catch (error) {
       console.error("Error fetch contacts:", error);
@@ -36,27 +56,23 @@ export default function AdminChatPage() {
 
   useEffect(() => {
     fetchContacts();
-    // Polling kontak tiap 5 detik untuk cek pesan baru dari user lain
+    // Polling kontak tiap 5 detik
     const interval = setInterval(fetchContacts, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // --- 2. Fetch Isi Percakapan ---
+  // --- 3. Fetch Isi Percakapan ---
   const fetchConversation = async (userId) => {
     if (!userId) return;
     try {
-      // Endpoint: /admin/chat/user/{userId}
       const response = await api.get(`/admin/chat/user/${userId}`);
       
       if (response.data.success) {
-        // PERHATIKAN: Backend menggunakan paginate(), jadi array ada di .data.data
-        // Jika backend diubah menjadi get(), maka cukup response.data.data
-        const messageData = response.data.data.data || response.data.data; 
+        const messageData = response.data.data.data || []; 
 
         const formatted = messageData.map((msg) => ({
-          id: msg.chatId, // Backend menggunakan 'chatId' sebagai primary key
+          id: msg.id, 
           text: msg.message,
-          // Logika: Jika sender type mengandung 'Admin', berarti 'me' (kanan)
           sender: msg.senderable_type.includes("Admin") ? "admin" : "user",
           time: new Date(msg.created_at).toLocaleTimeString("id-ID", {
              hour: "2-digit", minute: "2-digit" 
@@ -71,46 +87,74 @@ export default function AdminChatPage() {
     }
   };
 
-  // Efek saat memilih kontak
+  // Efek saat memilih kontak (Polling Chat Aktif)
   useEffect(() => {
     if (activeChatId) {
       setIsLoadingChat(true);
       fetchConversation(activeChatId);
       
-      // Polling pesan aktif tiap 3 detik (Realtime sederhana)
       const interval = setInterval(() => {
-        fetchConversation(activeChatId);
+        const fetchSilent = async () => {
+            try {
+                const response = await api.get(`/admin/chat/user/${activeChatId}`);
+                if (response.data.success) {
+                    const messageData = response.data.data.data || [];
+                    const formatted = messageData.map((msg) => ({
+                        id: msg.id, 
+                        text: msg.message,
+                        sender: msg.senderable_type.includes("Admin") ? "admin" : "user",
+                        time: new Date(msg.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+                    }));
+                    setActiveMessages(formatted);
+                }
+            } catch (err) { console.error(err); }
+        };
+        fetchSilent();
       }, 3000);
       
       return () => clearInterval(interval);
     }
   }, [activeChatId]);
 
-  // Handle Klik Kontak di Sidebar
+  // --- 4. Handle Klik Kontak (MODIFIKASI: Update Status Read) ---
   const handleContactClick = (contact) => {
-    // Backend mengirim key 'contact_id', bukan 'id'
     if (activeChatId === contact.contact_id) return;
 
     setActiveChatId(contact.contact_id);
     setActiveChatName(contact.name);
+
+    // LOGIKA BARU: Simpan waktu pesan terakhir ke Local Storage saat diklik
+    // Ini menandakan pesan sampai detik ini sudah "dibaca"
+    if (contact.time) {
+      localStorage.setItem(`chat_last_read_${contact.contact_id}`, contact.time);
+    }
+
+    // Update state contacts secara manual agar titik merah hilang instan (tanpa nunggu polling)
+    setContacts((prevContacts) => 
+      prevContacts.map((c) => 
+        c.contact_id === contact.contact_id ? { ...c, isUnread: false } : c
+      )
+    );
   };
 
-  // --- 3. Kirim Pesan (Admin ke User) ---
+  // --- 5. Kirim Pesan ---
   const handleSendMessage = async (text) => {
     if(!activeChatId || !text.trim()) return;
     setIsSending(true);
 
     try {
       const payload = {
-        receiver_id: activeChatId, // Backend perlu receiver_id
+        receiver_id: activeChatId,
         message: text,
       };
 
       await api.post("/admin/chat/send", payload);
       
-      // Refresh chat agar pesan muncul
+      // Update juga last read admin agar chat sendiri tidak dianggap unread
+      const nowISO = new Date().toISOString(); 
+      localStorage.setItem(`chat_last_read_${activeChatId}`, nowISO);
+
       await fetchConversation(activeChatId);
-      // Refresh list kontak agar "Last message" terupdate
       fetchContacts();
 
     } catch (error) {
@@ -123,11 +167,37 @@ export default function AdminChatPage() {
 
   return (
     <div className="min-h-screen bg-neutral-100 flex justify-center p-4 md:p-10">
+      
+      {/* --- INI STYLE SCROLLBAR YANG DISAMAKAN DENGAN USER --- */}
+      <style>{`
+        .custom-scroll-area *::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scroll-area *::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scroll-area *::-webkit-scrollbar-thumb {
+          background-color: transparent;
+          border-radius: 20px;
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        .custom-scroll-area:hover *::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+        }
+        .custom-scroll-area * {
+          scrollbar-width: thin;
+          scrollbar-color: transparent transparent;
+        }
+        .custom-scroll-area:hover * {
+          scrollbar-color: #cbd5e1 transparent;
+        }
+      `}</style>
+
       <div className="w-full max-w-6xl h-[85vh] flex bg-white shadow-2xl rounded-2xl border border-neutral-200 overflow-hidden">
         
         {/* KOLOM 1: Sidebar Daftar Kontak */}
         <div className="w-1/3 min-w-[300px] border-r border-neutral-200 flex flex-col bg-white">
-          {/* Header Sidebar */}
           <div className="p-4 border-b border-neutral-200 flex-shrink-0 bg-neutral-50">
              <div className="flex items-center gap-2 mb-3">
                 <button
@@ -149,8 +219,8 @@ export default function AdminChatPage() {
             </div>
           </div>
           
-          {/* List Kontak */}
-          <div className="flex-grow overflow-y-auto custom-scrollbar">
+          {/* Scroll Area Sidebar */}
+          <div className="flex-grow overflow-y-auto custom-scroll-area">
             {isLoadingContacts ? (
                  <div className="flex justify-center p-8"><Loader2 className="animate-spin text-neutral-400 w-8 h-8"/></div>
             ) : contacts.length === 0 ? (
@@ -168,21 +238,32 @@ export default function AdminChatPage() {
                       className={`w-full text-left p-4 flex items-center gap-3 border-b border-neutral-100 transition duration-200 
                         ${isActive ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'hover:bg-neutral-50 border-l-4 border-l-transparent'}`}
                     >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 
-                        ${isActive ? 'bg-blue-200 text-blue-700' : 'bg-neutral-200 text-neutral-500'}`}>
-                        <User size={24} />
+                      <div className="relative">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 
+                          ${isActive ? 'bg-blue-200 text-blue-700' : 'bg-neutral-200 text-neutral-500'}`}>
+                          <User size={24} />
+                        </div>
+                        
+                        {/* INDIKATOR TITIK MERAH (UNREAD) */}
+                        {contact.isUnread && !isActive && (
+                            <span className="absolute top-0 right-0 block h-3 w-3 rounded-full ring-2 ring-white bg-red-500 transform translate-x-1 -translate-y-1"></span>
+                        )}
                       </div>
+
                       <div className="flex-grow overflow-hidden">
                         <div className="flex justify-between items-baseline">
                             <h3 className={`font-semibold truncate ${isActive ? 'text-blue-900' : 'text-neutral-800'}`}>
                             {contact.name}
                             </h3>
-                            <span className="text-xs text-neutral-400 flex-shrink-0 ml-2">
+                            <span className={`text-xs flex-shrink-0 ml-2 ${contact.isUnread ? 'text-green-600 font-bold' : 'text-neutral-400'}`}>
                                 {contact.time ? new Date(contact.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
                             </span>
                         </div>
-                        <p className={`text-sm truncate mt-1 ${isActive ? 'text-blue-700/70' : 'text-neutral-500'}`}>
-                          {contact.last_message || "Gambar/File..."}
+                        <p className={`text-sm truncate mt-1 ${
+                            isActive ? 'text-blue-700/70' : 
+                            contact.isUnread ? 'text-neutral-800 font-medium' : 'text-neutral-500'
+                        }`}>
+                          {contact.last_message || "File/Gambar..."}
                         </p>
                       </div>
                     </button>
@@ -196,7 +277,6 @@ export default function AdminChatPage() {
         <div className="w-2/3 flex flex-col bg-neutral-50/50">
           {activeChatId ? (
             <>
-              {/* Header Chat Aktif */}
               <div className="flex-shrink-0 flex items-center gap-4 p-4 border-b border-neutral-200 bg-white shadow-sm z-10">
                 <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
                     <User size={20} />
@@ -212,8 +292,8 @@ export default function AdminChatPage() {
                 </div>
               </div>
               
-              {/* Area Chat */}
-              <div className="flex-1 overflow-hidden relative">
+              {/* Scroll Area Chat */}
+              <div className="flex-1 overflow-hidden relative custom-scroll-area">
                   {isLoadingChat && activeMessages.length === 0 ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
                             <Loader2 className="animate-spin text-blue-600 w-8 h-8"/>
@@ -229,7 +309,6 @@ export default function AdminChatPage() {
               </div>
             </>
           ) : (
-            // State Kosong (Belum pilih kontak)
             <div className="flex flex-col items-center justify-center h-full text-neutral-400 bg-neutral-50">
               <div className="w-24 h-24 bg-neutral-200 rounded-full flex items-center justify-center mb-6">
                   <MessageSquare className="w-12 h-12 text-neutral-400" />

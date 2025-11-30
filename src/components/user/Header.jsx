@@ -2,28 +2,26 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api from "../../services/api"; // Pastikan path ini benar
+import Image from "next/image"; // Import komponen Image dari Next.js
+import api from "../../services/api";
 import {
-  LayoutDashboard,
   Bell,
   MessageSquare,
   User,
   LogOut,
+  // LayoutDashboard dihapus karena sudah diganti image
 } from "lucide-react";
 
 export default function Header() {
   const [userName, setUserName] = useState("Memuat...");
-  const [notificationCount, setNotificationCount] = useState(0); // Bisa dihubungkan ke endpoint notifikasi nanti
+  const [notificationCount, setNotificationCount] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
-    // Ambil data user yang disimpan saat Login
     const storedUser = localStorage.getItem("user");
-
     if (storedUser) {
       try {
         const userObj = JSON.parse(storedUser);
-        // Backend Laravel mengirim field 'name', bukan 'userName'
         setUserName(userObj.name || "User");
       } catch (error) {
         console.error("Gagal parsing data user", error);
@@ -36,20 +34,12 @@ export default function Header() {
 
   const handleLogout = async () => {
     try {
-      // PENTING: Gunakan endpoint '/logout-user' sesuai route api.php untuk Pasien
       await api.post("/logout-user");
     } catch (error) {
       console.error("Gagal logout di server:", error);
-      // Tetap lanjutkan proses di client meskipun server error (misal token expired)
     } finally {
-      // Hapus semua data sesi di client
       localStorage.removeItem("token");
-      localStorage.removeItem("user"); // Hapus object user utama
-
-      // Hapus item lain jika ada (opsional, amannya clear semua)
-      // localStorage.clear();
-
-      // Redirect ke halaman login
+      localStorage.removeItem("user");
       router.push("/auth/login");
     }
   };
@@ -57,10 +47,19 @@ export default function Header() {
   return (
     <div className="bg-white text-neutral-800 border-b border-neutral-100 sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-        {/* Logo: Menggunakan Blue-600 agar senada dengan Dashboard */}
-        <h1 className="text-2xl font-extrabold flex items-center text-blue-600 cursor-default">
-          <LayoutDashboard className="w-7 h-7 mr-2" /> RSPB
-        </h1>
+        
+        {/* --- BAGIAN LOGO DIGANTI DI SINI --- */}
+        {/* Menggunakan komponen Image Next.js untuk memuat SVG dari public/images/ */}
+        <div className="flex items-center cursor-default relative h-10 w-40">
+           <Image
+            src="/images/logo.svg" // Path absolut dari root public folder
+            alt="RSPB Logo"
+            fill // Mengisi container parent (div h-10 w-40)
+            style={{ objectFit: 'contain', objectPosition: 'left' }} // Agar logo tidak terpotong dan rata kiri
+            priority // Prioritas loading tinggi untuk LCP (Largest Contentful Paint)
+          />
+        </div>
+        {/* ----------------------------------- */}
 
         {/* Navigasi Utilitas Kanan */}
         <div className="flex space-x-3 items-center">
@@ -108,7 +107,7 @@ export default function Header() {
             </button>
           </div>
         </div>
-      </div>x
+      </div>
     </div>
   );
 }
