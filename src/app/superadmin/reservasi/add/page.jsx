@@ -1,4 +1,4 @@
-import AdminLayout from "@/app/superadmin/components/superadmin_layou";
+import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 import FormReservasi from "../../components/form/reservasi"; // Path ke komponen form
 
 export default function AddReservasiPage() {

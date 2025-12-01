@@ -9,25 +9,25 @@ import { Navbar, TopBar } from "../../../components/guest/Header";
 export default function CaraReservasiPage() {
   const steps = [
     {
-      icon: <UserPlus className="w-10 h-10 text-white" />,
+      icon: <UserPlus className="w-8 h-8 text-white" />,
       title: "1. Daftar & Lengkapi Profil",
       description:
         "Buat akun baru atau masuk jika sudah punya. Pastikan data diri dan profil Anda sudah terisi dengan lengkap dan benar.",
     },
     {
-      icon: <Search className="w-10 h-10 text-white" />,
+      icon: <Search className="w-8 h-8 text-white" />,
       title: "2. Cari Poli & Dokter",
       description:
         "Gunakan fitur pencarian untuk menemukan poli tujuan dan dokter yang tersedia sesuai dengan jadwal yang Anda inginkan.",
     },
     {
-      icon: <CalendarCheck className="w-10 h-10 text-white" />,
+      icon: <CalendarCheck className="w-8 h-8 text-white" />,
       title: "3. Pilih Jadwal & Reservasi",
       description:
         "Pilih tanggal dan jam kunjungan, lalu konfirmasi reservasi Anda. Anda akan langsung mendapatkan kode booking.",
     },
     {
-      icon: <Bell className="w-10 h-10 text-white" />,
+      icon: <Bell className="w-8 h-8 text-white" />,
       title: "4. Dapatkan Notifikasi",
       description:
         "Sistem akan mengirimkan notifikasi pengingat H-1 sebelum jadwal kunjungan Anda melalui Email atau WhatsApp.",
@@ -35,51 +35,58 @@ export default function CaraReservasiPage() {
   ];
 
   return (
-    // UBAH: Menggunakan text-neutral-800
-    <main className="bg-white min-h-screen flex flex-col text-neutral-800 font-sans">
-      <TopBar isLoggedIn={false} />
-      <Navbar currentPage="cara-reservasi" />
+    <main className="bg-slate-50 min-h-screen flex flex-col font-sans text-slate-800">
+      <TopBar />
+      <Navbar activeSection="panduan" /> 
 
-      {/* Hero Section */}
-      {/* UBAH: Menggunakan gradasi primary */}
-      <section className="bg-gradient-to-br from-primary-50 to-primary-100 py-20 px-6 text-center">
-        {/* UBAH: Menggunakan text-neutral-900 */}
-        <h1 className="text-4xl md:text-5xl font-extrabold text-neutral-900 mb-4">
-          Cara Melakukan Reservasi
-        </h1>
-        {/* UBAH: Menggunakan text-neutral-600 */}
-        <p className="max-w-3xl mx-auto text-lg text-neutral-600">
-          Ikuti langkah-langkah mudah berikut untuk mendapatkan jadwal konsultasi
-          dengan dokter pilihan Anda.
-        </p>
+      {/* --- 1. HERO SECTION --- */}
+      <section className="relative bg-[#003B73] text-white py-20 px-6 text-center overflow-hidden">
+        {/* Pattern Background Halus */}
+        <div className="absolute top-0 right-0 w-full h-full bg-white/5 opacity-30 skew-y-12 pointer-events-none"></div>
+
+        <div className="relative z-10 max-w-4xl mx-auto">
+          {/* PERUBAHAN DI SINI: Style disamakan persis (Putih, Besar, Tebal) */}
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-6 leading-tight">
+            <span className="block mb-2">Panduan Pasien</span>
+            <span className="block">Cara Melakukan Reservasi</span>
+          </h1>
+
+          <p className="max-w-2xl mx-auto text-lg text-blue-100 leading-relaxed">
+            Ikuti 4 langkah mudah berikut untuk mendapatkan layanan kesehatan prioritas tanpa harus mengantre lama.
+          </p>
+        </div>
       </section>
 
-      {/* Steps Section */}
+      {/* --- 2. STEPS SECTION --- */}
       <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((step) => (
+            {steps.map((step, index) => (
               <div
-                key={step.title}
-                // UBAH: Menggunakan border-primary-500
-                className="flex flex-col items-center text-center p-6 bg-white rounded-xl shadow-lg border-t-4 border-primary-500 hover:shadow-xl hover:-translate-y-2 transition-all duration-300"
+                key={index}
+                className="flex flex-col items-center text-center p-8 bg-white rounded-2xl shadow-lg border-t-4 border-[#8CC63F] hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group"
               >
-                {/* UBAH: Menggunakan bg-primary-500 */}
-                <div className="bg-primary-500 p-4 rounded-full mb-6">
+                {/* Icon Circle */}
+                <div className="w-20 h-20 bg-[#003B73] rounded-full flex items-center justify-center mb-6 shadow-md group-hover:scale-110 transition-transform duration-300">
                   {step.icon}
                 </div>
-                {/* UBAH: Menggunakan text-primary-800 */}
-                <h3 className="text-xl font-bold text-primary-800 mb-2">
+                
+                {/* Title */}
+                <h3 className="text-xl font-bold text-[#003B73] mb-4">
                   {step.title}
                 </h3>
-                {/* UBAH: Menggunakan text-neutral-600 */}
-                <p className="text-neutral-600">{step.description}</p>
+                
+                {/* Description */}
+                <p className="text-slate-600 leading-relaxed text-sm">
+                    {step.description}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* --- 3. CTA & FOOTER --- */}
       <CallToAction />
       <Footer />
     </main>

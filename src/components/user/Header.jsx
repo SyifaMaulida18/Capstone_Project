@@ -1,102 +1,106 @@
 "use client";
 
-import React, { useState, useEffect } from "react"; // 1. Impor state & effect
-import { useRouter } from "next/navigation"; // 2. Impor router
-import api from "../../services/api"; // 3. Impor helper API (pastikan path alias '@' sudah benar)
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image"; // Import komponen Image dari Next.js
+import api from "../../services/api";
 import {
-  LayoutDashboard,
   Bell,
   MessageSquare,
   User,
   LogOut,
+  // LayoutDashboard dihapus karena sudah diganti image
 } from "lucide-react";
 
 export default function Header() {
-  // 4. Hapus prop 'user', ganti dengan state internal
   const [userName, setUserName] = useState("Memuat...");
-  const [notificationCount, setNotificationCount] = useState(0); // State untuk notifikasi
+  const [notificationCount, setNotificationCount] = useState(0);
   const router = useRouter();
 
-  // 5. useEffect untuk memuat data user dari localStorage saat komponen dimuat
   useEffect(() => {
-    const name = localStorage.getItem("userName");
-    if (name) {
-      setUserName(name);
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const userObj = JSON.parse(storedUser);
+        setUserName(userObj.name || "User");
+      } catch (error) {
+        console.error("Gagal parsing data user", error);
+        setUserName("Tamu");
+      }
     } else {
-      setUserName("Tamu"); // Fallback jika tidak ada
+      setUserName("Tamu");
     }
+  }, []);
 
-    // TODO: Nanti, Anda bisa fetch jumlah notifikasi dari API di sini
-    // try {
-    //   const res = await api.get("/notifications/count");
-    //   setNotificationCount(res.data.count);
-    // } catch (e) { console.error(e); }
-  }, []); // [] = jalankan sekali saat komponen mount
-
-  // 6. Buat fungsi logout yang benar
   const handleLogout = async () => {
     try {
-      // Panggil API backend untuk membatalkan token
-      await api.post("/logout");
+      await api.post("/logout-user");
     } catch (error) {
       console.error("Gagal logout di server:", error);
-      // Tetap lanjutkan proses logout di client
     } finally {
-      // Bersihkan semua data dari local storage
       localStorage.removeItem("token");
-      localStorage.removeItem("userName");
-      localStorage.removeItem("userRole");
-      localStorage.removeItem("userID");
-      localStorage.removeItem("userEmail");
-      localStorage.removeItem("userPhone");
-
-      // Arahkan ke halaman login
+      localStorage.removeItem("user");
       router.push("/auth/login");
     }
   };
 
   return (
-    <div className="bg-neutral-900 text-white shadow-xl">
+    <div className="bg-white text-neutral-800 border-b border-neutral-100 sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-        {/* Logo */}
-        <h1 className="text-2xl font-extrabold flex items-center">
-          <LayoutDashboard className="w-6 h-6 mr-2" /> RSPB
-        </h1>
+        
+        {/* --- BAGIAN LOGO DIGANTI DI SINI --- */}
+        {/* Menggunakan komponen Image Next.js untuk memuat SVG dari public/images/ */}
+        <div className="flex items-center cursor-default relative h-10 w-40">
+           <Image
+            src="/images/logo.svg" // Path absolut dari root public folder
+            alt="RSPB Logo"
+            fill // Mengisi container parent (div h-10 w-40)
+            style={{ objectFit: 'contain', objectPosition: 'left' }} // Agar logo tidak terpotong dan rata kiri
+            priority // Prioritas loading tinggi untuk LCP (Largest Contentful Paint)
+          />
+        </div>
+        {/* ----------------------------------- */}
 
         {/* Navigasi Utilitas Kanan */}
-        <div className="flex space-x-4 items-center">
-          <a
-            href="/dashboard/notifications"
-            className="p-2 rounded-full hover:bg-primary-600 transition duration-150 relative"
+        <div className="flex space-x-3 items-center">
+          {/* Tombol Notifikasi */}
+          <button
+            type="button"
+            className="p-2 rounded-full text-neutral-500 hover:bg-blue-50 hover:text-blue-600 transition duration-150 relative focus:outline-none"
+            onClick={() => router.push("/user/notifikasi")}
           >
             <Bell className="w-6 h-6" />
-            {/* 7. Gunakan state notificationCount */}
             {notificationCount > 0 && (
               <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-white bg-red-500"></span>
             )}
-          </a>
-          <a
-            href="/chat"
-            className="p-2 rounded-full hover:bg-primary-600 transition duration-150 relative"
+          </button>
+
+          {/* Tombol Chat */}
+          <button
+            type="button"
+            className="p-2 rounded-full text-neutral-500 hover:bg-blue-50 hover:text-blue-600 transition duration-150 relative focus:outline-none"
+            onClick={() => router.push("/user/chat")}
           >
             <MessageSquare className="w-6 h-6" />
-            {/* Asumsi ini juga menggunakan state yg sama */}
-            {notificationCount > 0 && (
-              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-white bg-red-500"></span>
-            )}
-          </a>
-          <div className="flex items-center space-x-2 border-l border-primary-500 pl-4">
-            <a
-              href="/user/profile"
-              className="flex items-center space-x-1 hover:text-primary-200 transition duration-150"
-            >
-              <User className="w-6 h-6" />
-              {/* 8. Gunakan state userName */}
-              <span className="hidden sm:inline font-semibold">{userName}</span>
-            </a>
+          </button>
+
+          {/* Profil & Logout */}
+          <div className="flex items-center space-x-2 border-l border-neutral-200 pl-4">
             <button
-              onClick={handleLogout} // 9. Panggil fungsi handleLogout
-              className="p-2 ml-2 hover:text-red-300 transition duration-150"
+              onClick={() => router.push("/user/profile")}
+              className="flex items-center space-x-2 text-neutral-600 hover:text-blue-600 transition duration-150 focus:outline-none"
+            >
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600">
+                <User className="w-5 h-5" />
+              </div>
+              <span className="hidden sm:inline font-semibold text-sm">
+                {userName}
+              </span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 ml-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-full transition duration-150 focus:outline-none"
               title="Keluar"
             >
               <LogOut className="w-5 h-5" />

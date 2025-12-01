@@ -6,14 +6,17 @@ import {
   Mail,
   Smartphone,
   Lock,
-  Loader2, // <-- Import ikon loading
+  Loader2,
+  CheckCircle,
+  X,
+  Send
 } from "lucide-react";
 import React, { useState } from "react";
-// 1. GANTI import axios biasa dengan instance 'api' kustom Anda
-import api from "../../../services/api"; // <-- SESUAIKAN PATH INI
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import api from "@/services/api"; // Pastikan path ini sesuai dengan file api.js Anda
 
 // --- Komponen InputField ---
-// (Termasuk prop 'hasError' untuk styling border merah)
 const InputField = ({
   label,
   type,
@@ -22,237 +25,157 @@ const InputField = ({
   icon: Icon,
   value,
   onChange,
-  options,
-  hasError, // <-- Prop untuk styling error
-  ...props
+  name,
+  disabled
 }) => {
-  // Tentukan kelas CSS berdasarkan ada tidaknya error
-  const errorClasses = "border-red-500 focus:ring-red-500 focus:border-red-500";
-  const normalClasses =
-    "border-neutral-200 focus:ring-primary-500 focus:border-primary-500";
-
   const inputClassName = `block w-full rounded-lg border py-2 ${
     Icon ? "pl-10" : "pl-3"
-  } pr-3 text-neutral-900 placeholder-neutral-600 sm:text-sm transition duration-150 ${
-    hasError ? errorClasses : normalClasses // <-- Terapkan style error
-  }`;
+  } pr-3 text-neutral-900 placeholder-neutral-600 sm:text-sm transition duration-150 border-neutral-200 focus:ring-primary-500 focus:border-primary-500 disabled:bg-neutral-100 disabled:text-neutral-500`;
 
   return (
     <div className="space-y-1">
-      <label
-        htmlFor={label}
-        className="block text-sm font-medium text-neutral-700"
-      >
+      <label className="block text-sm font-medium text-neutral-700">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <div className="relative rounded-md shadow-sm">
         {Icon && (
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Icon className="h-5 w-5 text-neutral-600" aria-hidden="true" />
+            <Icon className="h-5 w-5 text-neutral-600" />
           </div>
         )}
-
-        {type === "select" && options ? (
-          <select
-            id={label}
-            name={props.name}
-            required={required}
-            className={inputClassName}
-            value={value}
-            onChange={onChange}
-            {...props}
-          >
-            <option value="" disabled>
-              -- Pilih {label} --
-            </option>
-            {options.map((opt, index) => (
-              <option key={index} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            id={label}
-            name={props.name}
-            type={type}
-            placeholder={placeholder}
-            required={required}
-            className={inputClassName}
-            value={value}
-            onChange={onChange}
-            {...props}
-          />
-        )}
+        <input
+          type={type}
+          name={name}
+          placeholder={placeholder}
+          required={required}
+          className={inputClassName}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+        />
       </div>
     </div>
   );
 };
-// -----------------------------------------------------------------------------------
 
-// --- Komponen Modal Permintaan Lengkapi Data ---
-// (Kode ini diambil dari file Anda, tidak ada perubahan)
-const CompleteProfileModal = ({ isVisible, onClose, onConfirm }) => {
-  if (!isVisible) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-6 md:p-8 max-w-sm w-full text-center transform scale-100 transition-all duration-300">
-        <div className="text-primary-600 mb-4 flex justify-center">
-          <UserPlus className="w-10 h-10" />
-        </div>
-        <h3 className="text-xl font-bold text-neutral-900 mb-3">
-          Lengkapi Data Diri Anda!
-        </h3>
-        <p className="text-neutral-600 mb-6">
-          Untuk dapat melakukan **Reservasi Online**, Anda wajib mengisi data diri
-          lengkap (KTP, KK, Alamat, dll.).
-        </p>
-        <div className="flex justify-center space-x-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-neutral-200 rounded-full text-neutral-700 hover:bg-neutral-100 transition"
-          >
-            Nanti Saja (Lihat Jadwal)
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 px-4 py-2 bg-primary-600 text-white font-semibold rounded-full hover:bg-primary-800 transition"
-          >
-            Lengkapi Sekarang
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-// ---------------------------------------------------
-
-// --- Komponen Halaman Register ---
+// --- Halaman Register ---
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
-    namaLengkap: "",
-    email: "",
-    noTelepon: "",
-    password: "",
-    confirmPassword: "",
-  });
-  const [showModal, setShowModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState({}); // State untuk menyimpan error validasi
+  const router = useRouter();
 
-  // Fungsi untuk menangani perubahan input
+  // State Form Register
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    nomor_telepon: "",
+    password: "",
+    password_confirmation: "",
+  });
+
+  // State OTP
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  
+  // State UI (Loading & Error)
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState(""); // Pesan sukses OTP/Register
+
+  // Handle Input Change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-
-    // Hapus error untuk field ini jika user mulai mengetik lagi
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: null }));
-    }
   };
 
-  // Fungsi untuk menangani submit form registrasi
+  // --- 1. Fungsi Register ---
   const handleRegister = async (e) => {
     e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
     setIsLoading(true);
-    setErrors({}); // Bersihkan error sebelumnya
 
-    // 1. Validasi konfirmasi password di frontend
-    if (formData.password !== formData.confirmPassword) {
-      setErrors({ confirmPassword: ["Konfirmasi Kata Sandi tidak cocok."] });
-      setIsLoading(false);
-      return;
+    // Validasi Password Match di Frontend
+    if (formData.password !== formData.password_confirmation) {
+        setErrorMsg("Konfirmasi kata sandi tidak cocok.");
+        setIsLoading(false);
+        return;
     }
-
-    // 2. Siapkan payload untuk dikirim ke API Laravel
-    //    (Mapping keys frontend ke keys backend)
-    const payload = {
-      name: formData.namaLengkap,
-      email: formData.email,
-      nomor_telepon: formData.noTelepon,
-      password: formData.password,
-      password_confirmation: formData.confirmPassword, // Wajib untuk aturan 'confirmed'
-    };
 
     try {
-      // 3. Kirim permintaan POST ke endpoint /api/register
-      //    'api' adalah instance axios kustom Anda
-      const response = await api.post('/register', payload);
+      // Panggil API Register
+      const response = await api.post("/register", formData);
 
-      // 4. Handle jika registrasi sukses
-      console.log("Registrasi berhasil:", response.data);
-      setIsLoading(false);
-      setShowModal(true); // Tampilkan modal untuk melengkapi profil
-
-    } catch (error) {
-      setIsLoading(false);
-      
-      // 5. Handle jika terjadi error validasi (status 422)
-      if (error.response && error.response.status === 422) {
-        const validationErrors = error.response.data.errors;
-        console.error("Error Validasi:", validationErrors);
-
-        // Map balik keys error dari backend (e.g., 'nomor_telepon')
-        // ke keys state frontend (e.g., 'noTelepon')
-        const frontendErrors = {};
-        for (const key in validationErrors) {
-          const frontendKey = {
-            name: "namaLengkap",
-            nomor_telepon: "noTelepon",
-            password: "password",
-            email: "email",
-            confirmPassword: "confirmPassword"
-          }[key];
-          
-          if (frontendKey) {
-            frontendErrors[frontendKey] = validationErrors[key];
-          } else {
-            frontendErrors[key] = validationErrors[key]; // Fallback
-          }
-        }
-        setErrors(frontendErrors);
-
-      } else {
-        // 6. Handle error server lainnya (500, 404, dll)
-        console.error("Error Server:", error.message);
-        setErrors({
-          general: ["Terjadi kesalahan pada server. Silakan coba lagi nanti."],
-        });
+      if (response.data.success) {
+        // Jika sukses, buka modal OTP
+        setSuccessMsg(response.data.message || "Registrasi berhasil! Cek email Anda.");
+        setShowOtpModal(true);
       }
+    } catch (error) {
+      console.error(error);
+      if (error.response?.data?.errors) {
+         // Ambil error pertama dari validasi backend
+         const firstErrorKey = Object.keys(error.response.data.errors)[0];
+         setErrorMsg(error.response.data.errors[firstErrorKey][0]);
+      } else {
+         setErrorMsg(error.response?.data?.message || "Terjadi kesalahan saat registrasi.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Fungsi untuk tombol "Lengkapi Sekarang" pada modal
-  const handleCompleteProfile = () => {
-    // Arahkan user ke halaman profil
-    // Ganti '/profile' jika path Anda berbeda
-    window.location.href = "/user/profile";
+  // --- 2. Fungsi Verifikasi OTP ---
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setIsLoading(true);
+
+    try {
+        const response = await api.post("/otp/verify", {
+            email: formData.email, // Email diambil dari state form register
+            otp: otpCode
+        });
+
+        if (response.data.success) {
+            setSuccessMsg("Verifikasi Berhasil! Mengalihkan...");
+            // Delay sebentar agar user lihat pesan sukses
+            setTimeout(() => {
+                router.push("/auth/login");
+            }, 1500);
+        }
+    } catch (error) {
+        console.error(error);
+        setErrorMsg(error.response?.data?.message || "Kode OTP Salah atau Kadaluarsa.");
+        setIsLoading(false); // Stop loading jika error, biar bisa input ulang
+    }
   };
 
-  // Fungsi untuk tombol "Nanti Saja" pada modal
-  const handleCloseModal = () => {
-    setShowModal(false);
-    // Arahkan user ke halaman lain (misal: dashboard atau jadwal)
-    // Ganti '/jadwal-dokter' jika path Anda berbeda
-    window.location.href = "/jadwal-dokter";
+  // --- 3. Fungsi Resend OTP (Opsional) ---
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    try {
+        await api.post("/otp/resend", { email: formData.email });
+        alert("Kode OTP baru telah dikirim ke email Anda.");
+    } catch (error) {
+        alert("Gagal mengirim ulang OTP.");
+    } finally {
+        setIsLoading(false);
+    }
   };
 
-  // Komponen helper untuk menampilkan pesan error di bawah input
-  const ErrorMessage = ({ field }) => {
-    return errors[field] ? (
-      <p className="text-xs text-red-600 mt-1">{errors[field][0]}</p>
-    ) : null;
-  };
-
-  // Render JSX
   return (
     <>
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4 relative">
         <div className="bg-white shadow-2xl border-t-8 border-primary-600 rounded-2xl p-8 md:p-12 w-full max-w-lg transform transition-all duration-500 hover:shadow-3xl">
-          
+
+          {/* LOGO */}
           <div className="flex justify-center mb-6">
-            <UserPlus className="w-10 h-10 text-primary-600" />
+            <Image
+              src="/images/logo.svg"
+              alt="Logo Aplikasi"
+              width={120}
+              height={120}
+              className="object-contain h-24 w-auto"
+            />
           </div>
 
           <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">
@@ -262,128 +185,182 @@ export default function RegisterPage() {
             Hanya butuh beberapa detik untuk membuat akun Anda.
           </p>
 
+          {/* Alert Error General */}
+          {errorMsg && !showOtpModal && (
+             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm text-center">
+                {errorMsg}
+             </div>
+          )}
+
           <form onSubmit={handleRegister} className="space-y-6">
-            {/* Menampilkan error general (misal: server down) */}
-            {errors.general && (
-              <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg text-sm">
-                {errors.general[0]}
-              </div>
-            )}
+            <InputField
+              label="Nama Lengkap"
+              type="text"
+              name="name"
+              placeholder="Nama lengkap Anda"
+              required
+              icon={User}
+              value={formData.name}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
 
-            {/* --- Input Field Nama Lengkap --- */}
-            <div>
-              <InputField
-                label="Nama Lengkap"
-                type="text"
-                name="namaLengkap"
-                placeholder="Nama lengkap Anda"
-                required
-                icon={User}
-                value={formData.namaLengkap}
-                onChange={handleChange}
-                hasError={!!errors.namaLengkap} // Kirim status error ke komponen
-              />
-              <ErrorMessage field="namaLengkap" /> {/* Tampilkan error jika ada */}
-            </div>
+            <InputField
+              label="Email"
+              type="email"
+              name="email"
+              placeholder="contoh@mail.com"
+              required
+              icon={Mail}
+              value={formData.email}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
 
-            {/* --- Input Field Email --- */}
-            <div>
-              <InputField
-                label="Email"
-                type="email"
-                name="email"
-                placeholder="contoh@mail.com"
-                required
-                icon={Mail}
-                value={formData.email}
-                onChange={handleChange}
-                hasError={!!errors.email}
-              />
-              <ErrorMessage field="email" />
-            </div>
+            <InputField
+              label="Nomor Telepon (WA)"
+              type="tel"
+              name="nomor_telepon"
+              placeholder="Contoh: 0812xxxxxxxx"
+              required
+              icon={Smartphone}
+              value={formData.nomor_telepon}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
 
-            {/* --- Input Field Nomor Telepon --- */}
-            <div>
-              <InputField
-                label="Nomor Telepon (WA)"
-                type="tel"
-                name="noTelepon"
-                placeholder="Contoh: 0812xxxxxxxx"
-                required
-                icon={Smartphone}
-                value={formData.noTelepon}
-                onChange={handleChange}
-                hasError={!!errors.noTelepon}
-              />
-              <ErrorMessage field="noTelepon" />
-            </div>
+            <InputField
+              label="Kata Sandi"
+              type="password"
+              name="password"
+              placeholder="Min. 6 Karakter"
+              required
+              icon={Lock}
+              value={formData.password}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
 
-            {/* --- Input Field Kata Sandi --- */}
-            <div>
-              <InputField
-                label="Kata Sandi"
-                type="password"
-                name="password"
-                placeholder="Min. 6 Karakter" // Disesuaikan dengan validasi backend (min:6)
-                required
-                icon={Lock}
-                value={formData.password}
-                onChange={handleChange}
-                hasError={!!errors.password}
-              />
-              <ErrorMessage field="password" />
-            </div>
+            <InputField
+              label="Konfirmasi Kata Sandi"
+              type="password"
+              name="password_confirmation"
+              placeholder="Ulangi Kata Sandi"
+              required
+              icon={Lock}
+              value={formData.password_confirmation}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
 
-            {/* --- Input Field Konfirmasi Kata Sandi --- */}
-            <div>
-              <InputField
-                label="Konfirmasi Kata Sandi"
-                type="password"
-                name="confirmPassword"
-                placeholder="Ulangi Kata Sandi"
-                required
-                icon={Lock}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                hasError={!!errors.confirmPassword}
-              />
-              <ErrorMessage field="confirmPassword" />
-            </div>
-
-            {/* --- Tombol Submit --- */}
             <button
               type="submit"
-              disabled={isLoading} // Nonaktifkan tombol saat loading
-              className="w-full bg-secondary-500 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-secondary-600 transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center space-x-2 mt-8 disabled:opacity-70 disabled:cursor-not-allowed"
+              disabled={isLoading}
+              className={`w-full text-white font-semibold py-3 rounded-xl shadow-lg flex items-center justify-center space-x-2 mt-8 transition-all duration-300 transform
+                ${isLoading ? "bg-neutral-400 cursor-not-allowed" : "bg-secondary-500 hover:bg-secondary-600 hover:scale-[1.01]"}`}
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" /> // Ikon loading
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Memproses...</span>
+                  </>
               ) : (
-                <UserPlus className="w-5 h-5" />
+                  <>
+                    <UserPlus className="w-5 h-5" />
+                    <span>Daftar Sekarang</span>
+                  </>
               )}
-              <span>{isLoading ? "Mendaftarkan..." : "Daftar Sekarang"}</span>
             </button>
           </form>
 
-          {/* --- Link ke Halaman Login --- */}
           <p className="text-center text-sm mt-6 text-neutral-600">
             Sudah punya akun?{" "}
             <a
               href="/auth/login"
-              className="text-primary-600 font-bold hover:text-primary-800 transition-colors"
+              className={`text-primary-600 font-bold hover:text-primary-800 ${isLoading ? "pointer-events-none text-neutral-400" : ""}`}
             >
               Masuk
             </a>
           </p>
         </div>
-      </div>
 
-      {/* --- Modal --- */}
-      <CompleteProfileModal
-        isVisible={showModal}
-        onClose={handleCloseModal}
-        onConfirm={handleCompleteProfile}
-      />
+        {/* --- MODAL VERIFIKASI OTP --- */}
+        {showOtpModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-200">
+              
+              {/* Tombol Tutup Modal (Opsional, hati-hati user bisa close tanpa verif) */}
+              {/* <button 
+                onClick={() => setShowOtpModal(false)}
+                className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600"
+              >
+                <X className="w-6 h-6" />
+              </button> */}
+
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+                  <Mail className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-neutral-900">Verifikasi Email</h3>
+                <p className="text-sm text-neutral-500 mt-2">
+                  Kami telah mengirimkan kode OTP 6 digit ke email: <br/>
+                  <span className="font-semibold text-neutral-800">{formData.email}</span>
+                </p>
+              </div>
+
+              <form onSubmit={handleVerifyOtp} className="mt-6 space-y-4">
+                <div>
+                   <label className="sr-only">Kode OTP</label>
+                   <input
+                     type="text"
+                     maxLength={6}
+                     value={otpCode}
+                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))} // Hanya angka
+                     className="block w-full text-center text-2xl tracking-widest font-bold text-neutral-900 border-2 border-neutral-300 rounded-lg py-3 focus:ring-primary-500 focus:border-primary-500"
+                     placeholder="000000"
+                     required
+                   />
+                </div>
+
+                {/* Pesan Error / Sukses di Modal */}
+                {errorMsg && (
+                    <p className="text-red-500 text-sm text-center font-medium bg-red-50 p-2 rounded">{errorMsg}</p>
+                )}
+                {successMsg && successMsg !== "Registrasi berhasil! Cek email Anda." && (
+                    <p className="text-green-600 text-sm text-center font-medium bg-green-50 p-2 rounded flex justify-center items-center gap-2">
+                        <CheckCircle className="w-4 h-4"/> {successMsg}
+                    </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoading || otpCode.length < 6}
+                  className={`w-full py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white 
+                    ${isLoading ? "bg-neutral-400 cursor-not-allowed" : "bg-primary-600 hover:bg-primary-700"}`}
+                >
+                   {isLoading ? "Memverifikasi..." : "Verifikasi Akun"}
+                </button>
+              </form>
+
+              <div className="mt-4 text-center">
+                <p className="text-sm text-neutral-600">
+                  Tidak menerima kode?{" "}
+                  <button 
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={isLoading}
+                    className="font-semibold text-primary-600 hover:text-primary-500 disabled:text-neutral-400"
+                  >
+                    Kirim Ulang
+                  </button>
+                </p>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+      </div>
     </>
   );
 }

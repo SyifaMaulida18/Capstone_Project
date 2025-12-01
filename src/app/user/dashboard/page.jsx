@@ -1,532 +1,365 @@
 "use client";
 
 import {
-  AlertTriangle,
   Calendar,
-  Camera, // Diubah dari UploadCloud
-  CheckCircle,
   Clock,
+  FileText,
   History,
   MessageSquare,
-  PlusCircle,
-  Search,
+  Stethoscope,
+  ChevronRight,
+  User
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react"; // Ditambahkan useRef
+import { useEffect, useState } from "react";
+import api from "@/services/api"; // Import API helper
+
+// --- IMPORT KOMPONEN LAIN ---
 import Footer from "../../../components/user/Footer";
 import Header from "../../../components/user/Header";
 import Navbar from "../../../components/user/Navbar";
-import api from "../../../services/api"; // Sesuaikan path jika perlu
+import StatusAntrian from "../../../components/user/StatusAntrian";
 
-// --- KOMPONEN BANTUAN DISESUAIKAN ---
-
-// 1. Kartu Status Reservasi Utama (Tidak Berubah)
-const PrimaryStatusCard = ({ userName, nextAppointment }) => {
-  const isReserved = nextAppointment != null;
-
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-2xl border-l-8 border-primary-600">
-      <h2 className="text-2xl font-extrabold text-neutral-900 mb-4">
-        Selamat Datang, {userName}
-      </h2>
-
-      <div
-        className={`p-4 rounded-lg transition duration-300 ${
-          isReserved
-            ? "bg-green-50 border-green-300"
-            : "bg-yellow-50 border-yellow-300"
-        }`}
-      >
-        <div className="flex items-center space-x-2">
-          {isReserved ? (
-            <CheckCircle className="w-5 h-5 text-green-600" />
-          ) : (
-            <AlertTriangle className="w-5 h-5 text-yellow-600" />
-          )}
-          <span className="font-semibold text-neutral-700">
-            Status Reservasi
-          </span>
-        </div>
-        <p
-          className={`mt-1 font-medium ${
-            isReserved ? "text-green-700" : "text-yellow-700"
-          }`}
-        >
-          {isReserved
-            ? `Anda terdaftar di ${nextAppointment.poli.poli_name}`
-            : "Belum ada Reservasi Apapun"}
-        </p>
-      </div>
-
-      {/* Detail Janji Temu (Jika ada) */}
-      {isReserved && (
-        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm border-t pt-4">
-          <div>
-            <span className="text-neutral-600">Dokter</span>
-            <p className="font-bold text-neutral-800">
-              {nextAppointment.dokter.nama_dokter}
-            </p>
-          </div>
-          <div>
-            <span className="text-neutral-600">Jadwal</span>
-            <p className="font-bold text-neutral-800">
-              {nextAppointment.tanggal_reservasi}
-            </p>
-          </div>
-          <div>
-            <span className="text-neutral-600">No. Antrian Poli</span>
-            <p className="font-bold text-neutral-800">
-              {nextAppointment.nomor_antrian}
-            </p>
-          </div>
-          <div>
-            <span className="text-neutral-600">Status</span>
-            <p className="font-bold text-neutral-800">
-              {nextAppointment.status}
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+// --- HELPER: Format Tanggal Indonesia ---
+const formatDateIndo = (dateString) => {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
 };
 
-// 2. Kartu Jadwal Poli Tujuan (Tidak Berubah)
-const ScheduleCard = ({ scheduleData }) => (
-  <div className="bg-white p-6 rounded-xl shadow-lg flex flex-col justify-between h-full">
-    <h2 className="text-xl font-bold text-neutral-800 mb-4 flex items-center">
-      <Calendar className="w-5 h-5 mr-2 text-primary-600" /> Jadwal Dokter Poli
-      Tujuan
-    </h2>
+// --- HELPER: Get Today's Schedule Data ---
+const getTodayScheduleInfo = (schedule) => {
+  const days = ['minggu', 'senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu'];
+  const todayIndex = new Date().getDay(); // 0 = Minggu, 1 = Senin, dst.
+  const todayName = days[todayIndex];
 
-    {scheduleData.length > 0 ? (
-      <div className="space-y-3">
-        {scheduleData.map((s, index) => (
-          <div key={index} className="border-b pb-2 last:border-b-0">
-            <p className="font-semibold text-neutral-800">{s.doctor}</p>
-            <p className="text-sm text-neutral-600">
-              {s.days} | {s.time}
-            </p>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <p className="text-neutral-600 italic">
-        Silakan lakukan reservasi untuk melihat jadwal dokter.
-      </p>
-    )}
+  // 1. Cek apakah praktek hari ini aktif
+  const praktekKey = `${todayName}_praktek`;
+  const isActive = schedule[praktekKey] == '1' || schedule[praktekKey] == 'Y';
 
-    <a
-      href="/user/reservasi"
-      className="mt-4 text-center py-2 bg-primary-100 text-primary-800 rounded-lg font-semibold hover:bg-primary-200 transition"
-    >
-      Lakukan Reservasi
-    </a>
+  if (!isActive) return null;
+
+  // 2. Ambil Jam Praktek (Gabungkan Pagi, Siang, Sore jika ada)
+  let times = [];
+  
+  // Pagi
+  if (schedule[`${todayName}_pagi_kuota`] > 0) {
+      times.push(`${schedule[`${todayName}_pagi_dari`]} - ${schedule[`${todayName}_pagi_sampai`]}`);
+  }
+  // Siang (jika pagi kosong, atau mau ditampilkan semua, disini kita ambil semua yg ada)
+  if (schedule[`${todayName}_siang_kuota`] > 0) {
+      times.push(`${schedule[`${todayName}_siang_dari`]} - ${schedule[`${todayName}_siang_sampai`]}`);
+  }
+  // Sore
+  if (schedule[`${todayName}_sore_kuota`] > 0) {
+      times.push(`${schedule[`${todayName}_sore_dari`]} - ${schedule[`${todayName}_sore_sampai`]}`);
+  }
+
+  // Jika tidak ada jam spesifik tapi status aktif (fallback)
+  if (times.length === 0) times.push("Jadwal Tersedia");
+
+  return times.join(", ");
+};
+
+
+// --- SUB-KOMPONEN UI ---
+
+// 1. Stat Box
+const StatBox = ({ number, label, isActive = false }) => (
+  <div className={`p-4 rounded-2xl flex flex-col justify-between h-24 w-full ${
+    isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-white'
+  }`}>
+    <span className="text-3xl font-bold">{number}</span>
+    <span className="text-xs font-medium opacity-90 leading-tight">{label}</span>
   </div>
 );
 
-// 3. Kartu Kontrol Antrian (Tidak Berubah)
-const QueueControlCard = ({ nextAppointment, queueData }) => {
-  const isReserved = nextAppointment != null;
-
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-lg flex flex-col justify-between h-full">
-      <h2 className="text-xl font-bold text-neutral-800 mb-4 flex items-center">
-        <Clock className="w-5 h-5 mr-2 text-primary-600" /> Kontrol Antrian
-      </h2>
-
-      {isReserved ? (
-        <div className="space-y-3 text-sm">
-          <p className="flex justify-between">
-            <span className="text-neutral-600">No. Antrian Anda:</span>
-            <span className="font-bold text-lg text-primary-800">
-              {nextAppointment.nomor_antrian}
-            </span>
-          </p>
-          <p className="flex justify-between">
-            <span className="text-neutral-600">Posisi Saat Ini Dipanggil:</span>
-            <span className="font-bold text-lg text-green-600">
-              {queueData?.sedang_dipanggil?.nomor_antrian || "-"}
-            </span>
-          </p>
-          <div className="pt-2 border-t mt-2">
-            <span className="text-neutral-600 font-bold">
-              Sisa Antrian Saat Ini:
-            </span>
-            <p className="text-2xl font-extrabold text-red-500 mt-1">
-              {queueData?.sisa_antrian ?? 0} Orang
-            </p>
-          </div>
-        </div>
-      ) : (
-        <p className="text-neutral-600 italic">
-          Anda harus memiliki reservasi aktif untuk melacak antrian.
-        </p>
-      )}
-
-      <button
-        disabled={!isReserved}
-        className="mt-4 w-full text-center py-2 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-800 transition disabled:opacity-50"
-      >
-        Lihat Jadwal & Antrian
-      </button>
-    </div>
-  );
-};
-
-// 4. Kartu Riwayat Kunjungan & Upload Foto (DIMODIFIKASI)
-const OtherFeatureCard = ({
-  title,
-  icon: Icon,
-  placeholder,
-  link,
-  isHistory,
-  historyData, // Prop baru
-  actionText, // Prop baru untuk teks link
-}) => {
-  // --- State & Ref untuk upload foto ---
-  const inputRef = useRef(null);
-  const [fileName, setFileName] = useState(null);
-
-  // Fungsi untuk memicu klik pada input file tersembunyi
-  const handleButtonClick = () => {
-    inputRef.current.click();
-  };
-
-  // Fungsi untuk menangani file setelah diambil dari kamera
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setFileName(file.name);
-      // TODO: Tambahkan logika untuk upload file (file) ke server di sini
-      console.log("File captured:", file);
-      // Contoh: uploadFile(file);
-    }
-  };
-  // ------------------------------------
-
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-primary-500">
-      <h2 className="text-xl font-bold text-neutral-800 mb-4 flex items-center">
-        <Icon className="w-5 h-5 mr-2 text-primary-600" /> {title}
-      </h2>
-
-      {isHistory ? (
-        // --- Bagian History (Tidak Berubah) ---
-        historyData && historyData.length > 0 ? (
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-            {historyData.map((h) => (
-              <div
-                key={h.reservid}
-                className="p-3 bg-neutral-50 rounded-lg border border-neutral-200"
-              >
-                <p className="font-semibold text-neutral-800">
-                  {h.poli.poli_name}
-                </p>
-                <p className="text-sm text-neutral-600">
-                  {h.tanggal_reservasi} -{" "}
-                  <span
-                    className={`font-medium ${
-                      h.status === "selesai"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  >
-                    {h.status}
-                  </span>
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-8 bg-neutral-50 rounded-lg text-center text-neutral-600">
-            <History className="w-8 h-8 mx-auto mb-2" />
-            <p className="italic">{placeholder}</p>
-          </div>
-        )
-      ) : (
-        // --- Bagian Upload (DIMODIFIKASI) ---
-        <div className="p-8 bg-neutral-50 rounded-lg text-center text-neutral-600">
-          <Icon className="w-8 h-8 mx-auto mb-2" />
-          
-          {fileName ? (
-            <p className="italic font-medium text-green-700">
-              Foto diambil: {fileName}
-            </p>
-          ) : (
-            <p className="italic">{placeholder}</p>
-          )}
-
-          <button
-            onClick={handleButtonClick}
-            className="mt-4 px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition"
-          >
-            Ambil Foto
-          </button>
-
-          {/* Input file tersembunyi yang meminta kamera */}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment" // Meminta kamera belakang (bisa juga "user" untuk kamera depan)
-            ref={inputRef}
-            onChange={handleFileChange}
-            style={{ display: "none" }}
-          />
-        </div>
-      )}
-
-      <a
-        href={link}
-        className="block mt-4 text-primary-600 font-semibold hover:text-primary-800 text-sm"
-      >
-        {/* Menggunakan actionText jika bukan history */}
-        {isHistory ? "Lihat Semua Riwayat" : actionText}
-      </a>
-    </div>
-  );
-};
-
-// --- KOMPONEN UTAMA (PAGE) ---
-export default function DashboardPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [userName, setUserName] = useState("");
-  const [nextAppointment, setNextAppointment] = useState(null);
-  const [scheduleData, setScheduleData] = useState([]);
-  const [queueData, setQueueData] = useState(null);
-  const [historyData, setHistoryData] = useState([]);
-
-  const router = useRouter();
-
-  const navItems = [
-    { name: "Beranda", href: "/user/dashboard", isActive: true },
-    {
-      name: "Cek Jadwal Poli & Dokter",
-      href: "/jadwal_DokterPoli",
-      isActive: false,
-    },
-    { name: "Reservasi", href: "/user/reservasi", isActive: false },
-  ];
-
-  // Fungsi untuk memformat tanggal YYYY-MM-DD
-  const getTodayDate = () => {
-    return new Date().toISOString().split("T")[0];
-  };
-
-  // Fungsi untuk memformat data jadwal
-  const formatScheduleData = (schedules, targetPoliId) => {
-    const poliSchedules = schedules.filter((s) => s.poli_id === targetPoliId);
-
-    return poliSchedules.map((s) => {
-      let days = [];
-      let time = "Tutup";
-
-      // Cek setiap hari
-      if (s.senin_jam_mulai) {
-        days.push("Senin");
-        time = `${s.senin_jam_mulai.substring(
-          0,
-          5
-        )} - ${s.senin_jam_selesai.substring(0, 5)}`;
-      }
-      if (s.selasa_jam_mulai) days.push("Selasa");
-      if (s.rabu_jam_mulai) days.push("Rabu");
-      if (s.kamis_jam_mulai) days.push("Kamis");
-      if (s.jumat_jam_mulai) days.push("Jumat");
-      if (s.sabtu_jam_mulai) days.push("Sabtu");
-      if (s.minggu_jam_mulai) days.push("Minggu");
-
-      // Ambil jam praktek pertama yang valid sebagai contoh
-      if (time === "Tutup" && days.length > 0) {
-        if (s.selasa_jam_mulai)
-          time = `${s.selasa_jam_mulai.substring(
-            0,
-            5
-          )} - ${s.selasa_jam_selesai.substring(0, 5)}`;
-        // ... (bisa dilanjutkan untuk hari lain)
-      }
-
-      return {
-        doctor: s.dokter.nama_dokter,
-        days: days.join(", ") || "Tidak ada jadwal",
-        time: time,
-      };
-    });
-  };
-
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      setIsLoading(true);
-      const token = localStorage.getItem("token");
-      const name = localStorage.getItem("userName");
-
-      if (!token) {
-        router.push("/auth/login");
-        return;
-      }
-
-      setUserName(name || "Pasien");
-
-      try {
-        // 1. Ambil semua reservasi user
-        const resReservations = await api.get("/my-reservations");
-        const allReservations = resReservations.data; // Backend mengembalikan array
-
-        // 2. Cari reservasi aktif (confirmed & hari ini atau di masa depan)
-        const today = new Date(new Date().setHours(0, 0, 0, 0));
-        const confirmedApps = allReservations.filter(
-          (r) =>
-            r.status === "confirmed" && new Date(r.tanggal_reservasi) >= today
-        );
-
-        // Ambil yang paling dekat
-        const nextAppt = confirmedApps.length > 0 ? confirmedApps[0] : null;
-        setNextAppointment(nextAppt);
-
-        // 3. Ambil data history (selesai atau dibatalkan)
-        const history = allReservations.filter(
-          (r) => r.status === "selesai" || r.status === "cancelled"
-        );
-        setHistoryData(history);
-
-        // 4. Jika ada reservasi aktif, ambil data jadwal & antrian
-        if (nextAppt) {
-          // 4a. Ambil data antrian
-          try {
-            const resQueue = await api.get("/antrian/dashboard", {
-              params: {
-                poli_id: nextAppt.poli_id,
-                tanggal: nextAppt.tanggal_reservasi, // Gunakan tanggal reservasi
-              },
-            });
-            setQueueData(resQueue.data.data);
-          } catch (qError) {
-            console.error("Gagal mengambil data antrian:", qError);
-          }
-
-          // 4b. Ambil data jadwal
-          try {
-            const resSchedules = await api.get("/jadwal-dokter");
-            const formatted = formatScheduleData(
-              resSchedules.data.data,
-              nextAppt.poli_id
-            );
-            setScheduleData(formatted);
-          } catch (sError) {
-            console.error("Gagal mengambil data jadwal:", sError);
-          }
-        }
-      } catch (error) {
-        console.error("Gagal memuat data dashboard:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadDashboardData();
-  }, [router]);
-
-  if (isLoading) {
+// 2. Kartu Reservasi Mendatang
+const UpcomingReservationCard = ({ appointment, loading, onViewQueue }) => {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
-        <div className="flex items-center space-x-3 p-6 bg-white rounded-xl shadow-lg">
-          <svg
-            className="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-600"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <span className="text-neutral-700 font-medium">Memuat data...</span>
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 h-auto">
+        <div className="flex justify-between items-start mb-6">
+          <div className="h-5 w-40 bg-neutral-200 rounded-md animate-pulse"></div>
+          <div className="h-6 w-24 bg-neutral-200 rounded-full animate-pulse"></div>
+        </div>
+        <div className="h-12 w-full bg-neutral-200 rounded-xl animate-pulse"></div>
+      </div>
+    );
+  }
+
+  if (!appointment) {
+    return (
+      <div className="bg-white p-6 rounded-3xl shadow-lg border border-neutral-100">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-bold text-neutral-800">Reservasi Mendatang</h3>
+        </div>
+        <div className="text-center py-6 text-neutral-500">
+          <Calendar className="w-12 h-12 mx-auto mb-3 text-neutral-300" />
+          <p className="text-sm">Tidak ada reservasi aktif saat ini.</p>
+          <a href="/user/reservasi" className="text-blue-600 font-bold text-sm mt-2 block hover:underline">
+            Buat Reservasi Baru
+          </a>
         </div>
       </div>
     );
   }
 
+  const isConfirmed = appointment.status === 'confirmed';
+  const statusColor = isConfirmed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+  const statusLabel = isConfirmed ? 'Terkonfirmasi' : 'Menunggu Verifikasi';
+
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-100 font-sans">
-      <Header /> {/* Header mengambil datanya sendiri */}
+    <div className="bg-white p-6 rounded-3xl shadow-xl border border-neutral-100 relative overflow-hidden transition-all duration-500 ease-in-out">
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-lg font-bold text-neutral-800">Reservasi Mendatang</h3>
+        <span className={`${statusColor} text-xs font-bold px-3 py-1 rounded-full uppercase`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <div className="flex items-start space-x-3 mb-2">
+        <div className="mt-1 bg-blue-100 p-2 rounded-lg">
+           <FileText className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <p className="font-bold text-neutral-800 text-lg">{appointment.poli?.poli_name || 'Poli Umum'}</p>
+          <p className="text-sm text-neutral-500">{appointment.dokter?.nama_dokter || 'Dokter belum ditentukan'}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-2 mb-6 text-sm text-neutral-600 pl-[3.25rem]">
+        <Clock className="w-4 h-4" />
+        <span>{formatDateIndo(appointment.tanggal_reservasi)}</span>
+      </div>
+
+      <div className="bg-blue-50 rounded-xl p-4 flex flex-col items-center justify-center mb-4 border border-blue-100">
+        <span className="text-sm text-blue-600 font-medium">Nomor Antrian Anda</span>
+        <span className="text-3xl font-extrabold text-blue-800 mt-1">
+            {appointment.nomor_antrian || "-"}
+        </span>
+        {!appointment.nomor_antrian && (
+            <span className="text-xs text-blue-400 mt-1">(Akan muncul setelah diverifikasi)</span>
+        )}
+      </div>
+
+      {isConfirmed && (
+          <button 
+            onClick={onViewQueue}
+            className="w-full py-3 rounded-xl border border-neutral-200 font-semibold text-neutral-700 hover:bg-neutral-50 transition flex justify-center items-center"
+          >
+            Lihat Status Antrian
+          </button>
+      )}
+    </div>
+  );
+};
+
+// 3. Menu Grid Item
+const MenuButton = ({ icon: Icon, label, href, isActive = false, hasNotif = false }) => (
+  <a href={href} className={`p-5 rounded-3xl shadow-md flex flex-col justify-between h-32 transition-all duration-200 hover:scale-[1.02] ${
+    isActive ? 'bg-blue-600 text-white' : 'bg-white text-neutral-800'
+  }`}>
+    <div className="flex justify-between items-start">
+      <Icon className={`w-7 h-7 ${isActive ? 'text-white' : 'text-blue-600'}`} />
+      {hasNotif && <span className="w-2 h-2 bg-red-500 rounded-full"></span>}
+    </div>
+    <span className={`font-bold text-sm ${isActive ? 'text-white' : 'text-neutral-700'}`}>{label}</span>
+  </a>
+);
+
+// 4. Item Jadwal Dokter Hari Ini
+const DoctorScheduleItem = ({ doctorName, poliName, time }) => (
+    <div className="flex items-center gap-4 p-4 bg-white border border-neutral-100 rounded-2xl shadow-sm mb-3">
+        <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+            <User size={24} />
+        </div>
+        <div className="flex-1 min-w-0">
+            <p className="font-bold text-neutral-800 truncate">{doctorName}</p>
+            <p className="text-xs text-neutral-500 truncate">{poliName}</p>
+            <div className="flex items-center gap-1 mt-1 text-xs font-medium text-green-600 bg-green-50 w-fit px-2 py-0.5 rounded-md">
+                <Clock size={10} /> {time}
+            </div>
+        </div>
+    </div>
+);
+
+// --- MAIN COMPONENT ---
+export default function DashboardPage() {
+  const router = useRouter();
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [showAntrian, setShowAntrian] = useState(false);
+
+  const [userName, setUserName] = useState("");
+  const [nextAppointment, setNextAppointment] = useState(null);
+  const [stats, setStats] = useState({ active: 0, total: 0, messages: 0 });
+  const [todayDoctors, setTodayDoctors] = useState([]); // State untuk jadwal dokter hari ini
+
+  const navItems = [
+    { name: "Beranda", href: "/user/dashboard", isActive: true },
+    { name: "Cek Jadwal Poli", href: "/jadwal_DokterPoli", isActive: false },
+    { name: "Reservasi", href: "/user/reservasi", isActive: false },
+  ];
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+        try {
+            // 1. Ambil Nama User
+            const storedUserStr = localStorage.getItem("user");
+            if (storedUserStr) {
+                const userObj = JSON.parse(storedUserStr);
+                setUserName(userObj.name || userObj.Nama || "Pasien");
+            }
+
+            // 2. Ambil Data Reservasi
+            const response = await api.get('/my-reservations');
+            const reservations = response.data;
+
+            const activeReservations = reservations.filter(r => 
+                ['pending', 'confirmed'].includes(r.status)
+            );
+            
+            const today = new Date().setHours(0,0,0,0);
+            const upcoming = activeReservations
+                .filter(r => new Date(r.tanggal_reservasi) >= today)
+                .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
+
+            setNextAppointment(upcoming[0] || null);
+            setStats({
+                active: activeReservations.length,
+                total: reservations.length,
+                messages: 0 
+            });
+
+            // 3. Ambil Jadwal Dokter & Filter Hari Ini
+            const jadwalRes = await api.get('/jadwal-dokter'); // Endpoint publik
+            if (jadwalRes.data && jadwalRes.data.success) {
+                const allSchedules = jadwalRes.data.data;
+                
+                // Filter di Frontend
+                const todayList = allSchedules.reduce((acc, schedule) => {
+                    const timeInfo = getTodayScheduleInfo(schedule);
+                    if (timeInfo) {
+                        acc.push({
+                            id: `${schedule.dokter_id}-${schedule.poli_id}`,
+                            doctorName: schedule.dokter?.nama_dokter || "Dokter",
+                            poliName: schedule.poli?.poli_name || "Poli",
+                            time: timeInfo
+                        });
+                    }
+                    return acc;
+                }, []);
+
+                setTodayDoctors(todayList);
+            }
+
+        } catch (error) {
+            console.error("Gagal memuat dashboard:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (showAntrian) {
+    return <StatusAntrian onBack={() => setShowAntrian(false)} reservation={nextAppointment} />;
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-neutral-50 font-sans">
+      <Header />
       <Navbar navItems={navItems} />
 
-      <main className="flex-1 container mx-auto px-4 py-8 md:py-12">
-        <PrimaryStatusCard
-          userName={userName}
-          nextAppointment={nextAppointment}
-        />
+      <main className="flex-1 pb-20">
+        
+        {/* --- BLUE HEADER SECTION --- */}
+        <div className="bg-blue-600 px-6 pt-6 pb-24 rounded-b-[2.5rem] shadow-lg">
+            <div className="flex justify-between items-start mb-8">
+                <div>
+                    <p className="text-blue-100 text-sm mb-1">Selamat datang,</p>
+                    {isLoading ? (
+                        <div className="h-8 w-32 bg-white/20 rounded animate-pulse"></div>
+                    ) : (
+                        <h1 className="text-3xl font-bold text-white capitalize">{userName}</h1>
+                    )}
+                </div>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          <ScheduleCard scheduleData={scheduleData} />
-          <QueueControlCard
-            nextAppointment={nextAppointment}
-            queueData={queueData}
-          />
+            <div className="flex space-x-3">
+                <StatBox number={stats.active} label="Reservasi Aktif" isActive={true} />
+                <StatBox number={stats.total} label="Total Kunjungan" />
+                <StatBox number={stats.messages} label="Pesan Baru" />
+            </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          <OtherFeatureCard
-            title="History Kunjungan"
-            icon={History}
-            placeholder="Belum ada History Kunjungan"
-            link="/dashboard/history"
-            isHistory={true}
-            historyData={historyData} // Kirim data history
-            actionText="Lihat Semua Riwayat" // Teks untuk link
-          />
-          {/* --- KARTU INI DIMODIFIKASI --- */}
-          <OtherFeatureCard
-            title="Upload Foto"
-            icon={Camera}
-            placeholder="Ambil foto langsung dari kamera sebagai bukti"
-            link="/user/profile" // Link jika user ingin melihat galeri fotonya
-            isHistory={false}
-            actionText="Lihat Galeri Bukti" // Teks link diubah
-          />
-        </div>
+        {/* --- MAIN CONTENT --- */}
+        <div className="px-6 -mt-16 space-y-6">
+            
+            {/* 1. Main Card */}
+            <UpcomingReservationCard 
+                appointment={nextAppointment} 
+                loading={isLoading} 
+                onViewQueue={() => setShowAntrian(true)} 
+            />
 
-        {/* Quick Access (Tidak berubah) */}
-        <div className="mt-8 p-6 bg-white rounded-xl shadow-lg border-t-4 border-neutral-200">
-          <h2 className="text-xl font-bold text-neutral-800 mb-4">
-            Akses Fitur Cepat
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <a
-              href="/user/reservasi"
-              className="text-center p-3 bg-primary-500 text-white rounded-lg font-semibold hover:bg-primary-600 transition shadow-md"
-            >
-              <PlusCircle className="w-5 h-5 mx-auto mb-1" /> Reservasi Baru
-            </a>
-            <a
-              href="/dashboard/history"
-              className="text-center p-3 bg-secondary-500 text-white rounded-lg font-semibold hover:bg-secondary-600 transition shadow-md"
-            >
-              <History className="w-5 h-5 mx-auto mb-1" /> Riwayat Kunjungan
-            </a>
-            <a
-              href="/chat"
-              className="text-center p-3 bg-primary-500 text-white rounded-lg font-semibold hover:bg-primary-600 transition shadow-md"
-            >
-              <MessageSquare className="w-5 h-5 mx-auto mb-1" /> Chat Admin
-            </a>
-            <a
-              href="/jadwal"
-              className="text-center p-3 bg-neutral-600 text-white rounded-lg font-semibold hover:bg-neutral-700 transition shadow-md"
-            >
-              <Search className="w-5 h-5 mx-auto mb-1" /> Cek Jadwal Dokter
-            </a>
-          </div>
+            {/* 2. Grid Menu */}
+            <div className="grid grid-cols-2 gap-4">
+                <MenuButton icon={Clock} label="Buat Reservasi" href="/user/reservasi" isActive={true} />
+                <MenuButton icon={Calendar} label="Jadwal Dokter" href="/jadwal_DokterPoli" />
+                <MenuButton icon={History} label="Riwayat" href="/user/riwayat" />
+                <MenuButton icon={MessageSquare} label="Chat Admin" href="/user/chat" hasNotif={stats.messages > 0} />
+            </div>
+
+            {/* 3. Jadwal Dokter Hari Ini (Partial View) */}
+            <div className="pt-2">
+                <div className="flex justify-between items-center mb-4 px-1">
+                    <h3 className="text-lg font-bold text-neutral-800 flex items-center gap-2">
+                        <Stethoscope size={20} className="text-blue-600"/>
+                        Jadwal Hari Ini
+                    </h3>
+                    <a href="/jadwal_DokterPoli" className="text-sm font-semibold text-blue-600 flex items-center hover:underline">
+                        Lihat Semua <ChevronRight size={16} />
+                    </a>
+                </div>
+
+                {isLoading ? (
+                    <div className="space-y-3">
+                        <div className="h-20 bg-neutral-200 rounded-2xl animate-pulse"></div>
+                        <div className="h-20 bg-neutral-200 rounded-2xl animate-pulse"></div>
+                    </div>
+                ) : todayDoctors.length > 0 ? (
+                    <div>
+                        {todayDoctors.slice(0, 3).map((doc) => (
+                            <DoctorScheduleItem 
+                                key={doc.id}
+                                doctorName={doc.doctorName}
+                                poliName={doc.poliName}
+                                time={doc.time}
+                            />
+                        ))}
+                        {todayDoctors.length > 3 && (
+                            <div className="text-center mt-2">
+                                <span className="text-xs text-gray-400">
+                                    + {todayDoctors.length - 3} dokter lainnya tersedia hari ini
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="p-6 bg-white rounded-2xl border border-dashed border-neutral-300 text-center text-neutral-400 text-sm">
+                        Tidak ada jadwal praktek hari ini.
+                    </div>
+                )}
+            </div>
+
         </div>
       </main>
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { Lock, LogIn, User } from "lucide-react";
+import { Lock, LogIn, Mail, Loader2, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from 'next/navigation'; 
-import api from '../../../services/api'; 
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import api from "@/services/api"; 
 
-// --- Komponen InputField ---
-const InputField = ({ label, type, placeholder, required, icon: Icon, ...props }) => {
+const InputField = ({ label, type, placeholder, required, icon: Icon, endIcon, onEndIconClick, ...props }) => {
   return (
     <div className="space-y-1">
       <label htmlFor={label} className="block text-sm font-medium text-neutral-700">
@@ -23,21 +23,27 @@ const InputField = ({ label, type, placeholder, required, icon: Icon, ...props }
           type={type}
           placeholder={placeholder}
           required={required}
-          className={`block w-full rounded-lg border border-neutral-200 py-2 ${Icon ? "pl-10" : "pl-3"} pr-3 text-neutral-900 placeholder-neutral-600 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition duration-150`}
+          className={`block w-full rounded-lg border border-neutral-200 py-2 ${Icon ? "pl-10" : "pl-3"} ${endIcon ? "pr-10" : "pr-3"} text-neutral-900 placeholder-neutral-600 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition duration-150 disabled:bg-neutral-100 disabled:text-neutral-500`}
           {...props}
         />
+        {endIcon && (
+          <button type="button" onClick={onEndIconClick} className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer text-neutral-500 hover:text-neutral-700">
+            {endIcon}
+          </button>
+        )}
       </div>
     </div>
   );
 };
-// -----------------------------------------------------------------------------------
 
 export default function LoginPage() {
-  const [emailOrKTP, setEmailOrKTP] = useState("");
+  const router = useRouter();
+  
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter(); 
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -45,63 +51,96 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // LOGIN ADMIN / SUPERADMIN
-      const adminRes = await api.post("/login", {
-        Email: emailOrKTP, 
-        Password: password, 
-      });
-
-      const data = adminRes.data;
-
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("userRole", data.role);
-      
-      if (data.admin) {
-          localStorage.setItem("userName", data.admin.Nama); 
-          localStorage.setItem("userID", data.admin.adminID);
-      }
-
-      if (data.role === 'superadmin') {
-        router.push("/superadmin/dashboard"); 
-      } else {
-        router.push("/admin/dashboard");
-      }
-
-      return;
-
-    } catch (adminError) {
-      console.error("Gagal Login Admin:", adminError.response?.data || adminError.message);
-      // 2️⃣ Kalau login admin gagal, coba login user biasa
+      // -----------------------------------------------------------
+      // 1. COBA LOGIN SEBAGAI USER (PASIEN)
+      // -----------------------------------------------------------
       try {
-        const userRes = await api.post("/login-user", {
-          email: emailOrKTP,
-          password: password,
+        // User menggunakan key lowercase: 'email', 'password'
+        const responseUser = await api.post("/login-user", { 
+            email: email, 
+            password: password 
         });
 
-        // Jika sukses
-        const userData = userRes.data; // Data ada di dalam `userRes.data`
-        localStorage.setItem("token", userData.access_token);
-        localStorage.setItem("userRole", "user");
-        localStorage.setItem("userID", userData.user.id);
-        localStorage.setItem("userName", userData.user.name);
-        localStorage.setItem("userEmail", userData.user.email);
-        localStorage.setItem("userPhone", userData.user.nomor_telepon);
-        
-        router.push("/user/dashboard"); // 4. Gunakan router.push
-        return;
+        if (responseUser.data.success) {
+          const { access_token, user } = responseUser.data.data;
 
-      } catch (userError) {
-        // Kalau keduanya gagal
-        console.error("Login gagal:", userError);
-        if (userError.response && userError.response.data) {
-             setErrorMsg(userError.response.data.message || "Email/NIK atau password salah.");
-        } else if (adminError.response && adminError.response.data) {
-             setErrorMsg(adminError.response.data.message || "Login gagal.");
-        } else {
-             setErrorMsg("Terjadi kesalahan server atau koneksi.");
+          localStorage.setItem("token", access_token);
+          localStorage.setItem("user", JSON.stringify(user));
+          localStorage.setItem("role", "user");
+
+          router.push("/user/dashboard");
+          return; 
         }
-        setIsLoading(false);
+      } catch (userError) {
+        // Cek Verifikasi 403 (User ada tapi belum verifikasi OTP)
+        if (userError.response && userError.response.status === 403) {
+            const data = userError.response.data;
+            if(data.needs_verification) {
+                localStorage.setItem("pending_verification_email", email);
+                router.push("/otp/verify"); 
+                return;
+            }
+        }
+        
+        // Jika Error Server (500), lempar error (jangan lanjut ke admin)
+        if (userError.response && userError.response.status >= 500) {
+            throw userError;
+        }
+
+        // Jika Error 401 (Password Salah) atau 404 (User tidak ketemu),
+        // Kita ABAIKAN error ini dan LANJUT mencoba Login Admin di bawah.
       }
+
+      // -----------------------------------------------------------
+      // 2. COBA LOGIN SEBAGAI ADMIN (FALLBACK)
+      // -----------------------------------------------------------
+      
+      // PERBAIKAN UTAMA DI SINI:
+      // Backend Admin meminta key 'Email' dan 'Password' (Huruf Besar/PascalCase)
+      const responseAdmin = await api.post("/login", { 
+          Email: email,     // Mapping state 'email' ke key 'Email'
+          Password: password // Mapping state 'password' ke key 'Password'
+      });
+      
+      const adminData = responseAdmin.data; 
+      
+      if (adminData.access_token || adminData.token) {
+          const token = adminData.access_token || adminData.token;
+          // Ambil object 'admin' dari response backend
+          const userAdmin = adminData.admin || adminData.user; 
+
+          localStorage.setItem("token", token);
+          localStorage.setItem("user", JSON.stringify(userAdmin));
+          
+          const role = adminData.role || userAdmin?.role || "admin"; 
+          localStorage.setItem("role", role);
+
+          if (role === "superadmin") {
+            router.push("/superadmin/admins");
+          } else {
+            router.push("/admin/dashboard");
+          }
+      } else {
+        throw new Error("Gagal login admin.");
+      }
+
+    } catch (error) {
+      console.error("Login Failed:", error);
+      if (error.response) {
+        // Jika status 422, berarti validasi admin gagal (format salah)
+        // Jika status 401, berarti password salah di kedua percobaan (User & Admin)
+        if(error.response.status === 401 || error.response.status === 404) {
+            setErrorMsg("Email atau kata sandi salah.");
+        } else if (error.response.status === 422) {
+            setErrorMsg("Format data tidak sesuai.");
+        } else {
+            setErrorMsg(error.response.data.message || "Terjadi kesalahan server.");
+        }
+      } else {
+        setErrorMsg("Gagal terhubung ke server.");
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -109,52 +148,43 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 p-4">
       <div className="bg-white shadow-2xl border-t-8 border-primary-600 rounded-2xl p-8 md:p-12 w-full max-w-md">
         <div className="flex justify-center mb-6">
-          <LogIn className="w-10 h-10 text-primary-600" />
+          <Image src="/images/logo.svg" alt="Logo Aplikasi" width={120} height={120} priority className="object-contain h-24 w-auto" />
         </div>
 
-        <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">
-          SELAMAT DATANG
-        </h1>
-        <p className="text-center text-neutral-600 mb-8 text-md">
-          Masuk untuk melanjutkan
-        </p>
+        <h1 className="text-3xl font-extrabold text-center text-neutral-900 mb-2">SELAMAT DATANG</h1>
+        <p className="text-center text-neutral-600 mb-8 text-md">Masuk ke akun Anda</p>
 
         <form onSubmit={handleLogin} className="space-y-6">
-          <InputField
-            label="Email atau No. KTP"
-            type="text"
-            placeholder="Masukkan Email atau No. KTP"
-            icon={User}
-            required
-            value={emailOrKTP}
-            onChange={(e) => setEmailOrKTP(e.target.value)}
-          />
-          <InputField
-            label="Password"
-            type="password"
-            placeholder="Masukkan Password Anda"
-            icon={Lock}
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+          <InputField label="Email" type="email" placeholder="Masukkan Email Anda" icon={Mail} required value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
+          
+          <InputField 
+            label="Kata Sandi" 
+            type={showPassword ? "text" : "password"} 
+            placeholder="Masukkan Kata Sandi" 
+            icon={Lock} 
+            required 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            disabled={isLoading} 
+            endIcon={showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>} 
+            onEndIconClick={() => setShowPassword(!showPassword)} 
           />
 
-          {errorMsg && <p className="text-red-600 text-sm text-center">{errorMsg}</p>}
+          <div className="flex justify-end">
+            <a href="/auth/forgot-password" className="text-xs text-primary-600 hover:text-primary-800 font-medium">Lupa Kata Sandi?</a>
+          </div>
 
-          <button
-            type="submit"
-            className="w-full bg-primary-600 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-primary-800 transition-all duration-300 transform hover:scale-[1.01] flex items-center justify-center space-x-2"
-          >
-            <LogIn className="w-5 h-5" />
-            <span>Masuk ke Akun</span>
+          {errorMsg && (
+            <p className="text-red-600 text-sm text-center bg-red-50 p-2 rounded animate-pulse border border-red-200">{errorMsg}</p>
+          )}
+
+          <button type="submit" disabled={isLoading} className={`w-full text-white font-semibold py-3 rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all duration-300 ${isLoading ? "bg-neutral-400 cursor-not-allowed" : "bg-primary-600 hover:bg-primary-800 hover:scale-[1.01]"}`}>
+            {isLoading ? <><Loader2 className="w-5 h-5 animate-spin" /><span>Memproses...</span></> : <><LogIn className="w-5 h-5" /><span>Masuk Sekarang</span></>}
           </button>
         </form>
 
         <p className="text-center text-sm mt-6 text-neutral-600">
-          Belum punya akun?{" "}
-          <a href="/auth/register" className="text-primary-600 font-bold hover:text-primary-800">
-            Daftar Sekarang
-          </a>
+          Belum punya akun? <a href="/auth/register" className={`text-primary-600 font-bold hover:text-primary-800 ${isLoading ? "pointer-events-none text-neutral-400" : ""}`}>Daftar Sekarang</a>
         </p>
       </div>
     </div>
