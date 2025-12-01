@@ -317,7 +317,7 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
                     type="select" 
                     name="agama" 
                     required 
-                    options={['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Lainnya']} 
+                    options={['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu']} 
                     value={formData.agama} 
                     onChange={handleChange}
                     hasError={!!errors.agama} 
@@ -375,18 +375,18 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
                 <div className="col-span-full my-2 border-t border-dashed border-neutral-200"></div>
                 
                 <InputField 
-                    label="Nama Penanggung Jawab / Keluarga" 
+                    label="Nama Keluarga" 
                     type="text" 
                     name="nama_keluarga" 
-                    placeholder="Nama Kerabat" 
+                    placeholder="Nama Keluarga" 
                     value={formData.nama_keluarga} 
                     onChange={handleChange} 
                 />
                 <InputField 
-                    label="Hubungan Keluarga" 
+                    label="Status Hubungan Dalam Keluarga" 
                     type="text" 
                     name="status_keluarga" 
-                    placeholder="Contoh: Ayah, Istri, Kakak" 
+                    placeholder="Contoh: Ayah, Istri, Anak" 
                     value={formData.status_keluarga} 
                     onChange={handleChange} 
                 />
