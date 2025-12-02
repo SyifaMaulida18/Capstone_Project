@@ -1,20 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import api from "@/services/api";
 import {
-  ArrowRight,
-  ArrowLeft,
-  Loader2,
   AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Briefcase,
   Check,
   CheckCircle,
-  User,
   Clock,
   Lightbulb,
+  Loader2,
+  MapPin,
+  Sparkles,
+  User,
   Users,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 // --- Helper Input ---
 function InputField({
@@ -26,7 +29,7 @@ function InputField({
   required,
   disabled,
   maxLength,
-  placeholder
+  placeholder,
 }) {
   return (
     <div>
@@ -36,7 +39,7 @@ function InputField({
       <input
         type={type}
         name={name}
-        value={value}
+        value={value || ""}
         onChange={onChange}
         required={required}
         disabled={disabled}
@@ -50,19 +53,49 @@ function InputField({
   );
 }
 
+// --- Helper Select ---
+function SelectField({ label, name, value, onChange, options, required, disabled }) {
+  return (
+    <div>
+      <label className="block text-sm font-bold text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <select
+        name={name}
+        value={value || ""}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+        className={`w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${
+          disabled ? "bg-gray-100 text-gray-600" : "bg-white"
+        }`}
+      >
+        <option value="">-- Pilih {label} --</option>
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export default function ReservasiPage() {
   const router = useRouter();
 
   // --- STEP / STATE UMUM ---
   const [currentStep, setCurrentStep] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Loading submit akhir
   const [loadingData, setLoadingData] = useState(true);
+  const [isCheckingAI, setIsCheckingAI] = useState(false); // Loading cek AI Step 1 -> 2
   const [error, setError] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [todayStr, setTodayStr] = useState("");
 
-  // Hasil AI dari backend
-  const [aiResult, setAiResult] = useState(null);
+  // Hasil AI (Saran & Analisa Akhir)
+  const [aiRecommendation, setAiRecommendation] = useState(null); // Hasil Check Poli (Step 2)
+  const [aiResult, setAiResult] = useState(null); // Hasil Submit Akhir (Success Modal)
 
   // Data master
   const [polis, setPolis] = useState([]);
@@ -76,13 +109,14 @@ export default function ReservasiPage() {
   const [isSelf, setIsSelf] = useState(true);
   const [localUserData, setLocalUserData] = useState(null);
   const [apiProfileData, setApiProfileData] = useState(null);
-  
-  // State untuk Dropdown Profil (Self, New, History)
-  const [selectedProfileId, setSelectedProfileId] = useState("self"); 
-  const [savedPatients, setSavedPatients] = useState([]); // Menyimpan list unik orang lain
 
-  // Form
+  // State untuk Dropdown Profil
+  const [selectedProfileId, setSelectedProfileId] = useState("self");
+  const [savedPatients, setSavedPatients] = useState([]);
+
+  // Form Data Lengkap
   const [formData, setFormData] = useState({
+    // Dasar
     nama: "",
     email: "",
     nomor_whatsapp: "",
@@ -90,7 +124,26 @@ export default function ReservasiPage() {
     tempat_lahir: "",
     tanggal_lahir: "",
     jenis_kelamin: "Laki-laki",
+    
+    // Alamat Lengkap
     alamat: "",
+    provinsi: "",
+    kota_kabupaten: "", 
+    kecamatan: "",
+    kelurahan: "",
+    
+    // Detail Pribadi Tambahan
+    status_perkawinan: "",
+    suku: "",
+    agama: "",
+    pendidikan_terakhir: "",
+    nomor_pegawai: "",
+    
+    // Keluarga 
+    status_keluarga: "",
+    nama_keluarga: "",
+
+    // Reservasi
     keluhan: "",
     poli_id: "",
     dokter_id: "",
@@ -148,18 +201,30 @@ export default function ReservasiPage() {
       tempat_lahir: profile?.tempat_lahir || "",
       tanggal_lahir: profile?.tanggal_lahir || "",
       jenis_kelamin: profile?.jenis_kelamin || "Laki-laki",
+      
       alamat: profile?.alamat || "",
+      provinsi: profile?.provinsi || "",
+      kota_kabupaten: profile?.["kota/kabupaten"] || "",
+      kecamatan: profile?.kecamatan || "",
+      kelurahan: profile?.kelurahan || "",
+      
+      status_perkawinan: profile?.status_perkawinan || "",
+      suku: profile?.suku || "",
+      agama: profile?.agama || "",
+      pendidikan_terakhir: profile?.pendidikan_terakhir || "",
+      nomor_pegawai: profile?.nomor_pegawai || "",
+      status_keluarga: profile?.status_keluarga || "",
+      nama_keluarga: profile?.nama_keluarga || "",
+
       penjaminan: profile?.penjaminan || "cash",
       nama_asuransi: profile?.nama_asuransi || "",
       nomor_asuransi: profile?.nomor_asuransi || "",
     }));
   }, []);
 
-  // PERBAIKAN: Reset semua field data diri secara eksplisit
   const clearPatientData = () => {
     setFormData((prev) => ({
       ...prev,
-      // Pertahankan poli/dokter/tanggal
       nama: "",
       email: "",
       nomor_whatsapp: "",
@@ -168,29 +233,55 @@ export default function ReservasiPage() {
       tanggal_lahir: "",
       jenis_kelamin: "Laki-laki",
       alamat: "",
-      penjaminan: "cash", // Reset penjaminan ke default
+      provinsi: "",
+      kota_kabupaten: "",
+      kecamatan: "",
+      kelurahan: "",
+      status_perkawinan: "",
+      suku: "",
+      agama: "",
+      pendidikan_terakhir: "",
+      nomor_pegawai: "",
+      status_keluarga: "",
+      nama_keluarga: "",
+      penjaminan: "cash",
       nama_asuransi: "",
       nomor_asuransi: "",
     }));
   };
 
-  // Mengisi form dengan data dari riwayat (orang lain)
   const fillHistoryData = (patientData) => {
     setFormData((prev) => ({
-        ...prev,
-        nama: patientData.nama || "",
-        email: patientData.email || "", 
-        nomor_whatsapp: patientData.nomor_whatsapp || "",
-        nomor_ktp: patientData.nomor_ktp || "",
-        tempat_lahir: patientData.tempat_lahir || "",
-        // Handle format tanggal (ambil YYYY-MM-DD saja)
-        tanggal_lahir: patientData.tanggal_lahir ? String(patientData.tanggal_lahir).split('T')[0] : "",
-        jenis_kelamin: patientData.jenis_kelamin || "Laki-laki",
-        alamat: patientData.alamat || "",
-        penjaminan: patientData.penjaminan || "cash",
-        nama_asuransi: patientData.nama_asuransi || "",
-        nomor_asuransi: patientData.nomor_asuransi || "",
-      }));
+      ...prev,
+      nama: patientData.nama || "",
+      email: patientData.email || "",
+      nomor_whatsapp: patientData.nomor_whatsapp || "",
+      nomor_ktp: patientData.nomor_ktp || "",
+      tempat_lahir: patientData.tempat_lahir || "",
+      tanggal_lahir: patientData.tanggal_lahir
+        ? String(patientData.tanggal_lahir).split("T")[0]
+        : "",
+      jenis_kelamin: patientData.jenis_kelamin || "Laki-laki",
+      
+      alamat: patientData.alamat || "",
+      provinsi: patientData.provinsi || "",
+      kota_kabupaten: patientData.kota_kabupaten || patientData["kota/kabupaten"] || "",
+      kecamatan: patientData.kecamatan || "",
+      kelurahan: patientData.kelurahan || "",
+
+      status_perkawinan: patientData.status_perkawinan || "",
+      suku: patientData.suku || "",
+      agama: patientData.agama || "",
+      pendidikan_terakhir: patientData.pendidikan_terakhir || "",
+      nomor_pegawai: patientData.nomor_pegawai || "",
+      
+      status_keluarga: patientData.status_keluarga || "",
+      nama_keluarga: patientData.nama_keluarga || "",
+
+      penjaminan: patientData.penjaminan || "cash",
+      nama_asuransi: patientData.nama_asuransi || "",
+      nomor_asuransi: patientData.nomor_asuransi || "",
+    }));
   };
 
   // --- FETCH DATA AWAL ---
@@ -220,58 +311,45 @@ export default function ReservasiPage() {
           const profileRes = await api.get("/profile");
           currentProfile = profileRes.data?.data ?? null;
           setApiProfileData(currentProfile);
-          // Default: Self
           fillSelfData(storedUser, currentProfile);
         } catch (profileErr) {
-          console.warn("Profile belum lengkap/gagal load:", profileErr);
+          console.warn("Profile belum lengkap:", profileErr);
           fillSelfData(storedUser, null);
         }
 
         // Ambil Riwayat
         try {
-            const historyRes = await api.get("/my-reservations");
-            const historyData = historyRes.data?.data ?? historyRes.data ?? [];
-            
-            const uniquePatients = [];
-            const seenKTP = new Set();
-            
-            // Exclude KTP user login
-            if(currentProfile?.noKTP) {
-                seenKTP.add(currentProfile.noKTP);
+          const historyRes = await api.get("/my-reservations");
+          const historyData = historyRes.data?.data ?? historyRes.data ?? [];
+
+          const uniquePatients = [];
+          const seenKTP = new Set();
+
+          if (currentProfile?.noKTP) {
+            seenKTP.add(currentProfile.noKTP);
+          }
+
+          historyData.forEach((res) => {
+            if (
+              res.nomor_ktp &&
+              res.is_self !== 1 &&
+              res.is_self !== "1" &&
+              res.is_self !== true
+            ) {
+              if (!seenKTP.has(res.nomor_ktp)) {
+                seenKTP.add(res.nomor_ktp);
+                uniquePatients.push(res);
+              }
             }
+          });
 
-            historyData.forEach(res => {
-                // Pastikan bukan reservasi diri sendiri (is_self=1) dan punya KTP
-                if(res.nomor_ktp && res.is_self !== 1 && res.is_self !== "1" && res.is_self !== true) {
-                    if(!seenKTP.has(res.nomor_ktp)) {
-                        seenKTP.add(res.nomor_ktp);
-                        uniquePatients.push({
-                            nama: res.nama,
-                            nomor_ktp: res.nomor_ktp,
-                            email: res.email, 
-                            nomor_whatsapp: res.nomor_whatsapp,
-                            tempat_lahir: res.tempat_lahir,
-                            tanggal_lahir: res.tanggal_lahir,
-                            jenis_kelamin: res.jenis_kelamin,
-                            alamat: res.alamat,
-                            penjaminan: res.penjaminan,
-                            nama_asuransi: res.nama_asuransi,
-                            nomor_asuransi: res.nomor_asuransi,
-                            relation: res.status_keluarga || 'Keluarga/Kerabat' 
-                        });
-                    }
-                }
-            });
-
-            setSavedPatients(uniquePatients);
-
+          setSavedPatients(uniquePatients);
         } catch (histErr) {
-            console.warn("Gagal ambil history reservasi:", histErr);
+          console.warn("Gagal ambil history:", histErr);
         }
-
       } catch (err) {
-        console.error("Gagal mengambil data awal:", err);
-        setError("Gagal memuat data awal. Coba refresh halaman.");
+        console.error("Gagal ambil data awal:", err);
+        setError("Gagal memuat data. Coba refresh.");
       } finally {
         setLoadingData(false);
       }
@@ -296,7 +374,6 @@ export default function ReservasiPage() {
         : [];
       setDokters(list);
     } catch (err) {
-      console.error("Gagal ambil dokter:", err);
       setDokters([]);
       setError("Gagal mengambil daftar dokter.");
     }
@@ -304,24 +381,23 @@ export default function ReservasiPage() {
 
   // --- HANDLERS ---
   const handleProfileChange = (e) => {
-      const val = e.target.value;
-      setSelectedProfileId(val);
-      setError("");
+    const val = e.target.value;
+    setSelectedProfileId(val);
+    setError("");
 
-      if (val === "self") {
-          setIsSelf(true);
-          fillSelfData(localUserData, apiProfileData);
-      } else if (val === "new") {
-          setIsSelf(false);
-          clearPatientData();
-      } else {
-          // History
-          setIsSelf(false);
-          const patientData = savedPatients[parseInt(val)];
-          if (patientData) {
-              fillHistoryData(patientData);
-          }
+    if (val === "self") {
+      setIsSelf(true);
+      fillSelfData(localUserData, apiProfileData);
+    } else if (val === "new") {
+      setIsSelf(false);
+      clearPatientData();
+    } else {
+      setIsSelf(false);
+      const patientData = savedPatients[parseInt(val)];
+      if (patientData) {
+        fillHistoryData(patientData);
       }
+    }
   };
 
   const handleChange = (e) => {
@@ -393,42 +469,71 @@ export default function ReservasiPage() {
     }
   };
 
-  const nextStep = () => {
+  // --- LOGIKA STEP 1 -> STEP 2 (CEK AI) ---
+  const nextStep = async () => {
     setError("");
 
-    // Validasi step 1
+    // --- Validasi Step 1 ---
     if (currentStep === 1) {
       if (!formData.keluhan) {
         return setError("Silakan isi keluhan utama Anda.");
       }
 
       if (isSelf) {
-        if (
-          !apiProfileData ||
-          !apiProfileData.noKTP ||
-          !apiProfileData.tanggal_lahir
-        ) {
+        if (!apiProfileData?.noKTP || !apiProfileData?.tanggal_lahir) {
           return setError(
-            "Profil Anda belum lengkap (KTP/Tgl Lahir). Mohon lengkapi di menu Profil atau pilih 'Orang Lain'."
+            "Profil belum lengkap. Lengkapi di menu Profil atau pilih 'Orang Lain'."
           );
         }
       } else {
-        if (!formData.nama || !formData.nomor_ktp) {
-          return setError("Nama dan Nomor KTP wajib diisi.");
+        if (!formData.nama || !formData.nomor_ktp || !formData.email || !formData.nomor_whatsapp) {
+          return setError("Nama, Email, WhatsApp, dan Nomor KTP wajib diisi.");
         }
-        // Validasi Email Wajib untuk orang lain (BE requirement)
-        if (!formData.email) {
-            return setError("Email wajib diisi untuk data pasien.");
+        if (!formData.alamat) {
+            return setError("Alamat lengkap wajib diisi.");
         }
       }
+
+      // --- Panggil AI Recommendation ---
+      setIsCheckingAI(true);
+      try {
+        const payloadAI = {
+            keluhan: formData.keluhan,
+            is_self: isSelf,
+            // Jika orang lain, kirim data demografi
+            ...(!isSelf && {
+                tanggal_lahir: formData.tanggal_lahir,
+                jenis_kelamin: formData.jenis_kelamin,
+                // riwayat_penyakit: "" // Tambahkan jika ada field ini di form
+            })
+        };
+
+        const res = await api.post('/reservations/check-poli', payloadAI);
+        
+        if (res.data && res.data.success) {
+            const result = res.data.data;
+            setAiRecommendation(result);
+            
+            // Opsional: Auto select poli jika ID nya ada
+            // if (result.rekomendasi_poli_id) {
+            //     handlePoliChange({ target: { value: result.rekomendasi_poli_id } });
+            // }
+        }
+      } catch (err) {
+        console.warn("Gagal cek AI:", err);
+        // Error AI tidak memblokir user lanjut step
+      } finally {
+        setIsCheckingAI(false);
+        setCurrentStep((prev) => prev + 1);
+      }
+      return; // Stop eksekusi agar tidak lanjut langsung (tunggu async selesai)
     }
 
-    // Validasi step 2
+    // --- Validasi Step 2 ---
     if (currentStep === 2) {
       if (!formData.poli_id) return setError("Silakan pilih Poli tujuan.");
       if (!formData.dokter_id) return setError("Silakan pilih Dokter.");
-      if (!formData.tanggal_reservasi)
-        return setError("Silakan pilih tanggal kunjungan.");
+      if (!formData.tanggal_reservasi) return setError("Silakan pilih tanggal kunjungan.");
     }
 
     setCurrentStep((prev) => prev + 1);
@@ -440,7 +545,6 @@ export default function ReservasiPage() {
     setError("");
     setAiResult(null);
 
-    // Pastikan isSelf konsisten dengan dropdown yang dipilih
     const finalIsSelf = selectedProfileId === "self";
 
     const normalizePenjaminan = (val) => {
@@ -451,9 +555,9 @@ export default function ReservasiPage() {
 
     const normalizedPenjaminan = normalizePenjaminan(formData.penjaminan);
 
-    // Construct Payload
+    // Payload Base
     const payload = {
-      is_self: finalIsSelf ? 1 : 0, // Force 0 jika bukan "self"
+      is_self: finalIsSelf ? 1 : 0,
       poli_id: formData.poli_id,
       tanggal_reservasi: formData.tanggal_reservasi,
       keluhan: formData.keluhan,
@@ -461,18 +565,36 @@ export default function ReservasiPage() {
       penanggung_jawab_id: null,
     };
 
+    // Payload Tambahan jika Orang Lain
     if (!finalIsSelf) {
       Object.assign(payload, {
         nama: formData.nama,
-        email: formData.email, // Pastikan tidak undefined, validator BE butuh ini
+        email: formData.email,
         jenis_kelamin: formData.jenis_kelamin,
         tempat_lahir: formData.tempat_lahir,
         tanggal_lahir: formData.tanggal_lahir,
         nomor_ktp: formData.nomor_ktp,
         nomor_whatsapp: formData.nomor_whatsapp,
+        
+        // Alamat
+        alamat: formData.alamat,
+        provinsi: formData.provinsi || null,
+        "kota/kabupaten": formData.kota_kabupaten || null, // Map key
+        kecamatan: formData.kecamatan || null,
+        kelurahan: formData.kelurahan || null,
+
+        // Detail Lain
+        status_perkawinan: formData.status_perkawinan || null,
+        suku: formData.suku || null,
+        agama: formData.agama || null,
+        pendidikan_terakhir: formData.pendidikan_terakhir || null,
+        nomor_pegawai: formData.nomor_pegawai || null,
+        
+        status_keluarga: formData.status_keluarga || "Lainnya",
+        nama_keluarga: formData.nama_keluarga || null,
+
+        // Penjaminan
         penjaminan: normalizedPenjaminan,
-        status_keluarga: "Lainnya",
-        alamat: formData.alamat || "-", // Beri default dash jika kosong agar tidak error
         nama_asuransi:
           normalizedPenjaminan === "asuransi"
             ? formData.nama_asuransi || "BPJS"
@@ -486,20 +608,14 @@ export default function ReservasiPage() {
 
     try {
       const response = await api.post("/reservations", payload);
-
       if (response.data && response.data.ai_analysis) {
         setAiResult(response.data.ai_analysis);
       }
-
       setShowSuccessModal(true);
     } catch (err) {
       console.error(err);
-      const msg =
-        err.response?.data?.message ||
-        "Terjadi kesalahan saat membuat reservasi.";
-
+      const msg = err.response?.data?.message || "Terjadi kesalahan.";
       if (err.response?.data?.errors) {
-        // Tampilkan detail error validasi backend jika ada
         const errorList = err.response.data.errors;
         const firstErrKey = Object.keys(errorList)[0];
         const firstErr = errorList[firstErrKey][0];
@@ -512,40 +628,38 @@ export default function ReservasiPage() {
     }
   };
 
-  // --- STEPPER ---
+  // --- STEPPER UI ---
   const Stepper = () => (
     <div className="w-full max-w-3xl mx-auto mb-8 px-4 relative">
       <div className="absolute top-5 left-0 w-full h-1 bg-gray-200 -z-10" />
       <div className="flex justify-between items-start w-full">
-        {["Data & Keluhan", "Poli & Jadwal", "Konfirmasi"].map(
-          (label, index) => {
-            const stepNum = index + 1;
-            const active = stepNum === currentStep;
-            const done = stepNum < currentStep;
-            return (
-              <div key={index} className="flex flex-col items-center">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-4 bg-white ${
-                    active
-                      ? "border-[#8CC63F] text-[#003B73]"
-                      : done
-                      ? "bg-[#003B73] text-white border-[#003B73]"
-                      : "border-gray-200 text-gray-400"
-                  }`}
-                >
-                  {done ? <Check size={16} /> : stepNum}
-                </div>
-                <span
-                  className={`text-xs mt-1 font-medium ${
-                    active ? "text-[#003B73]" : "text-gray-400"
-                  }`}
-                >
-                  {label}
-                </span>
+        {["Data & Keluhan", "Poli & Jadwal", "Konfirmasi"].map((label, index) => {
+          const stepNum = index + 1;
+          const active = stepNum === currentStep;
+          const done = stepNum < currentStep;
+          return (
+            <div key={index} className="flex flex-col items-center">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-4 bg-white ${
+                  active
+                    ? "border-[#8CC63F] text-[#003B73]"
+                    : done
+                    ? "bg-[#003B73] text-white border-[#003B73]"
+                    : "border-gray-200 text-gray-400"
+                }`}
+              >
+                {done ? <Check size={16} /> : stepNum}
               </div>
-            );
-          }
-        )}
+              <span
+                className={`text-xs mt-1 font-medium ${
+                  active ? "text-[#003B73]" : "text-gray-400"
+                }`}
+              >
+                {label}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -586,46 +700,39 @@ export default function ReservasiPage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* STEP 1 */}
+            {/* STEP 1: DATA PASIEN */}
             {currentStep === 1 && (
               <div className="space-y-6 animate-fadeIn">
+                {/* 1. Pilih User */}
                 <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
                   <label className="text-sm font-bold text-[#003B73] mb-3 flex items-center gap-2">
                     <User size={18} /> Reservasi Untuk Siapa?
                   </label>
-                  
                   <div className="relative">
-                      <select
-                        value={selectedProfileId}
-                        onChange={handleProfileChange}
-                        className="w-full p-3 pl-10 border border-blue-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none font-medium text-gray-700"
-                      >
-                          <option value="self">Diri Sendiri ({localUserData?.name || "Saya"})</option>
-                          
-                          {savedPatients.length > 0 && (
-                            <optgroup label="Riwayat Keluarga / Orang Lain">
-                                {savedPatients.map((patient, idx) => (
-                                    <option key={idx} value={idx}>
-                                        {patient.nama} - {patient.nomor_ktp}
-                                    </option>
-                                ))}
-                            </optgroup>
-                          )}
-                          
-                          <option value="new">+ Input Orang Baru / Lainnya</option>
-                      </select>
-                      <Users className="absolute left-3 top-3.5 text-blue-500" size={18} />
+                    <select
+                      value={selectedProfileId}
+                      onChange={handleProfileChange}
+                      className="w-full p-3 pl-10 border border-blue-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none font-medium text-gray-700"
+                    >
+                      <option value="self">
+                        Diri Sendiri ({localUserData?.name || "Saya"})
+                      </option>
+                      {savedPatients.length > 0 && (
+                        <optgroup label="Riwayat Orang Lain">
+                          {savedPatients.map((patient, idx) => (
+                            <option key={idx} value={idx}>
+                              {patient.nama} - {patient.nomor_ktp}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      <option value="new">+ Input Orang Baru / Lainnya</option>
+                    </select>
+                    <Users className="absolute left-3 top-3.5 text-blue-500" size={18} />
                   </div>
-                  <p className="text-xs text-blue-600 mt-2 ml-1">
-                      {isSelf 
-                        ? "Data akan otomatis terisi dari profil akun Anda."
-                        : selectedProfileId === "new" 
-                            ? "Silakan isi data pasien baru secara manual."
-                            : "Data terisi otomatis dari riwayat reservasi sebelumnya."
-                      }
-                  </p>
                 </div>
 
+                {/* 2. Data Utama (Wajib) */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <InputField
                     label="Nama Lengkap"
@@ -650,9 +757,17 @@ export default function ReservasiPage() {
                     name="nomor_ktp"
                     value={formData.nomor_ktp}
                     onChange={handleChange}
-                    disabled={isSelf} 
+                    disabled={isSelf}
                     required
                     maxLength={16}
+                  />
+                  <InputField
+                    label="Nomor WhatsApp"
+                    name="nomor_whatsapp"
+                    value={formData.nomor_whatsapp}
+                    onChange={handleChange}
+                    disabled={isSelf}
+                    required
                   />
                   <InputField
                     label="Tempat Lahir"
@@ -671,30 +786,91 @@ export default function ReservasiPage() {
                     disabled={isSelf}
                     required
                   />
-                  <InputField
-                    label="Nomor WhatsApp"
-                    name="nomor_whatsapp"
-                    value={formData.nomor_whatsapp}
-                    onChange={handleChange}
-                    disabled={isSelf}
-                    required
-                  />
-                  {!isSelf && (
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-bold text-gray-700 mb-1">
-                        Alamat
-                      </label>
-                      <textarea
-                        name="alamat"
-                        value={formData.alamat}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">
+                        Jenis Kelamin
+                    </label>
+                    <select
+                        name="jenis_kelamin"
+                        value={formData.jenis_kelamin}
                         onChange={handleChange}
-                        className="w-full p-3 border rounded-xl"
-                        rows={2}
-                      />
-                    </div>
-                  )}
+                        disabled={isSelf}
+                        className={`w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${
+                            isSelf ? "bg-gray-100" : "bg-white"
+                        }`}
+                    >
+                        <option value="Laki-laki">Laki-laki</option>
+                        <option value="Perempuan">Perempuan</option>
+                    </select>
+                  </div>
                 </div>
 
+                {/* 3. Detail Data Pasien (Hanya jika Orang Lain) */}
+                {!isSelf && (
+                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 mt-4 space-y-4">
+                    <h3 className="font-bold text-[#003B73] flex items-center gap-2 border-b pb-2 mb-2">
+                        <MapPin size={18}/> Detail Alamat & Data Pribadi
+                    </h3>
+                    
+                    {/* Alamat Lengkap */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Alamat Lengkap</label>
+                            <textarea
+                                name="alamat"
+                                value={formData.alamat}
+                                onChange={handleChange}
+                                rows={2}
+                                className="w-full p-3 border rounded-xl"
+                                placeholder="Nama jalan, RT/RW, No. Rumah"
+                            />
+                        </div>
+                        <InputField label="Provinsi" name="provinsi" value={formData.provinsi} onChange={handleChange} />
+                        <InputField label="Kota/Kabupaten" name="kota_kabupaten" value={formData.kota_kabupaten} onChange={handleChange} />
+                        <InputField label="Kecamatan" name="kecamatan" value={formData.kecamatan} onChange={handleChange} />
+                        <InputField label="Kelurahan" name="kelurahan" value={formData.kelurahan} onChange={handleChange} />
+                    </div>
+
+                    <h3 className="font-bold text-[#003B73] flex items-center gap-2 border-b pb-2 pt-2 mb-2">
+                        <Briefcase size={18}/> Data Sosial & Pekerjaan
+                    </h3>
+
+                    {/* Data Sosial */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <SelectField 
+                            label="Agama" 
+                            name="agama" 
+                            value={formData.agama} 
+                            onChange={handleChange} 
+                            options={["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu"]} 
+                        />
+                        <SelectField 
+                            label="Status Perkawinan" 
+                            name="status_perkawinan" 
+                            value={formData.status_perkawinan} 
+                            onChange={handleChange} 
+                            options={["Belum Kawin", "Kawin", "Cerai Hidup", "Cerai Mati"]} 
+                        />
+                        <InputField label="Suku" name="suku" value={formData.suku} onChange={handleChange} />
+                        <SelectField 
+                            label="Pendidikan Terakhir" 
+                            name="pendidikan_terakhir" 
+                            value={formData.pendidikan_terakhir} 
+                            onChange={handleChange} 
+                            options={["SD", "SMP", "SMA/SMK", "D3", "S1", "S2", "S3", "Tidak Sekolah"]} 
+                        />
+                        <InputField label="Nomor Pegawai (Opsional)" name="nomor_pegawai" value={formData.nomor_pegawai} onChange={handleChange} />
+                    </div>
+
+                    {/* Keluarga */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <InputField label="Status Hubungan Keluarga" name="status_keluarga" placeholder="Contoh: Suami, Istri, Anak" value={formData.status_keluarga} onChange={handleChange} />
+                        <InputField label="Nama Keluarga Penanggung Jawab" name="nama_keluarga" value={formData.nama_keluarga} onChange={handleChange} />
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Keluhan */}
                 <div className="border-t pt-4">
                   <label className="block text-sm font-bold text-gray-700 mb-2">
                     Keluhan Utama <span className="text-red-500">*</span>
@@ -711,9 +887,31 @@ export default function ReservasiPage() {
               </div>
             )}
 
-            {/* STEP 2 */}
+            {/* STEP 2: PILIH POLI & JADWAL */}
             {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn">
+                
+                {/* --- DISPLAY SARAN AI --- */}
+                {aiRecommendation && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4 shadow-sm">
+                        <div className="bg-blue-100 p-2 rounded-full text-blue-600 mt-1">
+                            <Sparkles size={24} />
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-[#003B73] mb-1">Rekomendasi AI</h4>
+                            <p className="text-sm text-gray-700 mb-2">
+                                Berdasarkan keluhan: <span className="italic font-medium">"{formData.keluhan}"</span>, kami menyarankan Anda untuk memilih:
+                            </p>
+                            <div className="inline-block bg-blue-600 text-white font-bold px-3 py-1 rounded-lg text-sm">
+                                Poli {aiRecommendation.rekomendasi_nama}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">
+                                *Silakan pilih poli lain jika saran ini dirasa kurang tepat.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -723,14 +921,22 @@ export default function ReservasiPage() {
                       name="poli_id"
                       value={formData.poli_id}
                       onChange={handlePoliChange}
-                      className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500"
+                      // Beri highlight border hijau jika user memilih poli yang sesuai saran AI
+                      className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 bg-white ${
+                        aiRecommendation?.rekomendasi_poli_id && String(formData.poli_id) === String(aiRecommendation.rekomendasi_poli_id)
+                            ? "border-green-500 ring-1 ring-green-500" 
+                            : "border-gray-300"
+                      }`}
                     >
                       <option value="">-- Pilih Poli --</option>
-                      {polis.map((p) => (
-                        <option key={p.poli_id} value={p.poli_id}>
-                          {p.poli_name}
-                        </option>
-                      ))}
+                      {polis.map((p) => {
+                        const isRecommended = aiRecommendation?.rekomendasi_poli_id && String(p.poli_id) === String(aiRecommendation.rekomendasi_poli_id);
+                        return (
+                            <option key={p.poli_id} value={p.poli_id} className={isRecommended ? "font-bold text-green-700" : ""}>
+                            {p.poli_name} {isRecommended ? "(Disarankan ✅)" : ""}
+                            </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div>
@@ -821,7 +1027,7 @@ export default function ReservasiPage() {
               </div>
             )}
 
-            {/* STEP 3 */}
+            {/* STEP 3: KONFIRMASI */}
             {currentStep === 3 && (
               <div className="space-y-4 animate-fadeIn">
                 <div className="bg-gray-50 p-6 rounded-xl space-y-3 border border-gray-200">
@@ -834,28 +1040,16 @@ export default function ReservasiPage() {
 
                     <span className="text-gray-500">Poli:</span>
                     <span className="font-bold">
-                      {
-                        polis.find(
-                          (p) => String(p.poli_id) === String(formData.poli_id)
-                        )?.poli_name
-                      }
+                      {polis.find((p) => String(p.poli_id) === String(formData.poli_id))?.poli_name}
                     </span>
 
                     <span className="text-gray-500">Dokter:</span>
                     <span className="font-bold">
-                      {
-                        dokters.find(
-                          (d) =>
-                            String(d.dokter_id) ===
-                            String(formData.dokter_id)
-                        )?.dokter?.nama_dokter
-                      }
+                      {dokters.find((d) => String(d.dokter_id) === String(formData.dokter_id))?.dokter?.nama_dokter}
                     </span>
 
                     <span className="text-gray-500">Tanggal:</span>
-                    <span className="font-bold">
-                      {formData.tanggal_reservasi}
-                    </span>
+                    <span className="font-bold">{formData.tanggal_reservasi}</span>
 
                     <span className="text-gray-500">Bayar:</span>
                     <span className="uppercase font-bold text-[#8CC63F]">
@@ -882,9 +1076,18 @@ export default function ReservasiPage() {
                   <button
                     type="button"
                     onClick={nextStep}
-                    className="bg-[#8CC63F] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#7ab332] transition flex items-center gap-2 shadow-lg shadow-green-100"
+                    disabled={isCheckingAI}
+                    className="bg-[#8CC63F] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#7ab332] transition flex items-center gap-2 shadow-lg shadow-green-100 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    Lanjut <ArrowRight size={18} />
+                    {isCheckingAI ? (
+                        <>
+                            <Loader2 className="animate-spin" size={18}/> Menganalisa...
+                        </>
+                    ) : (
+                        <>
+                            Lanjut <ArrowRight size={18} />
+                        </>
+                    )}
                   </button>
                 ) : (
                   <button
@@ -892,11 +1095,7 @@ export default function ReservasiPage() {
                     disabled={loading}
                     className="bg-[#003B73] text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-900 transition flex items-center gap-2 shadow-lg shadow-blue-100 disabled:opacity-70"
                   >
-                    {loading ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      "Kirim Reservasi"
-                    )}
+                    {loading ? <Loader2 className="animate-spin" /> : "Kirim Reservasi"}
                   </button>
                 )}
               </div>
@@ -912,44 +1111,10 @@ export default function ReservasiPage() {
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600">
               <CheckCircle size={32} />
             </div>
-            <h3 className="text-xl font-bold text-[#003B73] mb-2">
-              Reservasi Terkirim!
-            </h3>
+            <h3 className="text-xl font-bold text-[#003B73] mb-2">Reservasi Terkirim!</h3>
             <p className="text-gray-500 text-sm mb-4">
               Reservasi Anda telah berhasil diproses.
             </p>
-
-            {aiResult && (
-              <div
-                className={`mb-6 p-4 rounded-xl text-left border ${
-                  aiResult.is_match
-                    ? "bg-blue-50 border-blue-200"
-                    : "bg-yellow-50 border-yellow-200"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1 font-bold text-sm">
-                  <Lightbulb
-                    size={16}
-                    className={
-                      aiResult.is_match ? "text-blue-600" : "text-yellow-600"
-                    }
-                  />
-                  <span className="text-gray-800">Analisa AI (Backend)</span>
-                </div>
-                <p className="text-xs text-gray-600">
-                  Berdasarkan keluhan Anda, sistem menyarankan:
-                  <span className="font-bold text-base block mt-1 text-[#003B73]">
-                    {aiResult.suggestion}
-                  </span>
-                </p>
-                <p className="text-[10px] text-gray-400 mt-2">
-                  {aiResult.is_match
-                    ? "✅ Pilihan Poli Anda sudah sesuai."
-                    : "⚠️ Pilihan Poli Anda berbeda dengan saran AI."}
-                </p>
-              </div>
-            )}
-
             <button
               onClick={() => router.push("/user/dashboard")}
               className="w-full py-3 bg-[#003B73] text-white rounded-xl font-bold hover:bg-blue-900 transition"
