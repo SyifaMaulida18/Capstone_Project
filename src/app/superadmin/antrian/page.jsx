@@ -12,7 +12,6 @@ import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
-// Ubah kalau route halaman rekam medis kamu beda
 const MEDICAL_RECORDS_PATH = "/superadmin/rekam-medis";
 
 export default function AntrianDashboardPage() {
@@ -135,18 +134,22 @@ export default function AntrianDashboardPage() {
         },
         body: JSON.stringify({
           poli_id: selectedPoli,
+          tanggal, // ✅ kirim tanggal yang sama dengan dashboard
         }),
       });
 
       const json = await res.json();
 
+      if (res.status === 404 && json.message === "Tidak ada antrian lagi.") {
+        alert("Tidak ada antrian lagi untuk poli dan tanggal ini.");
+        return;
+      }
+
       if (!res.ok || !json.success) {
         throw new Error(json.message || "Gagal memanggil antrian berikutnya.");
       }
 
-      // Refresh dashboard setelah sukses
       await fetchDashboard();
-
       alert(json.message);
     } catch (err) {
       console.error("Error panggil berikutnya:", err);
@@ -177,19 +180,24 @@ export default function AntrianDashboardPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          antrian_id: sedangDipanggil.id, // id dari baris yang sedangDipanggil
+          // kirim nomor_antrian (dan antrian_id kalau backend butuh)
+          nomor_antrian: sedangDipanggil.nomor_antrian,
+          antrian_id: sedangDipanggil.id ?? sedangDipanggil.antrian_id,
         }),
       });
 
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        throw new Error(json.message || "Gagal menyelesaikan panggilan.");
+        const msgFromValidation =
+          json?.errors?.antrian_id?.[0] ||
+          json?.errors?.nomor_antrian?.[0] ||
+          json.message;
+
+        throw new Error(msgFromValidation || "Gagal menyelesaikan panggilan.");
       }
 
-      // Setelah selesai, refresh dashboard
       await fetchDashboard();
-
       alert(json.message || "Panggilan antrian telah diselesaikan.");
     } catch (err) {
       console.error("Error selesaikan panggilan:", err);
@@ -312,7 +320,6 @@ export default function AntrianDashboardPage() {
                     : "-"}
                 </p>
 
-                {/* 🔗 Tambah Rekam Medis: kirim reservasi + data pasien */}
                 {sedangDipanggil.reservation_id &&
                   sedangDipanggil.reservation?.user && (
                     <div className="mt-3">
