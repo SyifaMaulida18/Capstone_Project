@@ -1,13 +1,13 @@
 "use client";
 
-import AdminLayout from "@/app/admin/components/admin_layout";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   ArrowPathIcon,
   PhoneArrowDownLeftIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import AdminLayout from "@/app/admin/components/admin_layout";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -18,7 +18,7 @@ export default function AntrianDashboardPage() {
   const [polis, setPolis] = useState([]);
   const [selectedPoli, setSelectedPoli] = useState("");
   const [tanggal, setTanggal] = useState(
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   );
 
   const [loading, setLoading] = useState(false);
@@ -134,10 +134,16 @@ export default function AntrianDashboardPage() {
         },
         body: JSON.stringify({
           poli_id: selectedPoli,
+          tanggal, // ✅ kirim tanggal yang sama dengan dashboard
         }),
       });
 
       const json = await res.json();
+
+      if (res.status === 404 && json.message === "Tidak ada antrian lagi.") {
+        alert("Tidak ada antrian lagi untuk poli dan tanggal ini.");
+        return;
+      }
 
       if (!res.ok || !json.success) {
         throw new Error(json.message || "Gagal memanggil antrian berikutnya.");
@@ -154,60 +160,65 @@ export default function AntrianDashboardPage() {
   };
 
   // === 3b. SELESAIKAN PANGGILAN SAAT INI ===
-const handleSelesaikanPanggilan = async () => {
-  if (!sedangDipanggil) {
-    alert("Tidak ada antrian yang sedang dipanggil.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-    setErrorMsg("");
-
-    const token = localStorage.getItem("token");
-
-    const res = await fetch(`${API_BASE}/antrian/selesai-dipanggil`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        nomor_antrian: sedangDipanggil.nomor_antrian,
-        poli_id: selectedPoli,
-      }),
-    });
-
-    const json = await res.json();
-
-    if (!res.ok || !json.success) {
-      throw new Error(json.message || "Gagal menyelesaikan panggilan.");
+  const handleSelesaikanPanggilan = async () => {
+    if (!sedangDipanggil) {
+      alert("Tidak ada antrian yang sedang dipanggil.");
+      return;
     }
 
-    await fetchDashboard();
-    alert(json.message || "Panggilan antrian telah diselesaikan.");
-  } catch (err) {
-    console.error("Error selesaikan panggilan:", err);
-    alert(err.message || "Terjadi kesalahan saat menyelesaikan panggilan.");
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+      setErrorMsg("");
 
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/antrian/selesaikan`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          // kirim nomor_antrian (dan antrian_id kalau backend butuh)
+          nomor_antrian: sedangDipanggil.nomor_antrian,
+          antrian_id: sedangDipanggil.id ?? sedangDipanggil.antrian_id,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        const msgFromValidation =
+          json?.errors?.antrian_id?.[0] ||
+          json?.errors?.nomor_antrian?.[0] ||
+          json.message;
+
+        throw new Error(msgFromValidation || "Gagal menyelesaikan panggilan.");
+      }
+
+      await fetchDashboard();
+      alert(json.message || "Panggilan antrian telah diselesaikan.");
+    } catch (err) {
+      console.error("Error selesaikan panggilan:", err);
+      alert(err.message || "Terjadi kesalahan saat menyelesaikan panggilan.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // === 4. RENDER ===
   return (
     <AdminLayout>
-      <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
-        <h1 className="text-xl sm:text-2xl font-bold text-center mb-6 text-neutral-800">
+      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
+        <h1 className="text-2xl font-bold text-center mb-6 text-neutral-800">
           Dashboard Antrian Poli
         </h1>
 
         {/* FILTER POLI & TANGGAL */}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-            <div className="w-full sm:w-64">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div>
               <label className="block text-sm font-semibold text-neutral-700 mb-1">
                 Poli
               </label>
@@ -215,7 +226,7 @@ const handleSelesaikanPanggilan = async () => {
                 value={selectedPoli}
                 onChange={(e) => setSelectedPoli(e.target.value)}
                 disabled={loadingPoli}
-                className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white text-sm"
+                className="w-full md:w-64 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white"
               >
                 {loadingPoli && <option>Memuat...</option>}
                 {!loadingPoli &&
@@ -227,7 +238,7 @@ const handleSelesaikanPanggilan = async () => {
               </select>
             </div>
 
-            <div className="w-full sm:w-48">
+            <div>
               <label className="block text-sm font-semibold text-neutral-700 mb-1">
                 Tanggal Antrian
               </label>
@@ -235,17 +246,17 @@ const handleSelesaikanPanggilan = async () => {
                 type="date"
                 value={tanggal}
                 onChange={(e) => setTanggal(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white text-sm"
+                className="w-full md:w-48 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white"
               />
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={fetchDashboard}
               disabled={loading}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-neutral-200 text-neutral-700 hover:bg-neutral-100 text-sm font-semibold"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-200 text-neutral-700 hover:bg-neutral-100 text-sm font-semibold"
             >
               <ArrowPathIcon className="h-4 w-4" />
               Refresh
@@ -254,15 +265,15 @@ const handleSelesaikanPanggilan = async () => {
               type="button"
               onClick={handleSelesaikanPanggilan}
               disabled={loading || !sedangDipanggil}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-semibold shadow-md disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-semibold shadow-md disabled:opacity-60"
             >
-              Selesaikan
+              Selesaikan Panggilan
             </button>
             <button
               type="button"
               onClick={handlePanggilBerikutnya}
               disabled={loading}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary-500 text-white hover:bg-secondary-600 text-sm font-semibold shadow-md"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary-500 text-white hover:bg-secondary-600 text-sm font-semibold shadow-md"
             >
               <PhoneArrowDownLeftIcon className="h-4 w-4" />
               Panggil Berikutnya
@@ -271,13 +282,13 @@ const handleSelesaikanPanggilan = async () => {
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700">
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
             {errorMsg}
           </div>
         )}
 
         {/* KARTU RINGKASAN */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
           <div className="p-4 rounded-xl border border-primary-100 bg-primary-50 flex items-center gap-3">
             <div className="p-2 rounded-full bg-primary-600">
               <UsersIcon className="h-5 w-5 text-white" />
@@ -336,7 +347,7 @@ const handleSelesaikanPanggilan = async () => {
 
           <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50">
             <p className="text-xs text-neutral-600 mb-1">Tanggal</p>
-            <p className="text-sm sm:text-lg font-semibold text-neutral-800">
+            <p className="text-lg font-semibold text-neutral-800">
               {new Date(tanggal).toLocaleDateString("id-ID", {
                 weekday: "long",
                 day: "2-digit",
@@ -349,24 +360,23 @@ const handleSelesaikanPanggilan = async () => {
 
         {/* TABEL DAFTAR TUNGGU */}
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200 text-xs sm:text-sm">
+          <table className="min-w-full divide-y divide-neutral-200">
             <thead className="bg-primary-600">
               <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-semibold text-white uppercase tracking-wider">
-                  No
-                </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-semibold text-white uppercase tracking-wider">
-                  Nomor Antrian
-                </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-semibold text-white uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-semibold text-white uppercase tracking-wider hidden sm:table-cell">
-                  Waktu Panggil
-                </th>
-                <th className="px-4 sm:px-6 py-3 text-left text-[11px] sm:text-xs font-semibold text-white uppercase tracking-wider hidden sm:table-cell">
-                  Waktu Selesai
-                </th>
+                {[
+                  "No",
+                  "Nomor Antrian",
+                  "Status",
+                  "Waktu Panggil",
+                  "Waktu Selesai",
+                ].map((header) => (
+                  <th
+                    key={header}
+                    className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider"
+                  >
+                    {header}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-neutral-100">
@@ -374,7 +384,7 @@ const handleSelesaikanPanggilan = async () => {
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 sm:px-6 py-4 text-center text-xs sm:text-sm text-neutral-500"
+                    className="px-6 py-4 text-center text-sm text-neutral-500"
                   >
                     Belum ada antrian untuk poli dan tanggal ini.
                   </td>
@@ -386,15 +396,15 @@ const handleSelesaikanPanggilan = async () => {
                   key={row.id}
                   className={idx % 2 === 1 ? "bg-neutral-50" : "bg-white"}
                 >
-                  <td className="px-4 sm:px-6 py-3 text-neutral-800">
+                  <td className="px-6 py-3 text-sm text-neutral-800">
                     {idx + 1}
                   </td>
-                  <td className="px-4 sm:px-6 py-3 font-semibold text-neutral-900">
+                  <td className="px-6 py-3 text-sm font-semibold text-neutral-900">
                     {row.nomor_antrian}
                   </td>
-                  <td className="px-4 sm:px-6 py-3">
+                  <td className="px-6 py-3 text-sm">
                     <span
-                      className={`inline-flex px-2 py-1 rounded-full text-[11px] sm:text-xs font-semibold ${
+                      className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
                         row.status === "menunggu"
                           ? "bg-yellow-50 text-yellow-700 border border-yellow-200"
                           : row.status === "dipanggil"
@@ -407,7 +417,7 @@ const handleSelesaikanPanggilan = async () => {
                       {row.status}
                     </span>
                   </td>
-                  <td className="px-4 sm:px-6 py-3 text-neutral-800 hidden sm:table-cell">
+                  <td className="px-6 py-3 text-sm text-neutral-800">
                     {row.waktu_panggil
                       ? new Date(row.waktu_panggil).toLocaleTimeString(
                           "id-ID",
@@ -415,7 +425,7 @@ const handleSelesaikanPanggilan = async () => {
                         )
                       : "-"}
                   </td>
-                  <td className="px-4 sm:px-6 py-3 text-neutral-800 hidden sm:table-cell">
+                  <td className="px-6 py-3 text-sm text-neutral-800">
                     {row.waktu_selesai
                       ? new Date(row.waktu_selesai).toLocaleTimeString(
                           "id-ID",
