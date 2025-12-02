@@ -60,23 +60,23 @@ export default function TopNav() {
           {/* RIGHT SIDE: Bell + Logout Button */}
           <div className="flex items-center space-x-4 ml-4 flex-shrink-0">
 
-            {/* Bell Icon */}
+            {/* Bell Icon
             <button
               className="p-2 rounded-md hover:bg-neutral-100 transition-colors"
               title="Notifikasi"
             >
               <BellIcon className="h-6 w-6 text-neutral-600" />
-            </button>
+            </button> */}
 
             {/* Logout Button */}
-            <button
+            {/* <button
               onClick={handleLogout}
               className="flex items-center space-x-2 text-red-600 hover:text-red-700 font-medium p-2 rounded-md hover:bg-red-50 transition-colors"
               title="Keluar"
             >
               <ArrowRightOnRectangleIcon className="h-6 w-6" />
               <span className="hidden sm:inline">Keluar</span>
-            </button>
+            </button> */}
           </div>
         </div>
       </div>

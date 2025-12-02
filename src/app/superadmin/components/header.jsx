@@ -24,6 +24,16 @@ export default function Header() {
     <header className="flex justify-end items-center space-x-4 h-16 bg-primary-800 text-white px-8 shadow-md">
       <div className="flex items-center space-x-6">
 
+                    {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-2 text-red-600 hover:text-red-700 font-medium p-2 rounded-md hover:bg-red-50 transition-colors"
+              title="Keluar"
+            >
+              <ArrowRightOnRectangleIcon className="h-6 w-6" />
+              <span className="hidden sm:inline">Keluar</span>
+            </button>
+
 
 
         {/* 🔔 Notifikasi */}

@@ -320,12 +320,12 @@ export default function VerifikasiReservasiPage() {
                   </td>
                   <td className="px-6 py-4 text-sm font-medium">
                     <div className="flex space-x-2">
-                      <Link
-                        href={`/superadmin/reservasi/edit/${p.id}`}
+                      {/* <Link
+                        href={`/admin/reservasi/edit/${p.id}`}
                         className="text-neutral-600 hover:text-primary-600 p-1 rounded-md hover:bg-primary-50"
                       >
                         <PencilIcon className="h-5 w-5" />
-                      </Link>
+                      </Link> */}
                       <button
                         onClick={() => handleDelete(p.id)}
                         className="text-neutral-600 hover:text-red-600 p-1 rounded-md hover:bg-red-50"

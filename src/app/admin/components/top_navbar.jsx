@@ -12,7 +12,7 @@ export default function TopNav() {
     { name: "Beranda", href: "/admin/dashboard" },
     { name: "Manajemen Dokter", href: "/admin/dokter" },
     { name: "Manajemen Jadwal Dokter", href: "/admin/schedule" },
-    { name: "Manajemen Pasien", href: "/admin/pasien" },
+    // { name: "Manajemen Pasien", href: "/admin/pasien" },
     { name: "Manajemen Reservasi", href: "/admin/reservasi" },
     { name: "Manajemen Antrian", href: "/admin/antrian" },
     { name: "Manajemen Rekam Medis", href: "/admin/rekam-medis" },
