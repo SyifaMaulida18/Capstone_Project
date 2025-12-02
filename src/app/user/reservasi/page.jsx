@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/services/api"; 
+import api from "@/services/api";
 import {
   ArrowRight,
   ArrowLeft,
@@ -12,48 +12,69 @@ import {
   CheckCircle,
   User,
   Clock,
-  Lightbulb
+  Lightbulb,
 } from "lucide-react";
 
-// Helper Component
-function InputField({ label, name, value, onChange, type="text", required, disabled }) {
-    return (
-        <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-            <input type={type} name={name} value={value} onChange={onChange} required={required} disabled={disabled}
-                className={`w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${disabled ? 'bg-gray-100 text-gray-600 font-medium' : 'bg-white'}`} 
-            />
-        </div>
-    )
+// --- Helper Input ---
+function InputField({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  required,
+  disabled,
+  maxLength,
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-bold text-gray-700 mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+        maxLength={maxLength}
+        className={`w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${
+          disabled ? "bg-gray-100 text-gray-600 font-medium" : "bg-white"
+        }`}
+      />
+    </div>
+  );
 }
 
 export default function ReservasiPage() {
   const router = useRouter();
 
-  // --- STATE ---
+  // --- STEP / STATE UMUM ---
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [todayStr, setTodayStr] = useState("");
 
-  // State untuk menyimpan hasil AI MURNI dari Backend
+  // Hasil AI dari backend
   const [aiResult, setAiResult] = useState(null);
 
-  // Data Master
+  // Data master
   const [polis, setPolis] = useState([]);
-  const [dokters, setDokters] = useState([]); 
-  
-  // State Logic Jadwal
-  const [selectedDoctorSchedule, setSelectedDoctorSchedule] = useState(null); 
+  const [dokters, setDokters] = useState([]);
+
+  // Jadwal dokter
+  const [selectedDoctorSchedule, setSelectedDoctorSchedule] = useState(null);
   const [availableDaysText, setAvailableDaysText] = useState("");
 
-  // Form Data
+  // Data user
   const [isSelf, setIsSelf] = useState(true);
-  
-  const [localUserData, setLocalUserData] = useState(null); 
+  const [localUserData, setLocalUserData] = useState(null);
   const [apiProfileData, setApiProfileData] = useState(null);
 
+  // Form
   const [formData, setFormData] = useState({
     nama: "",
     email: "",
@@ -69,50 +90,51 @@ export default function ReservasiPage() {
     tanggal_reservasi: "",
     penjaminan: "cash",
     nama_asuransi: "",
-    nomor_asuransi: ""
+    nomor_asuransi: "",
   });
 
-  // --- 1. FETCH DATA AWAL ---
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoadingData(true);
-      try {
-        const poliRes = await api.get("/polis");
-        setPolis(poliRes.data);
+  // --- UTIL: HARI PRAKTEK ---
+  const isPraktekActive = (val) =>
+    val == 1 || val === "1" || val === "Y" || val === "y" || val === true;
 
-        const storedUserStr = localStorage.getItem("user");
-        let storedUser = null;
-        if (storedUserStr) {
-            storedUser = JSON.parse(storedUserStr);
-            setLocalUserData(storedUser);
-        }
+  const getDoctorActiveDays = (jadwal) => {
+    if (!jadwal) return [];
+    const days = [];
+    if (isPraktekActive(jadwal.minggu_praktek)) days.push(0);
+    if (isPraktekActive(jadwal.senin_praktek)) days.push(1);
+    if (isPraktekActive(jadwal.selasa_praktek)) days.push(2);
+    if (isPraktekActive(jadwal.rabu_praktek)) days.push(3);
+    if (isPraktekActive(jadwal.kamis_praktek)) days.push(4);
+    if (isPraktekActive(jadwal.jumat_praktek)) days.push(5);
+    if (isPraktekActive(jadwal.sabtu_praktek)) days.push(6);
+    return days;
+  };
 
-        try {
-            const profileRes = await api.get("/profile");
-            if (profileRes.data && profileRes.data.data) {
-                setApiProfileData(profileRes.data.data);
-                fillSelfData(storedUser, profileRes.data.data);
-            } else {
-                fillSelfData(storedUser, null);
-            }
-        } catch (profileErr) {
-            console.warn("Profile belum lengkap:", profileErr);
-            fillSelfData(storedUser, null);
-        }
-
-      } catch (err) {
-        console.error("Gagal mengambil data awal:", err);
-      } finally {
-        setLoadingData(false);
-      }
+  const generateAvailableDaysText = (jadwal) => {
+    if (!jadwal) return "";
+    const mapDay = {
+      minggu_praktek: "Minggu",
+      senin_praktek: "Senin",
+      selasa_praktek: "Selasa",
+      rabu_praktek: "Rabu",
+      kamis_praktek: "Kamis",
+      jumat_praktek: "Jumat",
+      sabtu_praktek: "Sabtu",
     };
-    fetchData();
-  }, []);
 
-  const fillSelfData = (user, profile) => {
+    const textArr = Object.keys(mapDay).reduce((acc, key) => {
+      if (isPraktekActive(jadwal[key])) acc.push(mapDay[key]);
+      return acc;
+    }, []);
+
+    return textArr.length > 0 ? textArr.join(", ") : "Tidak ada jadwal praktek";
+  };
+
+  // --- PREFILL DATA DIRI ---
+  const fillSelfData = useCallback((user, profile) => {
     setFormData((prev) => ({
       ...prev,
-      nama: user?.name || user?.Nama || "", 
+      nama: user?.name || user?.Nama || "",
       email: user?.email || user?.Email || "",
       nomor_whatsapp: profile?.nomor_telepon || user?.nomor_telepon || "",
       nomor_ktp: profile?.noKTP || "",
@@ -122,9 +144,9 @@ export default function ReservasiPage() {
       alamat: profile?.alamat || "",
       penjaminan: profile?.penjaminan || "cash",
       nama_asuransi: profile?.nama_asuransi || "",
-      nomor_asuransi: profile?.nomor_asuransi || ""
+      nomor_asuransi: profile?.nomor_asuransi || "",
     }));
-  };
+  }, []);
 
   const clearPatientData = () => {
     setFormData((prev) => ({
@@ -138,54 +160,99 @@ export default function ReservasiPage() {
       jenis_kelamin: "Laki-laki",
       alamat: "",
       nama_asuransi: "",
-      nomor_asuransi: ""
+      nomor_asuransi: "",
     }));
   };
 
-  // --- LOGIC JADWAL & VALIDASI HARI ---
-  const isPraktekActive = (val) => {
-      return val == 1 || val === '1' || val === 'Y' || val === 'y' || val === true;
-  };
+  // --- FETCH DATA AWAL ---
+  useEffect(() => {
+    setTodayStr(new Date().toISOString().split("T")[0]);
 
-  const getDoctorActiveDays = (jadwal) => {
-      if(!jadwal) return [];
-      const days = [];
-      if (isPraktekActive(jadwal.minggu_praktek)) days.push(0);
-      if (isPraktekActive(jadwal.senin_praktek)) days.push(1);
-      if (isPraktekActive(jadwal.selasa_praktek)) days.push(2);
-      if (isPraktekActive(jadwal.rabu_praktek)) days.push(3);
-      if (isPraktekActive(jadwal.kamis_praktek)) days.push(4);
-      if (isPraktekActive(jadwal.jumat_praktek)) days.push(5);
-      if (isPraktekActive(jadwal.sabtu_praktek)) days.push(6);
-      return days;
-  };
+    const fetchData = async () => {
+      setLoadingData(true);
+      setError("");
 
-  const generateAvailableDaysText = (jadwal) => {
-      if(!jadwal) return "";
-      const mapDay = {
-          minggu_praktek: "Minggu",
-          senin_praktek: "Senin",
-          selasa_praktek: "Selasa",
-          rabu_praktek: "Rabu",
-          kamis_praktek: "Kamis",
-          jumat_praktek: "Jumat",
-          sabtu_praktek: "Sabtu"
-      };
-      
-      let textArr = [];
-      Object.keys(mapDay).forEach(key => {
-          if (isPraktekActive(jadwal[key])) textArr.push(mapDay[key]);
+      try {
+        // Ambil daftar poli (public)
+        const poliRes = await api.get("/polis");
+        setPolis(poliRes.data?.data ?? poliRes.data ?? []);
+
+        // Ambil user dari localStorage
+        const storedUserStr = typeof window !== "undefined"
+          ? localStorage.getItem("user")
+          : null;
+
+        let storedUser = null;
+        if (storedUserStr) {
+          storedUser = JSON.parse(storedUserStr);
+          setLocalUserData(storedUser);
+        }
+
+        // Ambil profile via API
+        try {
+          const profileRes = await api.get("/profile");
+          const profileData = profileRes.data?.data ?? null;
+          setApiProfileData(profileData);
+          fillSelfData(storedUser, profileData);
+        } catch (profileErr) {
+          console.warn("Profile belum lengkap:", profileErr);
+          fillSelfData(storedUser, null);
+        }
+      } catch (err) {
+        console.error("Gagal mengambil data awal:", err);
+        setError("Gagal memuat data awal. Coba refresh halaman.");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, [fillSelfData]);
+
+  // --- FETCH DOKTER BY POLI (PUBLIC ENDPOINT) ---
+  const fetchDoctorsByPoli = useCallback(async (poliId) => {
+    if (!poliId) {
+      setDokters([]);
+      return;
+    }
+
+    try {
+      setError("");
+      const res = await api.get(`/public/jadwal-dokter/${poliId}`);
+
+      // Backend getByPoli() sekarang return array langsung
+      const list = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.data)
+        ? res.data.data
+        : [];
+
+      setDokters(list);
+    } catch (err) {
+      console.error("Gagal ambil dokter:", {
+        poliId,
+        message: err.message,
+        status: err.response?.status,
+        response: err.response?.data,
       });
-      
-      return textArr.length > 0 ? textArr.join(", ") : "Tidak ada jadwal praktek";
-  };
+      setDokters([]);
+      setError(
+        "Gagal mengambil daftar dokter. Coba pilih poli lagi atau hubungi admin."
+      );
+    }
+  }, []);
 
-  // --- HANDLERS ---
+  // --- HANDLER FORM ---
   const handlePatientTypeChange = (e) => {
     const val = e.target.value === "self";
     setIsSelf(val);
-    if (val) fillSelfData(localUserData, apiProfileData);
-    else clearPatientData();
+    setError("");
+
+    if (val) {
+      fillSelfData(localUserData, apiProfileData);
+    } else {
+      clearPatientData();
+    }
   };
 
   const handleChange = (e) => {
@@ -195,241 +262,373 @@ export default function ReservasiPage() {
 
   const handlePoliChange = async (e) => {
     const selectedPoliId = e.target.value;
-    setFormData((prev) => ({ ...prev, poli_id: selectedPoliId, dokter_id: "", tanggal_reservasi: "" }));
+
+    setFormData((prev) => ({
+      ...prev,
+      poli_id: selectedPoliId,
+      dokter_id: "",
+      tanggal_reservasi: "",
+    }));
+
     setSelectedDoctorSchedule(null);
     setAvailableDaysText("");
-    
-    if (selectedPoliId) {
-        try {
-            const res = await api.get(`/public/jadwal-dokter/${selectedPoliId}`);
-            setDokters(Array.isArray(res.data) ? res.data : []);
-        } catch (err) {
-            console.error("Gagal ambil dokter", err);
-            setDokters([]);
-        }
-    } else {
-        setDokters([]);
-    }
+    setError("");
+
+    await fetchDoctorsByPoli(selectedPoliId);
   };
 
   const handleDokterChange = (e) => {
-      const docId = e.target.value;
-      setFormData(prev => ({ ...prev, dokter_id: docId, tanggal_reservasi: "" }));
-      setError("");
+    const docId = e.target.value;
 
-      if (docId) {
-          const selectedSchedule = dokters.find(d => String(d.dokter_id) === String(docId));
-          setSelectedDoctorSchedule(selectedSchedule);
-          setAvailableDaysText(generateAvailableDaysText(selectedSchedule));
-      } else {
-          setSelectedDoctorSchedule(null);
-          setAvailableDaysText("");
-      }
+    setFormData((prev) => ({
+      ...prev,
+      dokter_id: docId,
+      tanggal_reservasi: "",
+    }));
+    setError("");
+
+    if (docId) {
+      const selectedSchedule = dokters.find(
+        (d) => String(d.dokter_id) === String(docId)
+      );
+      setSelectedDoctorSchedule(selectedSchedule || null);
+      setAvailableDaysText(generateAvailableDaysText(selectedSchedule));
+    } else {
+      setSelectedDoctorSchedule(null);
+      setAvailableDaysText("");
+    }
   };
 
   const handleDateChange = (e) => {
-      const dateVal = e.target.value;
-      setError("");
+    const dateVal = e.target.value;
+    setError("");
 
-      if (!dateVal) {
-        setFormData(prev => ({...prev, tanggal_reservasi: ""}));
-        return;
-      }
+    if (!dateVal) {
+      setFormData((prev) => ({ ...prev, tanggal_reservasi: "" }));
+      return;
+    }
 
-      if (!selectedDoctorSchedule) {
-          setError("Silakan pilih dokter terlebih dahulu.");
-          return;
-      }
+    if (!selectedDoctorSchedule) {
+      setError("Silakan pilih dokter terlebih dahulu.");
+      setFormData((prev) => ({ ...prev, tanggal_reservasi: "" }));
+      return;
+    }
 
-      const selectedDate = new Date(dateVal);
-      const dayIndex = selectedDate.getDay(); 
-      const activeDays = getDoctorActiveDays(selectedDoctorSchedule);
+    const selectedDate = new Date(dateVal);
+    const dayIndex = selectedDate.getDay();
+    const activeDays = getDoctorActiveDays(selectedDoctorSchedule);
 
-      if (!activeDays.includes(dayIndex)) {
-          setError(`Dokter tidak praktek pada tanggal tersebut. Hari tersedia: ${availableDaysText}`);
-          setFormData(prev => ({...prev, tanggal_reservasi: ""}));
-      } else {
-          setFormData(prev => ({...prev, tanggal_reservasi: dateVal}));
-      }
+    if (!activeDays.includes(dayIndex)) {
+      setError(
+        `Dokter tidak praktek pada tanggal tersebut. Hari tersedia: ${availableDaysText}`
+      );
+      setFormData((prev) => ({ ...prev, tanggal_reservasi: "" }));
+    } else {
+      setFormData((prev) => ({ ...prev, tanggal_reservasi: dateVal }));
+    }
   };
 
   const nextStep = () => {
     setError("");
-    
+
+    // Validasi step 1
     if (currentStep === 1) {
-      if (!formData.keluhan) return setError("Silakan isi keluhan utama Anda.");
-      
+      if (!formData.keluhan) {
+        return setError("Silakan isi keluhan utama Anda.");
+      }
+
       if (isSelf) {
-          if (!apiProfileData || !apiProfileData.noKTP || !apiProfileData.tanggal_lahir) {
-              return setError("Profil Anda belum lengkap (KTP/Tgl Lahir). Mohon lengkapi di menu Profil atau pilih 'Orang Lain'.");
-          }
+        if (
+          !apiProfileData ||
+          !apiProfileData.noKTP ||
+          !apiProfileData.tanggal_lahir
+        ) {
+          return setError(
+            "Profil Anda belum lengkap (KTP/Tgl Lahir). Mohon lengkapi di menu Profil atau pilih 'Orang Lain'."
+          );
+        }
       } else {
-          if(!formData.nama || !formData.nomor_ktp) return setError("Data pasien wajib diisi lengkap.");
+        if (!formData.nama || !formData.nomor_ktp) {
+          return setError("Data pasien wajib diisi lengkap.");
+        }
       }
     }
-    
+
+    // Validasi step 2
     if (currentStep === 2) {
       if (!formData.poli_id) return setError("Silakan pilih Poli tujuan.");
       if (!formData.dokter_id) return setError("Silakan pilih Dokter.");
-      if (!formData.tanggal_reservasi) return setError("Silakan pilih tanggal kunjungan.");
+      if (!formData.tanggal_reservasi)
+        return setError("Silakan pilih tanggal kunjungan.");
     }
-    
+
     setCurrentStep((prev) => prev + 1);
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+    setAiResult(null);
 
-  // normalisasi penjaminan supaya cocok rules backend
-  const normalizePenjaminan = (val) => {
-    if (val === "bpjs" || val === "BPJS") return "asuransi";
-    if (val === "asuransi") return "asuransi";
-    return "cash"; // default
-  };
+    const normalizePenjaminan = (val) => {
+      if (val === "bpjs" || val === "BPJS") return "asuransi";
+      if (val === "asuransi") return "asuransi";
+      return "cash";
+    };
 
-  const normalizedPenjaminan = normalizePenjaminan(formData.penjaminan);
+    const normalizedPenjaminan = normalizePenjaminan(formData.penjaminan);
 
-  const payload = {
-    is_self: isSelf ? 1 : 0,
-    poli_id: formData.poli_id,
-    tanggal_reservasi: formData.tanggal_reservasi,
-    keluhan: formData.keluhan,
-    dokter_id: formData.dokter_id,
-    penanggung_jawab_id: null,
-  };
+    const payload = {
+      is_self: isSelf ? 1 : 0,
+      poli_id: formData.poli_id,
+      tanggal_reservasi: formData.tanggal_reservasi,
+      keluhan: formData.keluhan,
+      dokter_id: formData.dokter_id,
+      penanggung_jawab_id: null,
+    };
 
-  if (!isSelf) {
-    Object.assign(payload, {
-      nama: formData.nama,
-      email: formData.email || undefined, // boleh kosong kalau kamu mau ubah rules nanti
-      jenis_kelamin: formData.jenis_kelamin,
-      tempat_lahir: formData.tempat_lahir,
-      tanggal_lahir: formData.tanggal_lahir,
-      nomor_ktp: formData.nomor_ktp,
-      nomor_whatsapp: formData.nomor_whatsapp,
-      penjaminan: normalizedPenjaminan,
-      status_keluarga: "Lainnya",
-      alamat: formData.alamat,
-      // kalau penjaminan = asuransi, kedua field ini WAJIB
-      nama_asuransi:
-        normalizedPenjaminan === "asuransi"
-          ? formData.nama_asuransi || "BPJS"
-          : null,
-      nomor_asuransi:
-        normalizedPenjaminan === "asuransi"
-          ? formData.nomor_asuransi
-          : null,
-    });
-  }
+    if (!isSelf) {
+      Object.assign(payload, {
+        nama: formData.nama,
+        email: formData.email || undefined,
+        jenis_kelamin: formData.jenis_kelamin,
+        tempat_lahir: formData.tempat_lahir,
+        tanggal_lahir: formData.tanggal_lahir,
+        nomor_ktp: formData.nomor_ktp,
+        nomor_whatsapp: formData.nomor_whatsapp,
+        penjaminan: normalizedPenjaminan,
+        status_keluarga: "Lainnya",
+        alamat: formData.alamat,
+        nama_asuransi:
+          normalizedPenjaminan === "asuransi"
+            ? formData.nama_asuransi || "BPJS"
+            : null,
+        nomor_asuransi:
+          normalizedPenjaminan === "asuransi"
+            ? formData.nomor_asuransi
+            : null,
+      });
+    }
 
     try {
-      // KIRIM KE BACKEND (Backend akan memproses AI)
       const response = await api.post("/reservations", payload);
-      
-      // TANGKAP HASIL AI DARI RESPONSE BACKEND
+
       if (response.data && response.data.ai_analysis) {
-          setAiResult(response.data.ai_analysis);
+        setAiResult(response.data.ai_analysis);
       }
 
       setShowSuccessModal(true);
     } catch (err) {
       console.error(err);
-      const msg = err.response?.data?.message || "Terjadi kesalahan saat membuat reservasi.";
-      if(err.response?.data?.errors) {
-          const firstErr = Object.values(err.response.data.errors)[0][0];
-          setError(firstErr);
+      const msg =
+        err.response?.data?.message ||
+        "Terjadi kesalahan saat membuat reservasi.";
+
+      if (err.response?.data?.errors) {
+        const firstErr = Object.values(err.response.data.errors)[0][0];
+        setError(firstErr);
       } else {
-          setError(msg);
+        setError(msg);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // --- STEPPER UI ---
+  // --- STEPPER ---
   const Stepper = () => (
     <div className="w-full max-w-3xl mx-auto mb-8 px-4 relative">
-        <div className="absolute top-5 left-0 w-full h-1 bg-gray-200 -z-10"></div>
-        <div className="flex justify-between items-start w-full">
-          {["Data & Keluhan", "Poli & Jadwal", "Konfirmasi"].map((label, index) => {
+      <div className="absolute top-5 left-0 w-full h-1 bg-gray-200 -z-10" />
+      <div className="flex justify-between items-start w-full">
+        {["Data & Keluhan", "Poli & Jadwal", "Konfirmasi"].map(
+          (label, index) => {
             const stepNum = index + 1;
             const active = stepNum === currentStep;
             const done = stepNum < currentStep;
             return (
               <div key={index} className="flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-4 bg-white ${active ? "border-[#8CC63F] text-[#003B73]" : done ? "bg-[#003B73] text-white border-[#003B73]" : "border-gray-200 text-gray-400"}`}>
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-4 bg-white ${
+                    active
+                      ? "border-[#8CC63F] text-[#003B73]"
+                      : done
+                      ? "bg-[#003B73] text-white border-[#003B73]"
+                      : "border-gray-200 text-gray-400"
+                  }`}
+                >
                   {done ? <Check size={16} /> : stepNum}
                 </div>
-                <span className={`text-xs mt-1 font-medium ${active ? "text-[#003B73]" : "text-gray-400"}`}>{label}</span>
+                <span
+                  className={`text-xs mt-1 font-medium ${
+                    active ? "text-[#003B73]" : "text-gray-400"
+                  }`}
+                >
+                  {label}
+                </span>
               </div>
             );
-          })}
-        </div>
+          }
+        )}
+      </div>
     </div>
   );
 
-  if (loadingData) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#003B73]" size={40}/></div>;
+  // --- LOADING AWAL ---
+  if (loadingData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-[#003B73]" size={40} />
+      </div>
+    );
+  }
 
+  // --- MAIN UI ---
   return (
     <div className="min-h-screen bg-neutral-50 flex justify-center items-start py-8 md:py-12 px-4">
       <div className="w-full max-w-4xl bg-white shadow-xl rounded-3xl overflow-hidden border border-neutral-100">
         <div className="bg-[#003B73] px-6 py-5 flex items-center gap-4 text-white">
-          <button onClick={() => currentStep === 1 ? router.back() : setCurrentStep(prev=>prev-1)}><ArrowLeft /></button>
+          <button
+            type="button"
+            onClick={() =>
+              currentStep === 1
+                ? router.back()
+                : setCurrentStep((prev) => prev - 1)
+            }
+          >
+            <ArrowLeft />
+          </button>
           <h1 className="text-xl font-bold">Buat Reservasi Baru</h1>
         </div>
 
         <div className="p-6 md:p-8">
           <Stepper />
-          
+
           {error && (
             <div className="mb-6 p-4 bg-red-50 text-red-700 text-sm rounded-xl flex gap-3 border border-red-200 items-start">
-                <AlertCircle size={20} className="shrink-0 mt-0.5"/>
-                <span>{error}</span>
+              <AlertCircle size={20} className="shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit}>
-            
             {/* STEP 1 */}
             {currentStep === 1 && (
               <div className="space-y-6 animate-fadeIn">
-                {/* Pilihan Pasien */}
                 <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
-                    <label className="text-sm font-bold text-[#003B73] mb-3 flex items-center gap-2">
-                        <User size={18} /> Reservasi Untuk Siapa?
+                  <label className="text-sm font-bold text-[#003B73] mb-3 flex items-center gap-2">
+                    <User size={18} /> Reservasi Untuk Siapa?
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="patient_type"
+                        value="self"
+                        checked={isSelf}
+                        onChange={handlePatientTypeChange}
+                        className="w-5 h-5 accent-[#003B73]"
+                      />
+                      <span className="font-medium text-gray-700">
+                        Diri Sendiri
+                      </span>
                     </label>
-                    <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="patient_type" value="self" checked={isSelf} onChange={handlePatientTypeChange} className="w-5 h-5 accent-[#003B73]" />
-                            <span className="font-medium text-gray-700">Diri Sendiri</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="patient_type" value="other" checked={!isSelf} onChange={handlePatientTypeChange} className="w-5 h-5 accent-[#003B73]" />
-                            <span className="font-medium text-gray-700">Orang Lain / Keluarga</span>
-                        </label>
-                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="patient_type"
+                        value="other"
+                        checked={!isSelf}
+                        onChange={handlePatientTypeChange}
+                        className="w-5 h-5 accent-[#003B73]"
+                      />
+                      <span className="font-medium text-gray-700">
+                        Orang Lain / Keluarga
+                      </span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
-                    <InputField label="Nama Lengkap" name="nama" value={formData.nama} onChange={handleChange} disabled={isSelf} required />
-                    <InputField label="Email" name="email" type="email" value={formData.email} onChange={handleChange} disabled={isSelf} required={!isSelf} />
-                    <InputField label="Nomor KTP" name="nomor_ktp" value={formData.nomor_ktp} onChange={handleChange} disabled={isSelf} required maxLength={16} />
-                    <InputField label="Tempat Lahir" name="tempat_lahir" value={formData.tempat_lahir} onChange={handleChange} disabled={isSelf} required />
-                    <InputField label="Tanggal Lahir" name="tanggal_lahir" type="date" value={formData.tanggal_lahir} onChange={handleChange} disabled={isSelf} required />
-                    <InputField label="Nomor WhatsApp" name="nomor_whatsapp" value={formData.nomor_whatsapp} onChange={handleChange} disabled={isSelf} required />
-                    {!isSelf && (
-                        <div className="md:col-span-2">
-                             <label className="block text-sm font-bold text-gray-700 mb-1">Alamat</label>
-                             <textarea name="alamat" value={formData.alamat} onChange={handleChange} className="w-full p-3 border rounded-xl" rows={2} />
-                        </div>
-                    )}
+                  <InputField
+                    label="Nama Lengkap"
+                    name="nama"
+                    value={formData.nama}
+                    onChange={handleChange}
+                    disabled={isSelf}
+                    required
+                  />
+                  <InputField
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    disabled={isSelf}
+                    required={!isSelf}
+                  />
+                  <InputField
+                    label="Nomor KTP"
+                    name="nomor_ktp"
+                    value={formData.nomor_ktp}
+                    onChange={handleChange}
+                    disabled={isSelf}
+                    required
+                    maxLength={16}
+                  />
+                  <InputField
+                    label="Tempat Lahir"
+                    name="tempat_lahir"
+                    value={formData.tempat_lahir}
+                    onChange={handleChange}
+                    disabled={isSelf}
+                    required
+                  />
+                  <InputField
+                    label="Tanggal Lahir"
+                    name="tanggal_lahir"
+                    type="date"
+                    value={formData.tanggal_lahir}
+                    onChange={handleChange}
+                    disabled={isSelf}
+                    required
+                  />
+                  <InputField
+                    label="Nomor WhatsApp"
+                    name="nomor_whatsapp"
+                    value={formData.nomor_whatsapp}
+                    onChange={handleChange}
+                    disabled={isSelf}
+                    required
+                  />
+                  {!isSelf && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-1">
+                        Alamat
+                      </label>
+                      <textarea
+                        name="alamat"
+                        value={formData.alamat}
+                        onChange={handleChange}
+                        className="w-full p-3 border rounded-xl"
+                        rows={2}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Keluhan Utama <span className="text-red-500">*</span></label>
-                    <textarea name="keluhan" value={formData.keluhan} onChange={handleChange} className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" rows={3} required />
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Keluhan Utama <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    name="keluhan"
+                    value={formData.keluhan}
+                    onChange={handleChange}
+                    className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    rows={3}
+                    required
+                  />
                 </div>
               </div>
             )}
@@ -437,109 +636,249 @@ const handleSubmit = async (e) => {
             {/* STEP 2 */}
             {currentStep === 2 && (
               <div className="space-y-6 animate-fadeIn">
-                {/* --- BAGIAN AI DI FE DIHAPUS (HANYA MUNCUL DI AKHIR) --- */}
-
                 <div className="grid md:grid-cols-2 gap-5">
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Pilih Poli Tujuan</label>
-                        <select name="poli_id" value={formData.poli_id} onChange={handlePoliChange} className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500">
-                            <option value="">-- Pilih Poli --</option>
-                            {polis.map((p) => <option key={p.poli_id} value={p.poli_id}>{p.poli_name}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                         <label className="block text-sm font-bold text-gray-700 mb-2">Pilih Dokter</label>
-                         <select name="dokter_id" value={formData.dokter_id} onChange={handleDokterChange} disabled={!formData.poli_id} className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100">
-                             <option value="">-- Pilih Dokter --</option>
-                             {dokters.map((d) => (<option key={d.dokter_id} value={d.dokter_id}>{d.dokter?.nama_dokter}</option>))}
-                         </select>
-                         {selectedDoctorSchedule && <div className="mt-2 text-xs flex items-start gap-1.5 text-blue-700 bg-blue-50 p-2 rounded-lg border border-blue-100"><Clock size={14} className="mt-0.5" /><span><b>Jadwal:</b> {availableDaysText}</span></div>}
-                         {formData.poli_id && dokters.length === 0 && <p className="text-xs text-red-400 mt-1">Belum ada jadwal dokter aktif.</p>}
-                    </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Pilih Poli Tujuan
+                    </label>
+                    <select
+                      name="poli_id"
+                      value={formData.poli_id}
+                      onChange={handlePoliChange}
+                      className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- Pilih Poli --</option>
+                      {polis.map((p) => (
+                        <option key={p.poli_id} value={p.poli_id}>
+                          {p.poli_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Pilih Dokter
+                    </label>
+                    <select
+                      name="dokter_id"
+                      value={formData.dokter_id}
+                      onChange={handleDokterChange}
+                      disabled={!formData.poli_id}
+                      className="w-full p-3 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    >
+                      <option value="">-- Pilih Dokter --</option>
+                      {dokters.map((d) => (
+                        <option key={d.dokter_id} value={d.dokter_id}>
+                          {d.dokter?.nama_dokter || "Tanpa Nama"}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedDoctorSchedule && (
+                      <div className="mt-2 text-xs flex items-start gap-1.5 text-blue-700 bg-blue-50 p-2 rounded-lg border border-blue-100">
+                        <Clock size={14} className="mt-0.5" />
+                        <span>
+                          <b>Jadwal:</b> {availableDaysText}
+                        </span>
+                      </div>
+                    )}
+                    {formData.poli_id && dokters.length === 0 && (
+                      <p className="text-xs text-red-400 mt-1">
+                        Belum ada jadwal dokter aktif.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-5">
-                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Rencana Tanggal</label>
-                        <input type="date" name="tanggal_reservasi" value={formData.tanggal_reservasi} onChange={handleDateChange} min={new Date().toISOString().split("T")[0]} disabled={!formData.dokter_id} className="w-full p-3 border border-gray-300 rounded-xl disabled:bg-gray-100" required />
-                     </div>
-                     <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Metode Penjaminan</label>
-                        <select name="penjaminan" value={formData.penjaminan} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-xl bg-white">
-                            <option value="cash">Umum / Cash</option>
-                            <option value="bpjs">BPJS Kesehatan</option>
-                            <option value="asuransi">Asuransi Swasta</option>
-                        </select>
-                     </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Rencana Tanggal
+                    </label>
+                    <input
+                      type="date"
+                      name="tanggal_reservasi"
+                      value={formData.tanggal_reservasi}
+                      onChange={handleDateChange}
+                      min={todayStr || undefined}
+                      disabled={!formData.dokter_id}
+                      className="w-full p-3 border border-gray-300 rounded-xl disabled:bg-gray-100"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Metode Penjaminan
+                    </label>
+                    <select
+                      name="penjaminan"
+                      value={formData.penjaminan}
+                      onChange={handleChange}
+                      className="w-full p-3 border border-gray-300 rounded-xl bg-white"
+                    >
+                      <option value="cash">Umum / Cash</option>
+                      <option value="bpjs">BPJS Kesehatan</option>
+                      <option value="asuransi">Asuransi Swasta</option>
+                    </select>
+                  </div>
                 </div>
-                {formData.penjaminan === 'asuransi' && (
-                    <div className="grid md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
-                        <InputField label="Nama Asuransi" name="nama_asuransi" value={formData.nama_asuransi} onChange={handleChange} required />
-                        <InputField label="Nomor Polis" name="nomor_asuransi" value={formData.nomor_asuransi} onChange={handleChange} required />
-                    </div>
+
+                {formData.penjaminan === "asuransi" && (
+                  <div className="grid md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
+                    <InputField
+                      label="Nama Asuransi"
+                      name="nama_asuransi"
+                      value={formData.nama_asuransi}
+                      onChange={handleChange}
+                      required
+                    />
+                    <InputField
+                      label="Nomor Polis"
+                      name="nomor_asuransi"
+                      value={formData.nomor_asuransi}
+                      onChange={handleChange}
+                      required
+                    />
+                  </div>
                 )}
               </div>
             )}
 
             {/* STEP 3 */}
             {currentStep === 3 && (
-                <div className="space-y-4 animate-fadeIn">
-                    <div className="bg-gray-50 p-6 rounded-xl space-y-3 border border-gray-200">
-                        <h3 className="font-bold text-[#003B73] border-b pb-2">Ringkasan Reservasi</h3>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                            <span className="text-gray-500">Pasien:</span><span className="font-bold">{formData.nama}</span>
-                            <span className="text-gray-500">Poli:</span><span className="font-bold">{polis.find(p=>p.poli_id == formData.poli_id)?.poli_name}</span>
-                            <span className="text-gray-500">Dokter:</span><span className="font-bold">{dokters.find(d=>d.dokter_id == formData.dokter_id)?.dokter?.nama_dokter}</span>
-                            <span className="text-gray-500">Tanggal:</span><span className="font-bold">{formData.tanggal_reservasi}</span>
-                            <span className="text-gray-500">Bayar:</span><span className="uppercase font-bold text-[#8CC63F]">{formData.penjaminan}</span>
-                        </div>
-                    </div>
+              <div className="space-y-4 animate-fadeIn">
+                <div className="bg-gray-50 p-6 rounded-xl space-y-3 border border-gray-200">
+                  <h3 className="font-bold text-[#003B73] border-b pb-2">
+                    Ringkasan Reservasi
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-500">Pasien:</span>
+                    <span className="font-bold">{formData.nama}</span>
+
+                    <span className="text-gray-500">Poli:</span>
+                    <span className="font-bold">
+                      {
+                        polis.find(
+                          (p) => String(p.poli_id) === String(formData.poli_id)
+                        )?.poli_name
+                      }
+                    </span>
+
+                    <span className="text-gray-500">Dokter:</span>
+                    <span className="font-bold">
+                      {
+                        dokters.find(
+                          (d) =>
+                            String(d.dokter_id) ===
+                            String(formData.dokter_id)
+                        )?.dokter?.nama_dokter
+                      }
+                    </span>
+
+                    <span className="text-gray-500">Tanggal:</span>
+                    <span className="font-bold">
+                      {formData.tanggal_reservasi}
+                    </span>
+
+                    <span className="text-gray-500">Bayar:</span>
+                    <span className="uppercase font-bold text-[#8CC63F]">
+                      {formData.penjaminan}
+                    </span>
+                  </div>
                 </div>
+              </div>
             )}
 
+            {/* BOTTOM ACTIONS */}
             <div className="mt-8 pt-6 border-t flex justify-between">
-                {currentStep > 1 && <button type="button" onClick={() => setCurrentStep(prev => prev - 1)} className="px-6 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition">Kembali</button>}
-                <div className="ml-auto">
-                    {currentStep < 3 ? (
-                        <button type="button" onClick={nextStep} className="bg-[#8CC63F] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#7ab332] transition flex items-center gap-2 shadow-lg shadow-green-100">Lanjut <ArrowRight size={18}/></button>
+              {currentStep > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep((prev) => prev - 1)}
+                  className="px-6 py-3 text-gray-500 font-bold hover:bg-gray-100 rounded-xl transition"
+                >
+                  Kembali
+                </button>
+              )}
+              <div className="ml-auto">
+                {currentStep < 3 ? (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className="bg-[#8CC63F] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#7ab332] transition flex items-center gap-2 shadow-lg shadow-green-100"
+                  >
+                    Lanjut <ArrowRight size={18} />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="bg-[#003B73] text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-900 transition flex items-center gap-2 shadow-lg shadow-blue-100 disabled:opacity-70"
+                  >
+                    {loading ? (
+                      <Loader2 className="animate-spin" />
                     ) : (
-                        <button type="submit" disabled={loading} className="bg-[#003B73] text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-900 transition flex items-center gap-2 shadow-lg shadow-blue-100">{loading ? <Loader2 className="animate-spin"/> : "Kirim Reservasi"}</button>
+                      "Kirim Reservasi"
                     )}
-                </div>
+                  </button>
+                )}
+              </div>
             </div>
           </form>
         </div>
       </div>
 
-      {/* --- MODAL SUKSES DENGAN HASIL AI BACKEND --- */}
+      {/* MODAL SUKSES */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center p-4 z-50 backdrop-blur-sm">
-            <div className="bg-white p-8 rounded-3xl max-w-sm w-full text-center animate-fadeIn shadow-2xl">
-                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600"><CheckCircle size={32}/></div>
-                <h3 className="text-xl font-bold text-[#003B73] mb-2">Reservasi Terkirim!</h3>
-                <p className="text-gray-500 text-sm mb-4">Reservasi Anda telah berhasil diproses.</p>
-                
-                {/* MENAMPILKAN HASIL AI DARI BACKEND */}
-                {aiResult && (
-                    <div className={`mb-6 p-4 rounded-xl text-left border ${aiResult.is_match ? 'bg-blue-50 border-blue-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                        <div className="flex items-center gap-2 mb-1 font-bold text-sm">
-                            <Lightbulb size={16} className={aiResult.is_match ? "text-blue-600" : "text-yellow-600"}/>
-                            <span className="text-gray-800">Analisa AI (Backend)</span>
-                        </div>
-                        <p className="text-xs text-gray-600">
-                            Berdasarkan keluhan Anda, sistem menyarankan: <br/>
-                            <span className="font-bold text-base block mt-1 text-[#003B73]">{aiResult.suggestion}</span>
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-2">
-                            {aiResult.is_match 
-                                ? "✅ Pilihan Poli Anda sudah sesuai." 
-                                : "⚠️ Pilihan Poli Anda berbeda dengan saran AI."}
-                        </p>
-                    </div>
-                )}
-
-                <button onClick={() => router.push("/user/dashboard")} className="w-full py-3 bg-[#003B73] text-white rounded-xl font-bold hover:bg-blue-900 transition">Ke Dashboard</button>
+          <div className="bg-white p-8 rounded-3xl max-w-sm w-full text-center animate-fadeIn shadow-2xl">
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 text-green-600">
+              <CheckCircle size={32} />
             </div>
+            <h3 className="text-xl font-bold text-[#003B73] mb-2">
+              Reservasi Terkirim!
+            </h3>
+            <p className="text-gray-500 text-sm mb-4">
+              Reservasi Anda telah berhasil diproses.
+            </p>
+
+            {aiResult && (
+              <div
+                className={`mb-6 p-4 rounded-xl text-left border ${
+                  aiResult.is_match
+                    ? "bg-blue-50 border-blue-200"
+                    : "bg-yellow-50 border-yellow-200"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1 font-bold text-sm">
+                  <Lightbulb
+                    size={16}
+                    className={
+                      aiResult.is_match ? "text-blue-600" : "text-yellow-600"
+                    }
+                  />
+                  <span className="text-gray-800">Analisa AI (Backend)</span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Berdasarkan keluhan Anda, sistem menyarankan:
+                  <span className="font-bold text-base block mt-1 text-[#003B73]">
+                    {aiResult.suggestion}
+                  </span>
+                </p>
+                <p className="text-[10px] text-gray-400 mt-2">
+                  {aiResult.is_match
+                    ? "✅ Pilihan Poli Anda sudah sesuai."
+                    : "⚠️ Pilihan Poli Anda berbeda dengan saran AI."}
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={() => router.push("/user/dashboard")}
+              className="w-full py-3 bg-[#003B73] text-white rounded-xl font-bold hover:bg-blue-900 transition"
+            >
+              Ke Dashboard
+            </button>
+          </div>
         </div>
       )}
     </div>

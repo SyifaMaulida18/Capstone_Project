@@ -1,240 +1,371 @@
 "use client";
 
-import { useState, useEffect } from "react"; // Impor useState dan useEffect
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
-  TrashIcon,
-  PencilIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  PlusIcon,
+  ArrowPathIcon,
+  PhoneArrowDownLeftIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
-import AdminLayout from "../../superadmin/components/superadmin_layout";
-import { Dialog } from "@/app/superadmin/components/ui/dialog"; // Asumsi path Dialog benar
-import { Input } from "@/app/superadmin/components/ui/input"; // Asumsi path Input benar
+import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 
-// --- DATA SIMULASI ---
-// (Di aplikasi nyata, Anda akan fetch data ini)
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
-const initialQueues = [
-  {
-    id: 1,
-    pasienId: 1, // Merujuk ke Ayu Gideon
-    dokterId: 1, // Merujuk ke Dr. Budi Santoso
-    namaPasien: "Ayu dan Gideon",
-    dokter: "Dr. Budi Santoso",
-    waktu: "08:30",
-    status: "Menunggu",
-  },
-  {
-    id: 2,
-    pasienId: 2, // Merujuk ke Syifa
-    dokterId: 2, // Merujuk ke Dr. Andi
-    namaPasien: "Syifa maulida",
-    dokter: "Dr. Andi Rahman",
-    waktu: "09:00",
-    status: "Dalam Pemeriksaan",
-  },
-  {
-    id: 3,
-    pasienId: 3, // Merujuk ke Sheva
-    dokterId: 3, // Merujuk ke Dr. Rina
-    namaPasien: "Sheva Rebecca",
-    dokter: "Dr. Rina Kartika",
-    waktu: "09:45",
-    status: "Selesai",
-  },
-];
+// Ubah kalau route halaman rekam medis kamu beda
+const MEDICAL_RECORDS_PATH = "/superadmin/rekam-medis";
 
-// Data master untuk dropdown
-const registeredPatients = [
-  { id: 1, nama: "Ayu Gideon" },
-  { id: 2, nama: "Syifa maulida" },
-  { id: 3, nama: "Sheva Rebecca" },
-  { id: 4, nama: "Saputra" },
-  { id: 5, nama: "Muhammad Ole" },
-];
+export default function AntrianDashboardPage() {
+  const [polis, setPolis] = useState([]);
+  const [selectedPoli, setSelectedPoli] = useState("");
+  const [tanggal, setTanggal] = useState(
+    new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+  );
 
-const registeredDoctors = [
-  { id: 1, nama: "Dr. Budi Santoso" },
-  { id: 2, nama: "Dr. Andi Rahman" },
-  { id: 3, nama: "Dr. Rina Kartika" },
-  { id: 4, nama: "Dr. Lisa Hermawan" },
-];
+  const [loading, setLoading] = useState(false);
+  const [loadingPoli, setLoadingPoli] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
-const statusOptions = ["Menunggu", "Dalam Pemeriksaan", "Selesai"];
+  const [sedangDipanggil, setSedangDipanggil] = useState(null);
+  const [sisaAntrian, setSisaAntrian] = useState(0);
+  const [daftarTunggu, setDaftarTunggu] = useState([]);
 
-// --- KOMPONEN UTAMA ---
-
-export default function QueueManagementPage() {
-  const [queues, setQueues] = useState(initialQueues);
-  const [search, setSearch] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingQueue, setEditingQueue] = useState(null); // null = Add, Object = Edit
-
-  // State untuk form di dalam dialog
-  const [formData, setFormData] = useState({
-    pasienId: "",
-    dokterId: "",
-    waktu: "",
-    status: "Menunggu", // Default status
-  });
-
-  // useEffect untuk mengisi form saat dialog dibuka
+  // === 1. AMBIL DATA POLI UNTUK DROPDOWN ===
   useEffect(() => {
-    if (isDialogOpen) {
-      if (editingQueue) {
-        // Mode Edit
-        setFormData({
-          pasienId: editingQueue.pasienId.toString(),
-          dokterId: editingQueue.dokterId.toString(),
-          waktu: editingQueue.waktu,
-          status: editingQueue.status,
+    const fetchPolis = async () => {
+      try {
+        setLoadingPoli(true);
+        const token = localStorage.getItem("token");
+
+        const res = await fetch(`${API_BASE}/polis`, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         });
-      } else {
-        // Mode Add
-        setFormData({
-          pasienId: registeredPatients[0]?.id.toString() || "",
-          dokterId: registeredDoctors[0]?.id.toString() || "",
-          waktu: "",
-          status: "Menunggu",
-        });
+
+        const json = await res.json();
+        const data = json.data || json;
+
+        setPolis(data);
+        if (data.length > 0) {
+          setSelectedPoli(data[0].poli_id.toString());
+        }
+      } catch (err) {
+        console.error("Gagal ambil poli:", err);
+        setErrorMsg("Gagal mengambil data poli.");
+      } finally {
+        setLoadingPoli(false);
       }
+    };
+
+    fetchPolis();
+  }, []);
+
+  // === 2. FUNGSI FETCH DASHBOARD ANTRIAN ===
+  const fetchDashboard = async () => {
+    if (!selectedPoli || !tanggal) return;
+    try {
+      setLoading(true);
+      setErrorMsg("");
+
+      const token = localStorage.getItem("token");
+
+      const url = `${API_BASE}/antrian/dashboard?poli_id=${encodeURIComponent(
+        selectedPoli
+      )}&tanggal=${encodeURIComponent(tanggal)}`;
+
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(
+          `Gagal mengambil data antrian (status ${res.status}): ${text}`
+        );
+      }
+
+      const json = await res.json();
+      const data = json.data || {};
+
+      setSedangDipanggil(data.sedang_dipanggil || null);
+      setSisaAntrian(data.sisa_antrian || 0);
+      setDaftarTunggu(data.daftar_tunggu || []);
+    } catch (err) {
+      console.error("Error fetch dashboard:", err);
+      setErrorMsg(
+        err.message || "Terjadi kesalahan saat mengambil data antrian."
+      );
+    } finally {
+      setLoading(false);
     }
-  }, [isDialogOpen, editingQueue]);
-
-  // --- HANDLERS ---
-
-  const handleOpenAddDialog = () => {
-    setEditingQueue(null);
-    setIsDialogOpen(true);
   };
 
-  const handleOpenEditDialog = (queue) => {
-    setEditingQueue(queue);
-    setIsDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setEditingQueue(null);
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm("Yakin ingin menghapus antrian ini?")) {
-      setQueues(queues.filter((q) => q.id !== id));
+  // Auto fetch ketika poli & tanggal sudah ready
+  useEffect(() => {
+    if (!loadingPoli && selectedPoli && tanggal) {
+      fetchDashboard();
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingPoli, selectedPoli, tanggal]);
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Ambil data nama dari master data berdasarkan ID
-    const selectedPatient = registeredPatients.find(
-      (p) => p.id.toString() === formData.pasienId
-    );
-    const selectedDoctor = registeredDoctors.find(
-      (d) => d.id.toString() === formData.dokterId
-    );
-
-    if (!selectedPatient || !selectedDoctor) {
-      alert("Pasien atau Dokter tidak valid.");
+  // === 3. PANGGIL BERIKUTNYA ===
+  const handlePanggilBerikutnya = async () => {
+    if (!selectedPoli) {
+      alert("Silakan pilih poli terlebih dahulu.");
       return;
     }
 
-    const queueData = {
-      ...formData,
-      pasienId: parseInt(formData.pasienId, 10),
-      dokterId: parseInt(formData.dokterId, 10),
-      namaPasien: selectedPatient.nama,
-      dokter: selectedDoctor.nama,
-    };
+    try {
+      setLoading(true);
+      setErrorMsg("");
 
-    if (editingQueue) {
-      // --- Logika UPDATE ---
-      setQueues(
-        queues.map((q) =>
-          q.id === editingQueue.id
-            ? { ...q, ...queueData, id: q.id } // Pastikan ID tetap
-            : q
-        )
-      );
-    } else {
-      // --- Logika ADD ---
-      setQueues([
-        ...queues,
-        { ...queueData, id: (queues.length + 1) * 100 }, // ID unik dummy
-      ]);
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/antrian/panggil-berikutnya`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          poli_id: selectedPoli,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Gagal memanggil antrian berikutnya.");
+      }
+
+      // Refresh dashboard setelah sukses
+      await fetchDashboard();
+
+      alert(json.message);
+    } catch (err) {
+      console.error("Error panggil berikutnya:", err);
+      alert(err.message || "Terjadi kesalahan saat memanggil antrian.");
+    } finally {
+      setLoading(false);
     }
-
-    handleCloseDialog();
   };
 
-  // --- Filtering Data ---
-  const filteredQueues = queues.filter(
-    (q) =>
-      q.namaPasien.toLowerCase().includes(search.toLowerCase()) ||
-      q.dokter.toLowerCase().includes(search.toLowerCase())
-  );
+  // === 3b. SELESAIKAN PANGGILAN SAAT INI ===
+  const handleSelesaikanPanggilan = async () => {
+    if (!sedangDipanggil) {
+      alert("Tidak ada antrian yang sedang dipanggil.");
+      return;
+    }
 
+    try {
+      setLoading(true);
+      setErrorMsg("");
+
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/antrian/selesaikan`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          antrian_id: sedangDipanggil.id, // id dari baris yang sedangDipanggil
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Gagal menyelesaikan panggilan.");
+      }
+
+      // Setelah selesai, refresh dashboard
+      await fetchDashboard();
+
+      alert(json.message || "Panggilan antrian telah diselesaikan.");
+    } catch (err) {
+      console.error("Error selesaikan panggilan:", err);
+      alert(err.message || "Terjadi kesalahan saat menyelesaikan panggilan.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // === 4. RENDER ===
   return (
     <AdminLayout>
       <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
-        <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
-          Manajemen Antrian
+        <h1 className="text-2xl font-bold text-center mb-6 text-neutral-800">
+          Dashboard Antrian Poli
         </h1>
 
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center space-x-3 ml-auto">
-            {/* Search Box */}
-            <div className="relative w-full max-w-xs">
-              <input
-                type="text"
-                placeholder="Cari pasien, dokter..."
-                className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-600" />
+        {/* FILTER POLI & TANGGAL */}
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-neutral-700 mb-1">
+                Poli
+              </label>
+              <select
+                value={selectedPoli}
+                onChange={(e) => setSelectedPoli(e.target.value)}
+                disabled={loadingPoli}
+                className="w-full md:w-64 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white"
+              >
+                {loadingPoli && <option>Memuat...</option>}
+                {!loadingPoli &&
+                  polis.map((p) => (
+                    <option key={p.poli_id} value={p.poli_id}>
+                      {p.poli_name}
+                    </option>
+                  ))}
+              </select>
             </div>
 
-            {/* Filter Button */}
-            <button className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold">
-              <FunnelIcon className="h-5 w-5 text-neutral-600" />
-              <span>Filter</span>
-            </button>
+            <div>
+              <label className="block text-sm font-semibold text-neutral-700 mb-1">
+                Tanggal Antrian
+              </label>
+              <input
+                type="date"
+                value={tanggal}
+                onChange={(e) => setTanggal(e.target.value)}
+                className="w-full md:w-48 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white"
+              />
+            </div>
+          </div>
 
-            {/* Add Button */}
+          <div className="flex gap-3">
             <button
-              onClick={handleOpenAddDialog} // --- UBAH DI SINI ---
-              className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
+              type="button"
+              onClick={fetchDashboard}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-200 text-neutral-700 hover:bg-neutral-100 text-sm font-semibold"
             >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add</span>
+              <ArrowPathIcon className="h-4 w-4" />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={handleSelesaikanPanggilan}
+              disabled={loading || !sedangDipanggil}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-semibold shadow-md disabled:opacity-60"
+            >
+              Selesaikan Panggilan
+            </button>
+            <button
+              type="button"
+              onClick={handlePanggilBerikutnya}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary-500 text-white hover:bg-secondary-600 text-sm font-semibold shadow-md"
+            >
+              <PhoneArrowDownLeftIcon className="h-4 w-4" />
+              Panggil Berikutnya
             </button>
           </div>
         </div>
 
-        {/* Tabel Data Antrian */}
+        {errorMsg && (
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* KARTU RINGKASAN */}
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <div className="p-4 rounded-xl border border-primary-100 bg-primary-50 flex items-center gap-3">
+            <div className="p-2 rounded-full bg-primary-600">
+              <UsersIcon className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-xs text-neutral-600">Sisa Antrian</p>
+              <p className="text-xl font-bold text-primary-700">
+                {sisaAntrian}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-amber-100 bg-amber-50">
+            <p className="text-xs text-neutral-600 mb-1">Sedang Dipanggil</p>
+            {sedangDipanggil ? (
+              <>
+                <p className="text-lg font-bold text-amber-700">
+                  {sedangDipanggil.nomor_antrian}
+                </p>
+                <p className="text-xs text-neutral-600 mt-1">
+                  Dipanggil pada:{" "}
+                  {sedangDipanggil.waktu_panggil
+                    ? new Date(
+                        sedangDipanggil.waktu_panggil
+                      ).toLocaleTimeString("id-ID", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "-"}
+                </p>
+
+                {/* 🔗 Tambah Rekam Medis: kirim reservasi + data pasien */}
+                {sedangDipanggil.reservation_id &&
+                  sedangDipanggil.reservation?.user && (
+                    <div className="mt-3">
+                      <Link
+                        href={`${MEDICAL_RECORDS_PATH}?reservasi_id=${
+                          sedangDipanggil.reservation_id
+                        }&patient_id=${
+                          sedangDipanggil.reservation.user.userid
+                        }&patient_name=${encodeURIComponent(
+                          sedangDipanggil.reservation.user.name || ""
+                        )}`}
+                        className="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
+                      >
+                        Tambah Rekam Medis
+                      </Link>
+                    </div>
+                  )}
+              </>
+            ) : (
+              <p className="text-sm text-neutral-500">
+                Belum ada antrian aktif
+              </p>
+            )}
+          </div>
+
+          <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50">
+            <p className="text-xs text-neutral-600 mb-1">Tanggal</p>
+            <p className="text-lg font-semibold text-neutral-800">
+              {new Date(tanggal).toLocaleDateString("id-ID", {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+        </div>
+
+        {/* TABEL DAFTAR TUNGGU */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-primary-600 rounded-t-lg">
+            <thead className="bg-primary-600">
               <tr>
                 {[
-                  "ID",
-                  "Nama Pasien",
-                  "Dokter",
-                  "Waktu",
+                  "No",
+                  "Nomor Antrian",
                   "Status",
-                  "Aksi",
+                  "Waktu Panggil",
+                  "Waktu Selesai",
                 ].map((header) => (
                   <th
                     key={header}
-                    className="px-6 py-3 text-left text-sm font-semibold text-white uppercase tracking-wider rounded-t-lg first:rounded-tl-lg last:rounded-tr-lg"
+                    className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider"
                   >
                     {header}
                   </th>
@@ -242,49 +373,58 @@ export default function QueueManagementPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-neutral-100">
-              {filteredQueues.map((queue, index) => (
-                <tr
-                  key={queue.id}
-                  className={index % 2 === 1 ? "bg-neutral-50" : "bg-white"}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-900">
-                    {queue.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {queue.namaPasien}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {queue.dokter}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-800">
-                    {queue.waktu}
-                  </td>
+              {daftarTunggu.length === 0 && (
+                <tr>
                   <td
-                    className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${
-                      queue.status === "Menunggu"
-                        ? "text-yellow-600"
-                        : queue.status === "Dalam Pemeriksaan"
-                        ? "text-blue-600"
-                        : "text-green-600"
-                    }`}
+                    colSpan={5}
+                    className="px-6 py-4 text-center text-sm text-neutral-500"
                   >
-                    {queue.status}
+                    Belum ada antrian untuk poli dan tanggal ini.
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={() => handleDelete(queue.id)} // --- UBAH DI SINI ---
-                        className="text-neutral-600 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenEditDialog(queue)} // --- UBAH DI SINI ---
-                        className="text-neutral-600 hover:text-primary-600 transition-colors p-1 rounded-md hover:bg-primary-50"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </button>
-                    </div>
+                </tr>
+              )}
+
+              {daftarTunggu.map((row, idx) => (
+                <tr
+                  key={row.id}
+                  className={idx % 2 === 1 ? "bg-neutral-50" : "bg-white"}
+                >
+                  <td className="px-6 py-3 text-sm text-neutral-800">
+                    {idx + 1}
+                  </td>
+                  <td className="px-6 py-3 text-sm font-semibold text-neutral-900">
+                    {row.nomor_antrian}
+                  </td>
+                  <td className="px-6 py-3 text-sm">
+                    <span
+                      className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                        row.status === "menunggu"
+                          ? "bg-yellow-50 text-yellow-700 border border-yellow-200"
+                          : row.status === "dipanggil"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : row.status === "selesai"
+                          ? "bg-green-50 text-green-700 border border-green-200"
+                          : "bg-neutral-50 text-neutral-700 border border-neutral-200"
+                      }`}
+                    >
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-sm text-neutral-800">
+                    {row.waktu_panggil
+                      ? new Date(row.waktu_panggil).toLocaleTimeString(
+                          "id-ID",
+                          { hour: "2-digit", minute: "2-digit" }
+                        )
+                      : "-"}
+                  </td>
+                  <td className="px-6 py-3 text-sm text-neutral-800">
+                    {row.waktu_selesai
+                      ? new Date(row.waktu_selesai).toLocaleTimeString(
+                          "id-ID",
+                          { hour: "2-digit", minute: "2-digit" }
+                        )
+                      : "-"}
                   </td>
                 </tr>
               ))}
@@ -292,101 +432,6 @@ export default function QueueManagementPage() {
           </table>
         </div>
       </div>
-
-      {/* --- DIALOG UNTUK ADD DAN EDIT --- */}
-      <Dialog show={isDialogOpen} onClose={handleCloseDialog}>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <h2 className="text-xl font-semibold text-neutral-700 mb-2">
-            {editingQueue ? "Edit Antrian" : "Tambah Antrian Baru"}
-          </h2>
-
-          <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Nama Pasien
-            </label>
-            <select
-              name="pasienId"
-              value={formData.pasienId}
-              onChange={handleFormChange}
-              required
-              className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            >
-              {registeredPatients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nama}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Dokter
-            </label>
-            <select
-              name="dokterId"
-              value={formData.dokterId}
-              onChange={handleFormChange}
-              required
-              className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            >
-              {registeredDoctors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.nama}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Waktu
-            </label>
-            <Input
-              type="time"
-              name="waktu"
-              value={formData.waktu}
-              onChange={handleFormChange}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Status
-            </label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleFormChange}
-              required
-              className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            >
-              {statusOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={handleCloseDialog}
-              className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg hover:bg-neutral-200 transition"
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              className="bg-secondary-500 text-white px-4 py-2 rounded-lg hover:bg-secondary-600 transition"
-            >
-              Simpan
-            </button>
-          </div>
-        </form>
-      </Dialog>
     </AdminLayout>
   );
 }

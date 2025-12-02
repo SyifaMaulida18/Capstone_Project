@@ -13,6 +13,7 @@ export default function AddRekamMedisPage() {
 
   const [reservations, setReservations] = useState([]);
   const [loadingReservasi, setLoadingReservasi] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const [form, setForm] = useState({
     reservasi_id: "",
@@ -23,21 +24,26 @@ export default function AddRekamMedisPage() {
     tanggal_diperiksa: "",
   });
 
-  // ✅ Ambil daftar reservasi berdasarkan user yang login
+  // ✅ Ambil daftar reservasi (misalnya hanya yang confirmed)
   useEffect(() => {
     const fetchReservasi = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const userId = localStorage.getItem("user_id");
+        setLoadingReservasi(true);
+        setErrorMsg("");
 
-        if (!token || !userId) {
-          console.error("Token atau user_id tidak ditemukan");
+        const token =
+          typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+        if (!token) {
+          setErrorMsg("Token tidak ditemukan, silakan login ulang.");
           setLoadingReservasi(false);
           return;
         }
 
+        // Sesuai ReservationController@index
+        // GET /reservations?status=confirmed
         const res = await fetch(
-          `${API_BASE}/reservasi?user_id=${userId}`,
+          `${API_BASE}/reservations?status=confirmed`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -48,15 +54,23 @@ export default function AddRekamMedisPage() {
 
         const json = await res.json();
 
-        if (!res.ok) {
+        if (!res.ok || json.success === false) {
           console.error("Gagal fetch reservasi:", json);
+          setErrorMsg(json.message || "Gagal mengambil data reservasi.");
           setLoadingReservasi(false);
           return;
         }
 
-        setReservations(json.data || json); // sesuaikan shape backend
+        // Laravel paginator -> json.data.data
+        const paginated = json.data;
+        const items = Array.isArray(paginated)
+          ? paginated
+          : paginated?.data || [];
+
+        setReservations(items);
       } catch (err) {
         console.error("Gagal fetch reservasi:", err);
+        setErrorMsg("Terjadi kesalahan saat mengambil data reservasi.");
       } finally {
         setLoadingReservasi(false);
       }
@@ -74,36 +88,40 @@ export default function AddRekamMedisPage() {
 
     try {
       const token = localStorage.getItem("token");
-      const userId = localStorage.getItem("user_id");
 
-      if (!token || !userId) {
-        alert("Token atau user tidak ditemukan");
+      if (!token) {
+        alert("Token tidak ditemukan, silakan login ulang.");
         return;
       }
 
-      // ✅ kalau backend perlu user_id di body, kita tambahkan di payload
+      // ✅ Payload sesuai RekamMedisController::store
       const payload = {
-        ...form,
-        user_id: userId,
+        reservasi_id: Number(form.reservasi_id),
+        no_medrec: form.no_medrec,
+        gejala: form.gejala || null,
+        diagnosis: form.diagnosis || null,
+        tindakan: form.tindakan || null,
+        resep_obat: null, // belum ada field di form, kirim null dulu
+        tanggal_diperiksa: form.tanggal_diperiksa,
       };
 
-      const res = await fetch(
-        `${API_BASE}/rekam-medis?user_id=${userId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${API_BASE}/rekam-medis`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
       const json = await res.json();
 
       if (!res.ok) {
         console.error("Gagal menyimpan rekam medis:", json);
-        alert("Gagal menyimpan rekam medis");
+        const msg =
+          json.message || "Gagal menyimpan rekam medis. Periksa input Anda.";
+        alert(msg);
         return;
       }
 
@@ -121,6 +139,10 @@ export default function AddRekamMedisPage() {
         <h1 className="text-2xl font-bold mb-6 text-neutral-800">
           Tambah Rekam Medis
         </h1>
+
+        {errorMsg && (
+          <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Reservasi */}
@@ -142,7 +164,12 @@ export default function AddRekamMedisPage() {
                 <option value="">Pilih reservasi</option>
                 {reservations.map((r) => (
                   <option key={r.reservid} value={r.reservid}>
-                    {r.reservid} - {r.kode_reservasi || r.status || "Reservasi"}
+                    {r.reservid} - {r.nama || r.status || "Reservasi"} -{" "}
+                    {r.tanggal_reservasi
+                      ? new Date(r.tanggal_reservasi).toLocaleDateString(
+                          "id-ID"
+                        )
+                      : ""}
                   </option>
                 ))}
               </select>
@@ -158,6 +185,7 @@ export default function AddRekamMedisPage() {
               value={form.no_medrec}
               onChange={handleChange("no_medrec")}
               required
+              placeholder="Contoh: RM-00001"
             />
           </div>
 
@@ -171,6 +199,7 @@ export default function AddRekamMedisPage() {
               onChange={handleChange("gejala")}
               rows={3}
               className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              placeholder="Keluhan / gejala utama pasien"
             />
           </div>
 
@@ -184,6 +213,7 @@ export default function AddRekamMedisPage() {
               onChange={handleChange("diagnosis")}
               rows={3}
               className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              placeholder="Diagnosis dokter"
             />
           </div>
 
@@ -197,6 +227,7 @@ export default function AddRekamMedisPage() {
               onChange={handleChange("tindakan")}
               rows={3}
               className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              placeholder="Tindakan medis yang dilakukan"
             />
           </div>
 
