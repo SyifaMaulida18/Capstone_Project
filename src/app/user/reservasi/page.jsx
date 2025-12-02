@@ -13,6 +13,7 @@ import {
   User,
   Clock,
   Lightbulb,
+  Users,
 } from "lucide-react";
 
 // --- Helper Input ---
@@ -25,6 +26,7 @@ function InputField({
   required,
   disabled,
   maxLength,
+  placeholder
 }) {
   return (
     <div>
@@ -39,6 +41,7 @@ function InputField({
         required={required}
         disabled={disabled}
         maxLength={maxLength}
+        placeholder={placeholder}
         className={`w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none ${
           disabled ? "bg-gray-100 text-gray-600 font-medium" : "bg-white"
         }`}
@@ -69,10 +72,14 @@ export default function ReservasiPage() {
   const [selectedDoctorSchedule, setSelectedDoctorSchedule] = useState(null);
   const [availableDaysText, setAvailableDaysText] = useState("");
 
-  // Data user
+  // Data user & Pasien
   const [isSelf, setIsSelf] = useState(true);
   const [localUserData, setLocalUserData] = useState(null);
   const [apiProfileData, setApiProfileData] = useState(null);
+  
+  // State untuk Dropdown Profil (Self, New, History)
+  const [selectedProfileId, setSelectedProfileId] = useState("self"); 
+  const [savedPatients, setSavedPatients] = useState([]); // Menyimpan list unik orang lain
 
   // Form
   const [formData, setFormData] = useState({
@@ -130,7 +137,7 @@ export default function ReservasiPage() {
     return textArr.length > 0 ? textArr.join(", ") : "Tidak ada jadwal praktek";
   };
 
-  // --- PREFILL DATA DIRI ---
+  // --- PREFILL DATA ---
   const fillSelfData = useCallback((user, profile) => {
     setFormData((prev) => ({
       ...prev,
@@ -148,9 +155,11 @@ export default function ReservasiPage() {
     }));
   }, []);
 
+  // PERBAIKAN: Reset semua field data diri secara eksplisit
   const clearPatientData = () => {
     setFormData((prev) => ({
       ...prev,
+      // Pertahankan poli/dokter/tanggal
       nama: "",
       email: "",
       nomor_whatsapp: "",
@@ -159,9 +168,29 @@ export default function ReservasiPage() {
       tanggal_lahir: "",
       jenis_kelamin: "Laki-laki",
       alamat: "",
+      penjaminan: "cash", // Reset penjaminan ke default
       nama_asuransi: "",
       nomor_asuransi: "",
     }));
+  };
+
+  // Mengisi form dengan data dari riwayat (orang lain)
+  const fillHistoryData = (patientData) => {
+    setFormData((prev) => ({
+        ...prev,
+        nama: patientData.nama || "",
+        email: patientData.email || "", 
+        nomor_whatsapp: patientData.nomor_whatsapp || "",
+        nomor_ktp: patientData.nomor_ktp || "",
+        tempat_lahir: patientData.tempat_lahir || "",
+        // Handle format tanggal (ambil YYYY-MM-DD saja)
+        tanggal_lahir: patientData.tanggal_lahir ? String(patientData.tanggal_lahir).split('T')[0] : "",
+        jenis_kelamin: patientData.jenis_kelamin || "Laki-laki",
+        alamat: patientData.alamat || "",
+        penjaminan: patientData.penjaminan || "cash",
+        nama_asuransi: patientData.nama_asuransi || "",
+        nomor_asuransi: patientData.nomor_asuransi || "",
+      }));
   };
 
   // --- FETCH DATA AWAL ---
@@ -173,11 +202,9 @@ export default function ReservasiPage() {
       setError("");
 
       try {
-        // Ambil daftar poli (public)
         const poliRes = await api.get("/polis");
         setPolis(poliRes.data?.data ?? poliRes.data ?? []);
 
-        // Ambil user dari localStorage
         const storedUserStr = typeof window !== "undefined"
           ? localStorage.getItem("user")
           : null;
@@ -188,16 +215,60 @@ export default function ReservasiPage() {
           setLocalUserData(storedUser);
         }
 
-        // Ambil profile via API
+        let currentProfile = null;
         try {
           const profileRes = await api.get("/profile");
-          const profileData = profileRes.data?.data ?? null;
-          setApiProfileData(profileData);
-          fillSelfData(storedUser, profileData);
+          currentProfile = profileRes.data?.data ?? null;
+          setApiProfileData(currentProfile);
+          // Default: Self
+          fillSelfData(storedUser, currentProfile);
         } catch (profileErr) {
-          console.warn("Profile belum lengkap:", profileErr);
+          console.warn("Profile belum lengkap/gagal load:", profileErr);
           fillSelfData(storedUser, null);
         }
+
+        // Ambil Riwayat
+        try {
+            const historyRes = await api.get("/my-reservations");
+            const historyData = historyRes.data?.data ?? historyRes.data ?? [];
+            
+            const uniquePatients = [];
+            const seenKTP = new Set();
+            
+            // Exclude KTP user login
+            if(currentProfile?.noKTP) {
+                seenKTP.add(currentProfile.noKTP);
+            }
+
+            historyData.forEach(res => {
+                // Pastikan bukan reservasi diri sendiri (is_self=1) dan punya KTP
+                if(res.nomor_ktp && res.is_self !== 1 && res.is_self !== "1" && res.is_self !== true) {
+                    if(!seenKTP.has(res.nomor_ktp)) {
+                        seenKTP.add(res.nomor_ktp);
+                        uniquePatients.push({
+                            nama: res.nama,
+                            nomor_ktp: res.nomor_ktp,
+                            email: res.email, 
+                            nomor_whatsapp: res.nomor_whatsapp,
+                            tempat_lahir: res.tempat_lahir,
+                            tanggal_lahir: res.tanggal_lahir,
+                            jenis_kelamin: res.jenis_kelamin,
+                            alamat: res.alamat,
+                            penjaminan: res.penjaminan,
+                            nama_asuransi: res.nama_asuransi,
+                            nomor_asuransi: res.nomor_asuransi,
+                            relation: res.status_keluarga || 'Keluarga/Kerabat' 
+                        });
+                    }
+                }
+            });
+
+            setSavedPatients(uniquePatients);
+
+        } catch (histErr) {
+            console.warn("Gagal ambil history reservasi:", histErr);
+        }
+
       } catch (err) {
         console.error("Gagal mengambil data awal:", err);
         setError("Gagal memuat data awal. Coba refresh halaman.");
@@ -209,50 +280,48 @@ export default function ReservasiPage() {
     fetchData();
   }, [fillSelfData]);
 
-  // --- FETCH DOKTER BY POLI (PUBLIC ENDPOINT) ---
+  // --- FETCH DOKTER ---
   const fetchDoctorsByPoli = useCallback(async (poliId) => {
     if (!poliId) {
       setDokters([]);
       return;
     }
-
     try {
       setError("");
       const res = await api.get(`/public/jadwal-dokter/${poliId}`);
-
-      // Backend getByPoli() sekarang return array langsung
       const list = Array.isArray(res.data)
         ? res.data
         : Array.isArray(res.data?.data)
         ? res.data.data
         : [];
-
       setDokters(list);
     } catch (err) {
-      console.error("Gagal ambil dokter:", {
-        poliId,
-        message: err.message,
-        status: err.response?.status,
-        response: err.response?.data,
-      });
+      console.error("Gagal ambil dokter:", err);
       setDokters([]);
-      setError(
-        "Gagal mengambil daftar dokter. Coba pilih poli lagi atau hubungi admin."
-      );
+      setError("Gagal mengambil daftar dokter.");
     }
   }, []);
 
-  // --- HANDLER FORM ---
-  const handlePatientTypeChange = (e) => {
-    const val = e.target.value === "self";
-    setIsSelf(val);
-    setError("");
+  // --- HANDLERS ---
+  const handleProfileChange = (e) => {
+      const val = e.target.value;
+      setSelectedProfileId(val);
+      setError("");
 
-    if (val) {
-      fillSelfData(localUserData, apiProfileData);
-    } else {
-      clearPatientData();
-    }
+      if (val === "self") {
+          setIsSelf(true);
+          fillSelfData(localUserData, apiProfileData);
+      } else if (val === "new") {
+          setIsSelf(false);
+          clearPatientData();
+      } else {
+          // History
+          setIsSelf(false);
+          const patientData = savedPatients[parseInt(val)];
+          if (patientData) {
+              fillHistoryData(patientData);
+          }
+      }
   };
 
   const handleChange = (e) => {
@@ -262,24 +331,20 @@ export default function ReservasiPage() {
 
   const handlePoliChange = async (e) => {
     const selectedPoliId = e.target.value;
-
     setFormData((prev) => ({
       ...prev,
       poli_id: selectedPoliId,
       dokter_id: "",
       tanggal_reservasi: "",
     }));
-
     setSelectedDoctorSchedule(null);
     setAvailableDaysText("");
     setError("");
-
     await fetchDoctorsByPoli(selectedPoliId);
   };
 
   const handleDokterChange = (e) => {
     const docId = e.target.value;
-
     setFormData((prev) => ({
       ...prev,
       dokter_id: docId,
@@ -349,7 +414,11 @@ export default function ReservasiPage() {
         }
       } else {
         if (!formData.nama || !formData.nomor_ktp) {
-          return setError("Data pasien wajib diisi lengkap.");
+          return setError("Nama dan Nomor KTP wajib diisi.");
+        }
+        // Validasi Email Wajib untuk orang lain (BE requirement)
+        if (!formData.email) {
+            return setError("Email wajib diisi untuk data pasien.");
         }
       }
     }
@@ -371,6 +440,9 @@ export default function ReservasiPage() {
     setError("");
     setAiResult(null);
 
+    // Pastikan isSelf konsisten dengan dropdown yang dipilih
+    const finalIsSelf = selectedProfileId === "self";
+
     const normalizePenjaminan = (val) => {
       if (val === "bpjs" || val === "BPJS") return "asuransi";
       if (val === "asuransi") return "asuransi";
@@ -379,8 +451,9 @@ export default function ReservasiPage() {
 
     const normalizedPenjaminan = normalizePenjaminan(formData.penjaminan);
 
+    // Construct Payload
     const payload = {
-      is_self: isSelf ? 1 : 0,
+      is_self: finalIsSelf ? 1 : 0, // Force 0 jika bukan "self"
       poli_id: formData.poli_id,
       tanggal_reservasi: formData.tanggal_reservasi,
       keluhan: formData.keluhan,
@@ -388,10 +461,10 @@ export default function ReservasiPage() {
       penanggung_jawab_id: null,
     };
 
-    if (!isSelf) {
+    if (!finalIsSelf) {
       Object.assign(payload, {
         nama: formData.nama,
-        email: formData.email || undefined,
+        email: formData.email, // Pastikan tidak undefined, validator BE butuh ini
         jenis_kelamin: formData.jenis_kelamin,
         tempat_lahir: formData.tempat_lahir,
         tanggal_lahir: formData.tanggal_lahir,
@@ -399,7 +472,7 @@ export default function ReservasiPage() {
         nomor_whatsapp: formData.nomor_whatsapp,
         penjaminan: normalizedPenjaminan,
         status_keluarga: "Lainnya",
-        alamat: formData.alamat,
+        alamat: formData.alamat || "-", // Beri default dash jika kosong agar tidak error
         nama_asuransi:
           normalizedPenjaminan === "asuransi"
             ? formData.nama_asuransi || "BPJS"
@@ -426,8 +499,11 @@ export default function ReservasiPage() {
         "Terjadi kesalahan saat membuat reservasi.";
 
       if (err.response?.data?.errors) {
-        const firstErr = Object.values(err.response.data.errors)[0][0];
-        setError(firstErr);
+        // Tampilkan detail error validasi backend jika ada
+        const errorList = err.response.data.errors;
+        const firstErrKey = Object.keys(errorList)[0];
+        const firstErr = errorList[firstErrKey][0];
+        setError(`${firstErrKey}: ${firstErr}`);
       } else {
         setError(msg);
       }
@@ -474,7 +550,6 @@ export default function ReservasiPage() {
     </div>
   );
 
-  // --- LOADING AWAL ---
   if (loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -483,7 +558,6 @@ export default function ReservasiPage() {
     );
   }
 
-  // --- MAIN UI ---
   return (
     <div className="min-h-screen bg-neutral-50 flex justify-center items-start py-8 md:py-12 px-4">
       <div className="w-full max-w-4xl bg-white shadow-xl rounded-3xl overflow-hidden border border-neutral-100">
@@ -519,34 +593,37 @@ export default function ReservasiPage() {
                   <label className="text-sm font-bold text-[#003B73] mb-3 flex items-center gap-2">
                     <User size={18} /> Reservasi Untuk Siapa?
                   </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="patient_type"
-                        value="self"
-                        checked={isSelf}
-                        onChange={handlePatientTypeChange}
-                        className="w-5 h-5 accent-[#003B73]"
-                      />
-                      <span className="font-medium text-gray-700">
-                        Diri Sendiri
-                      </span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="patient_type"
-                        value="other"
-                        checked={!isSelf}
-                        onChange={handlePatientTypeChange}
-                        className="w-5 h-5 accent-[#003B73]"
-                      />
-                      <span className="font-medium text-gray-700">
-                        Orang Lain / Keluarga
-                      </span>
-                    </label>
+                  
+                  <div className="relative">
+                      <select
+                        value={selectedProfileId}
+                        onChange={handleProfileChange}
+                        className="w-full p-3 pl-10 border border-blue-200 rounded-xl bg-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none font-medium text-gray-700"
+                      >
+                          <option value="self">Diri Sendiri ({localUserData?.name || "Saya"})</option>
+                          
+                          {savedPatients.length > 0 && (
+                            <optgroup label="Riwayat Keluarga / Orang Lain">
+                                {savedPatients.map((patient, idx) => (
+                                    <option key={idx} value={idx}>
+                                        {patient.nama} - {patient.nomor_ktp}
+                                    </option>
+                                ))}
+                            </optgroup>
+                          )}
+                          
+                          <option value="new">+ Input Orang Baru / Lainnya</option>
+                      </select>
+                      <Users className="absolute left-3 top-3.5 text-blue-500" size={18} />
                   </div>
+                  <p className="text-xs text-blue-600 mt-2 ml-1">
+                      {isSelf 
+                        ? "Data akan otomatis terisi dari profil akun Anda."
+                        : selectedProfileId === "new" 
+                            ? "Silakan isi data pasien baru secara manual."
+                            : "Data terisi otomatis dari riwayat reservasi sebelumnya."
+                      }
+                  </p>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
@@ -562,6 +639,7 @@ export default function ReservasiPage() {
                     label="Email"
                     name="email"
                     type="email"
+                    placeholder="email@contoh.com"
                     value={formData.email}
                     onChange={handleChange}
                     disabled={isSelf}
@@ -572,7 +650,7 @@ export default function ReservasiPage() {
                     name="nomor_ktp"
                     value={formData.nomor_ktp}
                     onChange={handleChange}
-                    disabled={isSelf}
+                    disabled={isSelf} 
                     required
                     maxLength={16}
                   />

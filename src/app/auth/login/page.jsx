@@ -170,9 +170,9 @@ export default function LoginPage() {
             onEndIconClick={() => setShowPassword(!showPassword)} 
           />
 
-          <div className="flex justify-end">
+          {/* <div className="flex justify-end">
             <a href="/auth/forgot-password" className="text-xs text-primary-600 hover:text-primary-800 font-medium">Lupa Kata Sandi?</a>
-          </div>
+          </div> */}
 
           {errorMsg && (
             <p className="text-red-600 text-sm text-center bg-red-50 p-2 rounded animate-pulse border border-red-200">{errorMsg}</p>

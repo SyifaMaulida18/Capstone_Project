@@ -208,7 +208,7 @@ export default function Home() {
                   ))}
                </ul>
 
-               <a href="/auth/reservasi" className="inline-flex items-center gap-2 bg-[#8CC63F] hover:bg-[#7ab332] text-white font-bold py-4 px-8 rounded-xl transition-colors shadow-lg shadow-lime-200/50">
+               <a href="/auth/login" className="inline-flex items-center gap-2 bg-[#8CC63F] hover:bg-[#7ab332] text-white font-bold py-4 px-8 rounded-xl transition-colors shadow-lg shadow-lime-200/50">
                   Buat Reservasi Sekarang <ArrowRight className="w-5 h-5" />
                </a>
             </div>

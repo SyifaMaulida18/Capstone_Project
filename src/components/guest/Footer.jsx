@@ -1,86 +1,120 @@
-// Komponen Footer yang bisa dipakai di banyak halaman
+"use client";
+
+import { Facebook, Instagram, Twitter, Mail, Phone, MapPin } from "lucide-react";
+import Link from "next/link"; // Menggunakan Link dari Next.js untuk navigasi yang lebih baik
 
 export default function Footer() {
   return (
-    // UBAH: Menggunakan 'neutral-900' untuk background
-    <footer className="bg-neutral-900 text-white px-6 py-16 grid md:grid-cols-4 gap-8">
+    <footer className="bg-neutral-900 text-white px-6 py-16 grid md:grid-cols-4 gap-8 font-sans">
+      
+      {/* Kolom 1: Brand & Deskripsi */}
       <div className="col-span-full md:col-span-1">
-        {/* UBAH: Menggunakan 'primary-500' sebagai warna aksen brand */}
-        <h3 className="text-2xl font-bold mb-4 text-primary-500">
-          Reservasi Medis
+        <h3 className="text-2xl font-bold mb-4 text-[#8CC63F]">
+          RSPB Online
         </h3>
-        {/* UBAH: Menggunakan 'neutral-200' untuk teks terang (light) */}
-        <p className="text-sm text-neutral-200">
-          Sistem Reservasi Online digunakan untuk pendaftaran rawat jalan. Untuk
-          keadaan darurat, segera hubungi UGD terdekat.
+        <p className="text-sm text-neutral-300 leading-relaxed">
+          Sistem Reservasi Online Rumah Sakit Pertamina Balikpapan. 
+          Memberikan kemudahan akses layanan kesehatan prioritas untuk Anda dan keluarga.
         </p>
+        
+        {/* Sosmed Icons */}
+        <div className="flex gap-4 mt-6">
+            <a href="#" className="text-neutral-400 hover:text-[#8CC63F] transition"><Instagram size={20}/></a>
+            <a href="#" className="text-neutral-400 hover:text-[#8CC63F] transition"><Facebook size={20}/></a>
+            <a href="#" className="text-neutral-400 hover:text-[#8CC63F] transition"><Twitter size={20}/></a>
+        </div>
       </div>
+
+      {/* Kolom 2: Navigasi */}
       <div>
-        {/* UBAH: Menggunakan 'neutral-200' untuk judul */}
-        <h3 className="font-bold mb-4 text-neutral-200">Navigasi</h3>
-        {/* UBAH: Menggunakan 'neutral-200' dan 'hover:text-primary-500' */}
-        <ul className="space-y-2 text-sm text-neutral-200">
+        <h3 className="font-bold mb-4 text-white">Navigasi</h3>
+        <ul className="space-y-3 text-sm text-neutral-300">
           <li>
-            <a href="/" className="hover:text-primary-500 transition-colors">
+            {/* Menggunakan "/" agar selalu kembali ke home dari halaman manapun */}
+            <Link 
+                href="/" 
+                className="hover:text-[#8CC63F] transition-colors flex items-center gap-2"
+            >
               Beranda
-            </a>
+            </Link>
           </li>
           <li>
-            <a
-              href="/about"
-              className="hover:text-primary-500 transition-colors"
+            <Link 
+                href="/#jadwal-dokter" 
+                className="hover:text-[#8CC63F] transition-colors flex items-center gap-2"
+            >
+              Cek Jadwal Dokter
+            </Link>
+          </li>
+          <li>
+            {/* UPDATE: Mengarah ke halaman terpisah */}
+            <Link 
+                href="/guest/tentang" 
+                className="hover:text-[#8CC63F] transition-colors flex items-center gap-2"
             >
               Tentang Kami
-            </a>
+            </Link>
           </li>
           <li>
-            <a
-              href="/reservasi"
-              className="hover:text-primary-500 transition-colors"
+            <Link 
+                href="/#fasilitas" 
+                className="hover:text-[#8CC63F] transition-colors flex items-center gap-2"
             >
-              Mulai Reservasi
-            </a>
+              Fasilitas
+            </Link>
           </li>
         </ul>
       </div>
+
+      {/* Kolom 3: Layanan Pasien */}
       <div>
-        {/* UBAH: Menggunakan 'neutral-200' */}
-        <h3 className="font-bold mb-4 text-neutral-200">Dukungan</h3>
-        {/* UBAH: Menggunakan 'neutral-200' dan 'hover:text-primary-500' */}
-        <ul className="space-y-2 text-sm text-neutral-200">
+        <h3 className="font-bold mb-4 text-white">Layanan Pasien</h3>
+        <ul className="space-y-3 text-sm text-neutral-300">
           <li>
-            <a href="/faq" className="hover:text-primary-500 transition-colors">
-              FAQ
-            </a>
+            <Link href="/auth/login" className="hover:text-[#8CC63F] transition-colors">
+              Masuk / Login
+            </Link>
           </li>
           <li>
-            <a
-              href="/chat-admin"
-              className="hover:text-primary-500 transition-colors"
-            >
-              Chat dengan Admin
+            <Link href="/auth/register" className="hover:text-[#8CC63F] transition-colors">
+              Daftar Akun Baru
+            </Link>
+          </li>
+          <li>
+            <Link href="/auth/login" className="hover:text-[#8CC63F] transition-colors">
+              Buat Reservasi
+            </Link>
+          </li>
+          <li>
+            <a href="#" className="hover:text-[#8CC63F] transition-colors">
+              Layanan Darurat (UGD)
             </a>
           </li>
         </ul>
       </div>
+
+      {/* Kolom 4: Kontak */}
       <div>
-        {/* UBAH: Menggunakan 'neutral-200' */}
-        <h3 className="font-bold mb-4 text-neutral-200">Kontak Kami</h3>
-        {/* UBAH: Menggunakan 'neutral-200' */}
-        <ul className="space-y-2 text-sm text-neutral-200">
-          <li>
-            <span className="font-semibold text-neutral-200">Telepon:</span>{" "}
-            (1234) 678910
+        <h3 className="font-bold mb-4 text-white">Hubungi Kami</h3>
+        <ul className="space-y-4 text-sm text-neutral-300">
+          <li className="flex items-start gap-3">
+            <MapPin className="w-5 h-5 text-[#8CC63F] shrink-0" />
+            <span>Jl. Jenderal Sudirman No.1, Balikpapan, Kalimantan Timur</span>
           </li>
-          <li>
-            <span className="font-semibold text-neutral-200">Email:</span>{" "}
-            info@rsbp.com
+          <li className="flex items-center gap-3">
+            <Phone className="w-5 h-5 text-[#8CC63F] shrink-0" />
+            <span>150-442 (Call Center)</span>
+          </li>
+          <li className="flex items-center gap-3">
+            <Mail className="w-5 h-5 text-[#8CC63F] shrink-0" />
+            <span>info@rsbp.com</span>
           </li>
         </ul>
       </div>
-      {/* UBAH: Menggunakan 'neutral-700' dan 'neutral-600' */}
-      <div className="col-span-full border-t border-neutral-700 mt-8 pt-8 text-center text-sm text-neutral-600">
-        © 2024 Reservasi Medis. Semua Hak Cipta Dilindungi.
+
+      {/* Copyright */}
+      <div className="col-span-full border-t border-neutral-800 mt-8 pt-8 text-center text-sm text-neutral-500">
+        © {new Date().getFullYear()} Rumah Sakit Pertamina Balikpapan. Semua Hak Cipta Dilindungi.
       </div>
     </footer>
   );
