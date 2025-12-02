@@ -7,7 +7,8 @@ import {
   FileText,
   History,
   MessageSquare,
-  Users
+  Users,
+  CheckCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -18,7 +19,7 @@ import Header from "../../../components/user/Header";
 import Navbar from "../../../components/user/Navbar";
 import StatusAntrian from "../../../components/user/StatusAntrian";
 
-// Format tanggal
+// Format tanggal helper
 const formatDateLong = (dateInput) => {
   if (!dateInput) return "-";
   const date = new Date(dateInput);
@@ -47,9 +48,6 @@ const StatBox = ({ number, label, isActive = false }) => (
 /* ============================================================
    COMPONENT: UpcomingReservationCard
 ============================================================ */
-/* ============================================================
-   COMPONENT: UpcomingReservationCard
-============================================================ */
 const UpcomingReservationCard = ({
   appointment,
   antrianData,
@@ -64,7 +62,6 @@ const UpcomingReservationCard = ({
     );
   }
 
-  // Jika appointment null (karena belum ada atau sudah selesai), tampilkan default
   if (!appointment) {
     return (
       <div className="bg-white p-6 rounded-3xl shadow-lg text-center py-8">
@@ -73,11 +70,11 @@ const UpcomingReservationCard = ({
         </div>
         <h3 className="font-bold text-neutral-800 text-lg">Belum Ada Jadwal</h3>
         <p className="text-sm text-neutral-500 mb-4 px-6">
-          Anda tidak memiliki reservasi aktif saat ini.
+          Tidak ada reservasi aktif atau antrian yang sedang berjalan.
         </p>
         <a
           href="/user/reservasi"
-          className="inline-block px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold"
+          className="inline-block px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition"
         >
           Buat Reservasi Baru
         </a>
@@ -86,23 +83,20 @@ const UpcomingReservationCard = ({
   }
 
   const isConfirmed = appointment.status === "confirmed";
-
-  // Cek apakah antrian ini sedang dipanggil
-  // Kita cek id reservasi user dengan id reservasi yang ada di objek 'sedang_dipanggil'
-  const isDipanggil = 
-    isConfirmed && 
+  
+  // Cek apakah sedang dipanggil (Realtime logic)
+  const isDipanggil =
+    isConfirmed &&
     antrianData?.sedang_dipanggil?.reservation_id === appointment.reservid;
 
   return (
-    <div 
+    <div
       className={`p-6 rounded-3xl shadow-xl border relative overflow-hidden transition-all duration-500 ${
-        isDipanggil 
-          ? "bg-green-600 text-white border-green-500 ring-4 ring-green-200" // Style saat Dipanggil
-          : "bg-white text-neutral-800 border-neutral-100" // Style Normal
+        isDipanggil
+          ? "bg-green-600 text-white border-green-500 ring-4 ring-green-200"
+          : "bg-white text-neutral-800 border-neutral-100"
       }`}
     >
-      
-      {/* Efek visual tambahan jika Dipanggil */}
       {isDipanggil && (
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full animate-ping" />
       )}
@@ -110,10 +104,18 @@ const UpcomingReservationCard = ({
       {/* Header */}
       <div className="flex justify-between items-start mb-6 relative z-10">
         <div>
-          <h3 className={`text-lg font-bold ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
+          <h3
+            className={`text-lg font-bold ${
+              isDipanggil ? "text-white" : "text-neutral-800"
+            }`}
+          >
             {isDipanggil ? "GILIRAN ANDA!" : "Reservasi Mendatang"}
           </h3>
-          <p className={`text-xs flex items-center gap-1 ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
+          <p
+            className={`text-xs flex items-center gap-1 ${
+              isDipanggil ? "text-green-100" : "text-neutral-500"
+            }`}
+          >
             <Clock size={12} /> {formatDateLong(appointment.tanggal_reservasi)}
           </p>
         </div>
@@ -121,33 +123,45 @@ const UpcomingReservationCard = ({
         <span
           className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm ${
             isDipanggil
-                ? "bg-white text-green-700 animate-bounce"
-                : isConfirmed
-                    ? "bg-green-100 text-green-700"
-                    : "bg-yellow-100 text-yellow-700"
+              ? "bg-white text-green-700 animate-bounce"
+              : isConfirmed
+              ? "bg-green-100 text-green-700"
+              : "bg-yellow-100 text-yellow-700"
           }`}
         >
-          {isDipanggil 
-            ? "SEGERA MASUK" 
-            : isConfirmed 
-                ? "Terkonfirmasi" 
-                : "Menunggu Verifikasi"}
+          {isDipanggil
+            ? "SEGERA MASUK"
+            : isConfirmed
+            ? "Terkonfirmasi"
+            : "Menunggu Verifikasi"}
         </span>
       </div>
 
       {/* Poli & Dokter */}
       <div className="flex items-center space-x-4 mb-6 relative z-10">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${
-            isDipanggil ? "bg-white/20 text-white" : "bg-blue-100 text-blue-600"
-        }`}>
+        <div
+          className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${
+            isDipanggil
+              ? "bg-white/20 text-white"
+              : "bg-blue-100 text-blue-600"
+          }`}
+        >
           <FileText className="w-6 h-6" />
         </div>
 
         <div>
-          <p className={`font-bold text-lg ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
+          <p
+            className={`font-bold text-lg ${
+              isDipanggil ? "text-white" : "text-neutral-800"
+            }`}
+          >
             {appointment.poli?.poli_name}
           </p>
-          <p className={`text-sm ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
+          <p
+            className={`text-sm ${
+              isDipanggil ? "text-green-100" : "text-neutral-500"
+            }`}
+          >
             {appointment.dokter?.nama_dokter || "-"}
           </p>
         </div>
@@ -156,33 +170,48 @@ const UpcomingReservationCard = ({
       {/* Informasi Nomor Antrian (Hanya jika confirmed) */}
       {isConfirmed && (
         <>
-          <div className={`rounded-2xl p-5 border mb-5 relative z-10 ${
-             isDipanggil ? "bg-white/10 border-white/20 text-white" : "bg-neutral-50 border-neutral-200"
-          }`}>
-            <span className={`text-xs ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
-                Nomor Antrian Anda
+          <div
+            className={`rounded-2xl p-5 border mb-5 relative z-10 ${
+              isDipanggil
+                ? "bg-white/10 border-white/20 text-white"
+                : "bg-neutral-50 border-neutral-200"
+            }`}
+          >
+            <span
+              className={`text-xs ${
+                isDipanggil ? "text-green-100" : "text-neutral-500"
+              }`}
+            >
+              Nomor Antrian Anda
             </span>
-            <div className={`text-4xl font-black ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
-              {appointment.nomor_antrian.split("-").pop()}
+            <div
+              className={`text-4xl font-black ${
+                isDipanggil ? "text-white" : "text-neutral-800"
+              }`}
+            >
+              {appointment.nomor_antrian?.split("-").pop() || "?"}
             </div>
-            <div className={`text-xs mt-1 ${isDipanggil ? "text-green-100" : "text-neutral-400"}`}>
+            <div
+              className={`text-xs mt-1 ${
+                isDipanggil ? "text-green-100" : "text-neutral-400"
+              }`}
+            >
               ({appointment.nomor_antrian})
             </div>
-            
+
             {isDipanggil && (
-                <div className="mt-2 text-sm font-semibold bg-white text-green-700 py-1 px-3 rounded-lg inline-block">
-                    Silakan Masuk ke Ruangan
-                </div>
+              <div className="mt-2 text-sm font-semibold bg-white text-green-700 py-1 px-3 rounded-lg inline-block">
+                Silakan Masuk ke Ruangan
+              </div>
             )}
           </div>
 
-          {/* Button lihat antrian */}
           <button
             onClick={onViewQueue}
             className={`w-full py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors ${
-                isDipanggil 
-                    ? "bg-white text-green-700 hover:bg-green-50" 
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+              isDipanggil
+                ? "bg-white text-green-700 hover:bg-green-50"
+                : "bg-blue-600 text-white hover:bg-blue-700"
             }`}
           >
             <Users size={18} />
@@ -242,86 +271,110 @@ export default function DashboardPage() {
 
     const fetchData = async () => {
       try {
-        // 2. Ambil semua reservasi user
-const res = await api.get("/my-reservations");
-const reservations = res.data;
+        const res = await api.get("/my-reservations");
+        const reservations = res.data;
 
-// Buat object Date untuk hari ini jam 00:00:00
-const todayStart = new Date();
-todayStart.setHours(0, 0, 0, 0);
+        // Reset waktu hari ini ke 00:00:00 untuk perbandingan tanggal yang akurat
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayStr = new Date().toISOString().split("T")[0];
 
-// Filter list
-const activeList = reservations
-  .filter((r) => {
-    // 1. Cek Status
-    const isStatusActive = ["pending", "confirmed"].includes(r.status);
-    
-    // 2. Cek Tanggal (Harus Hari Ini atau Masa Depan)
-    const rDate = new Date(r.tanggal_reservasi);
-    // Kita set jam rDate ke 00:00:00 juga untuk perbandingan apple-to-apple
-    rDate.setHours(0,0,0,0); 
-    
-    const isFutureOrToday = rDate >= todayStart;
+        // 1. Filter awal: Hanya Pending/Confirmed & Tanggal >= Hari ini
+        const potentialList = reservations
+          .filter((r) => {
+            const isStatusActive = ["pending", "confirmed"].includes(r.status);
+            const rDate = new Date(r.tanggal_reservasi);
+            rDate.setHours(0, 0, 0, 0);
+            return isStatusActive && rDate >= todayStart;
+          })
+          .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
 
-    return isStatusActive && isFutureOrToday;
-  })
-  .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
+        let finalAppointment = null;
+        let finalQueueData = null;
 
-let candidate = activeList[0] || null;
-let queueData = null;
+        // 2. LOOPING CERDAS UNTUK MENENTUKAN STATUS SEBENARNYA
+        for (const candidate of potentialList) {
+          
+          // CASE A: Status Pending
+          // Pasti valid ditampilkan karena belum ada proses antrian
+          if (candidate.status === "pending") {
+            finalAppointment = candidate;
+            break; // Stop loop, ketemu.
+          }
 
-if (candidate && candidate.status === "confirmed") {
-    // ... Logika cek antrian hari ini (sama seperti kode Anda) ...
-    // Anda TIDAK PERLU lagi blok 'else if' untuk cek masa lalu di sini
-    // karena sudah difilter di atas.
-    
-    const todayStr = new Date().toISOString().split('T')[0];
-    const candidateDate = new Date(candidate.tanggal_reservasi).toISOString().split('T')[0];
+          // CASE B: Status Confirmed
+          if (candidate.status === "confirmed") {
+            const candidateDateStr = new Date(candidate.tanggal_reservasi)
+              .toISOString()
+              .split("T")[0];
 
-          // Hanya cek ke API antrian jika tanggalnya HARI INI
-          // Karena antrian hanya berlaku hari H
-          if (candidateDate === todayStr) {
-             const antrianRes = await api.get("/antrian/dashboard", {
-                params: {
-                  poli_id: candidate.poli_id,
-                  tanggal: candidate.tanggal_reservasi,
-                },
-              });
+            // B.1: Masa Depan (Besok dst) -> Valid ditampilkan
+            if (candidateDateStr > todayStr) {
+              finalAppointment = candidate;
+              break; 
+            }
 
-              if (antrianRes.data.success) {
-                queueData = antrianRes.data.data;
-                
-                // Cek apakah user ada di 'sedang_dipanggil'
-                const isDipanggil = queueData.sedang_dipanggil?.reservation_id === candidate.reservid;
-                
-                // Cek apakah user ada di 'daftar_tunggu'
-                const isMenunggu = queueData.daftar_tunggu?.some(
+            // B.2: Hari Ini -> Cek status antrian
+            if (candidateDateStr === todayStr) {
+              try {
+                // Panggil API Antrian untuk poli & tanggal ini
+                const antrianRes = await api.get("/antrian/dashboard", {
+                  params: {
+                    poli_id: candidate.poli_id,
+                    tanggal: candidate.tanggal_reservasi,
+                  },
+                });
+
+                if (antrianRes.data.success) {
+                  const qData = antrianRes.data.data;
+
+                  // Cek apakah reservasi ini ada di list "Sedang Dipanggil" atau "Daftar Tunggu"
+                  // BE AntrianController hanya mengembalikan status 'menunggu' dan 'dipanggil'
+                  const isDipanggil = qData.sedang_dipanggil?.reservation_id === candidate.reservid;
+                  const isMenunggu = qData.daftar_tunggu?.some(
                     (item) => item.reservation_id === candidate.reservid
-                );
+                  );
 
-                // --- INTI LOGIKA ---
-                // Jika status CONFIRMED, tanggal HARI INI, tapi TIDAK DIPANGGIL dan TIDAK MENUNGGU
-                // Berarti API tidak mengembalikan data antrian user ini (karena difilter BE sebagai 'selesai')
-                // Maka: Kita anggap selesai, dan HILANGKAN dari tampilan dashboard.
-                if (!isDipanggil && !isMenunggu) {
-                    candidate = null; 
+                  if (isDipanggil || isMenunggu) {
+                    // MASIH AKTIF -> Tampilkan
+                    finalAppointment = candidate;
+                    finalQueueData = qData;
+                    break;
+                  } else {
+                    // TIDAK ADA DI LIST -> Berarti sudah 'selesai' atau 'dilewati'
+                    // SKIP candidate ini, jangan ditampilkan di dashboard "Mendatang"
+                    // Loop akan lanjut ke item berikutnya (misal reservasi pending besok)
+                    continue; 
+                  }
                 }
+              } catch (err) {
+                console.error("Gagal validasi antrian hari ini:", err);
+                // Fallback: Jika API error, tampilkan saja daripada hilang
+                finalAppointment = candidate;
+                break;
               }
-          } else if (new Date(candidate.tanggal_reservasi) < new Date().setHours(0,0,0,0)) {
-              // Jika tanggal sudah lewat tapi status masih confirmed (belum di-cancel/selesai secara manual)
-              // Kita anggap selesai juga agar tidak mengganggu dashboard
-              candidate = null;
+            }
           }
         }
 
-        setNextAppointment(candidate);
-        setAntrianInfo(queueData);
+        setNextAppointment(finalAppointment);
+        setAntrianInfo(finalQueueData);
 
         // --- Update Stats ---
-        // Hitung manual berdasarkan data mentah
+        // Total Kunjungan: Reservasi Confirmed yang sudah lewat (tanggal < hari ini)
+        // ATAU reservasi hari ini yang sudah tidak aktif (tidak terpilih jadi finalAppointment)
+        const pastConfirmed = reservations.filter((r) => {
+            const rDate = new Date(r.tanggal_reservasi);
+            rDate.setHours(0, 0, 0, 0);
+            
+            // Logic kasar: Confirmed dan tanggal <= hari ini
+            return r.status === 'confirmed' && rDate <= todayStart;
+        });
+
+        // Agar angka 'Reservasi Aktif' konsisten dengan card
         setStats({
-          active: candidate ? 1 : 0, // Jika ada candidate tampil, hitung 1
-          visits: reservations.filter((r) => r.status === 'confirmed').length,
+          active: finalAppointment ? 1 : 0, 
+          visits: pastConfirmed.length, // Bisa disesuaikan lagi logikanya
           messages: 0,
         });
 
@@ -338,7 +391,7 @@ if (candidate && candidate.status === "confirmed") {
   /* ============================================================
      VIEW ANTRIAN MODE
   ============================================================ */
-if (showAntrian && nextAppointment) {
+  if (showAntrian && nextAppointment) {
     return (
       <StatusAntrian
         onBack={() => setShowAntrian(false)}
@@ -373,7 +426,6 @@ if (showAntrian && nextAppointment) {
         </div>
 
         <div className="px-6 -mt-20 space-y-6">
-          {/* Panggil Card yang sudah diupdate */}
           <UpcomingReservationCard
             appointment={nextAppointment}
             loading={loading}

@@ -17,8 +17,9 @@ const MEDICAL_RECORDS_PATH = "/admin/rekam-medis";
 export default function AntrianDashboardPage() {
   const [polis, setPolis] = useState([]);
   const [selectedPoli, setSelectedPoli] = useState("");
+  // Inisialisasi tanggal hari ini (Format YYYY-MM-DD)
   const [tanggal, setTanggal] = useState(
-    new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    new Date().toISOString().slice(0, 10)
   );
 
   const [loading, setLoading] = useState(false);
@@ -118,6 +119,10 @@ export default function AntrianDashboardPage() {
       alert("Silakan pilih poli terlebih dahulu.");
       return;
     }
+    if (!tanggal) {
+      alert("Tanggal tidak boleh kosong.");
+      return;
+    }
 
     try {
       setLoading(true);
@@ -132,9 +137,10 @@ export default function AntrianDashboardPage() {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
         },
+        // PERBAIKAN: Pastikan 'tanggal' dikirim dalam body
         body: JSON.stringify({
           poli_id: selectedPoli,
-          tanggal, // ✅ kirim tanggal yang sama dengan dashboard
+          tanggal: tanggal, 
         }),
       });
 
@@ -146,7 +152,11 @@ export default function AntrianDashboardPage() {
       }
 
       if (!res.ok || !json.success) {
-        throw new Error(json.message || "Gagal memanggil antrian berikutnya.");
+        // Cek jika error validasi tanggal muncul spesifik
+        const serverError = json.errors?.tanggal 
+            ? `Error Tanggal: ${json.errors.tanggal[0]}` 
+            : json.message || "Gagal memanggil antrian berikutnya.";
+        throw new Error(serverError);
       }
 
       await fetchDashboard();
@@ -172,7 +182,8 @@ export default function AntrianDashboardPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/antrian/selesaikan`, {
+      // Perbaikan Endpoint: Sesuaikan dengan Backend
+      const res = await fetch(`${API_BASE}/antrian/selesai-dipanggil`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -180,9 +191,8 @@ export default function AntrianDashboardPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          // kirim nomor_antrian (dan antrian_id kalau backend butuh)
-          nomor_antrian: sedangDipanggil.nomor_antrian,
-          antrian_id: sedangDipanggil.id ?? sedangDipanggil.antrian_id,
+          // Kirim ID antrian sesuai validasi backend 'antrian_id'
+          antrian_id: sedangDipanggil.id, 
         }),
       });
 
@@ -191,7 +201,6 @@ export default function AntrianDashboardPage() {
       if (!res.ok || !json.success) {
         const msgFromValidation =
           json?.errors?.antrian_id?.[0] ||
-          json?.errors?.nomor_antrian?.[0] ||
           json.message;
 
         throw new Error(msgFromValidation || "Gagal menyelesaikan panggilan.");

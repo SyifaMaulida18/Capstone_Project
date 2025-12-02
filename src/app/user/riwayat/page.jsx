@@ -2,83 +2,29 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import api from "@/services/api"; // Pastikan import api service benar
 import Sidebar from "../../../components/user/Sidebar"; 
 import {
   ArrowLeft,
   Search,
   FileText,
   Download,
-  Eye,
-  Clock,
   Loader2,
-  AlertCircle,
   Menu,
   User,
-  Users
+  Users,
+  Calendar,
+  Clock,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 
-// --- DUMMY DATA (Update: Tambah properti patient_name & relation) ---
-const DUMMY_USER = {
-  name: "Syifa",
-  email: "syifa@example.com",
+// Helper Format Tanggal
+const formatDate = (dateString) => {
+  if (!dateString) return "-";
+  const options = { day: 'numeric', month: 'short', year: 'numeric' };
+  return new Date(dateString).toLocaleDateString('id-ID', options);
 };
-
-const DUMMY_HISTORY_DATA = [
-  {
-    id: 1,
-    status: "upcoming",
-    tanggal: "28 Nov 2025",
-    kode_antrian: "A-012",
-    poli: "Poli Gigi",
-    dokter: "drg. Budi Santoso",
-    diagnosa: "Pemeriksaan rutin",
-    patient_name: "Syifa", // Diri Sendiri
-    relation: "self",
-    resep: null,
-    hasLab: false,
-  },
-  {
-    id: 2,
-    status: "completed",
-    tanggal: "15 Okt 2025",
-    kode_antrian: "B-005",
-    poli: "Poli Umum",
-    dokter: "dr. Andi Pratama",
-    diagnosa: "Demam viral",
-    patient_name: "Syifa", // Diri Sendiri
-    relation: "self",
-    resep: "Paracetamol",
-    hasLab: true, 
-  },
-  {
-    id: 3,
-    status: "completed",
-    tanggal: "10 Okt 2025",
-    kode_antrian: "A-020",
-    poli: "Poli Anak",
-    dokter: "dr. Siti Aminah, Sp.A",
-    diagnosa: "Imunisasi Campak",
-    patient_name: "Adik Budi", // Orang Lain
-    relation: "family",
-    relation_label: "Anak",
-    resep: "Vitamin A",
-    hasLab: false,
-  },
-  {
-    id: 4,
-    status: "completed",
-    tanggal: "01 Sep 2025",
-    kode_antrian: "C-003",
-    poli: "Poli Penyakit Dalam",
-    dokter: "dr. Hartono, Sp.PD",
-    diagnosa: "Cek Gula Darah",
-    patient_name: "Bapak Joko", // Orang Lain
-    relation: "family",
-    relation_label: "Ayah",
-    resep: "Metformin",
-    hasLab: true,
-  },
-];
 
 export default function RiwayatKunjunganPage() {
   const router = useRouter();
@@ -89,31 +35,100 @@ export default function RiwayatKunjunganPage() {
   const [riwayatData, setRiwayatData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // State Sidebar
+  // State Sidebar & User
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [isProfileComplete] = useState(true); 
+  const [isProfileComplete, setIsProfileComplete] = useState(true); 
 
-  // --- SIMULASI FETCH DATA ---
+  // --- FETCH DATA ---
   useEffect(() => {
-    const timer = setTimeout(() => {
-        setUserData(DUMMY_USER);
-        setRiwayatData(DUMMY_HISTORY_DATA);
-        setIsLoading(false);
-    }, 1000);
+    // 1. Ambil data User dari LocalStorage
+    let currentUser = null;
+    if (typeof window !== "undefined") {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+            try {
+                currentUser = JSON.parse(storedUser);
+                setUserData(currentUser);
+            } catch (e) {
+                console.error("Error parsing user data", e);
+            }
+        }
+    }
 
-    return () => clearTimeout(timer);
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        // 2. Fetch Reservasi dari API
+        const response = await api.get("/my-reservations");
+        const data = response.data; // Array reservasi
+
+        // 3. Proses Data
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const processedData = data.map((item) => {
+            // Cek apakah reservasi milik sendiri atau keluarga
+            // Logic: Jika nama di reservasi SAMA dengan nama akun login -> Self
+            const currentUserName = currentUser?.name || currentUser?.Nama || "";
+            const isSelf = item.nama.toLowerCase() === currentUserName.toLowerCase();
+
+            // Cek Tanggal untuk Status
+            const resDate = new Date(item.tanggal_reservasi);
+            resDate.setHours(0, 0, 0, 0);
+
+            // Tentukan Status Tampilan (Upcoming / Completed / Cancelled)
+            // Syarat Completed (Riwayat): Status Confirmed DAN Tanggal di masa lampau
+            let displayStatus = "upcoming";
+            
+            if (item.status === "cancelled") {
+                displayStatus = "cancelled";
+            } else if (item.status === "confirmed" && resDate < today) {
+                displayStatus = "completed";
+            } else {
+                // Pending atau Confirmed hari ini/masa depan
+                displayStatus = "upcoming";
+            }
+
+            return {
+                id: item.reservid,
+                tanggal: formatDate(item.tanggal_reservasi),
+                rawDate: resDate,
+                poli: item.poli?.poli_name || "Poli Umum",
+                dokter: item.dokter?.nama_dokter || "Dokter Jaga",
+                diagnosa: item.keluhan, // Menggunakan keluhan sebagai info awal
+                patient_name: item.nama,
+                relation: isSelf ? "self" : "family",
+                relation_label: isSelf ? "Anda" : item.status_keluarga || "Keluarga",
+                status: displayStatus,
+                originalStatus: item.status,
+                hasLab: false, // Default false karena belum ada integrasi lab di BE
+            };
+        });
+
+        // Urutkan: Yang terbaru di atas
+        const sortedData = processedData.sort((a, b) => b.rawDate - a.rawDate);
+        setRiwayatData(sortedData);
+
+      } catch (err) {
+        console.error("Gagal mengambil riwayat:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  // Filter Logika (Search + Tab Filter)
+  // --- FILTERING ---
   const filteredRiwayat = riwayatData.filter((item) => {
-    // 1. Filter berdasarkan Search
+    // 1. Filter Search (Nama Pasien, Dokter, atau Poli)
     const matchSearch = 
       item.poli.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.dokter.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.patient_name.toLowerCase().includes(searchTerm.toLowerCase()); // Bisa cari nama pasien
+      item.patient_name.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // 2. Filter berdasarkan Tab
+    // 2. Filter Tab (Semua, Diri Sendiri, Keluarga)
     let matchTab = true;
     if (activeFilter === "self") matchTab = item.relation === "self";
     if (activeFilter === "family") matchTab = item.relation === "family";
@@ -121,7 +136,7 @@ export default function RiwayatKunjunganPage() {
     return matchSearch && matchTab;
   });
 
-  // Hitung Statistik (Berdasarkan filter yang aktif)
+  // Hitung Statistik
   const stats = {
     selesai: filteredRiwayat.filter((i) => i.status === "completed").length,
     akanDatang: filteredRiwayat.filter((i) => i.status === "upcoming").length,
@@ -158,15 +173,15 @@ export default function RiwayatKunjunganPage() {
                                 <ArrowLeft className="w-6 h-6" />
                              </button>
                              <div>
-                                 <h1 className="text-2xl font-bold text-neutral-800">Riwayat Kunjungan</h1>
-                                 <p className="text-sm text-neutral-500">Pantau rekam medis Anda dan Keluarga.</p>
+                                 <h1 className="text-2xl font-bold text-neutral-800">Riwayat & Jadwal</h1>
+                                 <p className="text-sm text-neutral-500">Pantau kunjungan medis Anda dan Keluarga.</p>
                              </div>
                         </div>
 
-                        {/* --- FILTER BARU --- */}
+                        {/* --- FILTER BAR --- */}
                         <div className="flex flex-col sm:flex-row justify-between gap-4">
                             {/* Tabs Filter */}
-                            <div className="flex bg-white p-1 rounded-xl border border-neutral-200 w-fit">
+                            <div className="flex bg-white p-1 rounded-xl border border-neutral-200 w-fit shadow-sm">
                                 <button 
                                     onClick={() => setActiveFilter("all")}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeFilter === 'all' ? 'bg-[#003B73] text-white shadow' : 'text-neutral-500 hover:bg-neutral-50'}`}
@@ -191,7 +206,7 @@ export default function RiwayatKunjunganPage() {
                             <div className="relative w-full sm:w-64">
                                 <input 
                                     type="text" 
-                                    placeholder="Cari nama, diagnosa..." 
+                                    placeholder="Cari nama, poli..." 
                                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition shadow-sm bg-white"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -205,8 +220,8 @@ export default function RiwayatKunjunganPage() {
                     {isLoading ? (
                           <div className="flex flex-col items-center justify-center py-20">
                              <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-3" />
-                             <p className="text-neutral-500">Memuat data riwayat...</p>
-                         </div>
+                             <p className="text-neutral-500">Memuat data...</p>
+                          </div>
                     ) : (
                         <>
                             {/* Stats Bar */}
@@ -236,7 +251,7 @@ export default function RiwayatKunjunganPage() {
                                 ) : (
                                     <div className="text-center py-12 text-neutral-400 bg-white rounded-2xl border border-dashed border-neutral-200">
                                         <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                        <p>Tidak ada riwayat ditemukan.</p>
+                                        <p>Tidak ada data ditemukan.</p>
                                     </div>
                                 )}
                             </div>
@@ -249,7 +264,7 @@ export default function RiwayatKunjunganPage() {
   );
 }
 
-// --- COMPONENT: KARTU RIWAYAT (Diperbarui) ---
+// --- COMPONENT: KARTU RIWAYAT ---
 function RiwayatCard({ data, router }) {
   const isUpcoming = data.status === "upcoming";
   const isCancelled = data.status === "cancelled";
@@ -257,25 +272,25 @@ function RiwayatCard({ data, router }) {
 
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow border border-neutral-100 relative overflow-hidden">
-      {/* Header Kartu: Tanggal & Badge Pasien */}
+      {/* Header Kartu */}
       <div className="flex justify-between items-start mb-3">
          <div className="flex items-center gap-2 text-sm text-neutral-500 font-medium">
-            <span>{data.tanggal}</span>
+            <span className="flex items-center gap-1"><Calendar size={14}/> {data.tanggal}</span>
             <span className="w-1 h-1 bg-neutral-300 rounded-full"></span>
             
             {/* Badge Pemilik Data */}
             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs border ${isSelf ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
                 {isSelf ? <User size={12} /> : <Users size={12} />}
-                <span className="font-bold">{isSelf ? "Anda" : data.patient_name}</span>
-                {!isSelf && <span className="text-[10px] opacity-80">({data.relation_label})</span>}
+                <span className="font-bold truncate max-w-[100px]">{isSelf ? "Anda" : data.patient_name}</span>
             </div>
          </div>
 
          {/* Status Badge */}
-         <span className={`text-[10px] md:text-xs font-bold px-3 py-1 rounded-full ${
-            isUpcoming ? "bg-blue-100 text-blue-700" : isCancelled ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+         <span className={`text-[10px] md:text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 ${
+           isUpcoming ? "bg-blue-100 text-blue-700" : isCancelled ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
          }`}>
-            {isUpcoming ? "Akan Datang" : isCancelled ? "Dibatalkan" : "Selesai"}
+            {isUpcoming ? <Clock size={12}/> : isCancelled ? <XCircle size={12}/> : <CheckCircle size={12}/>}
+            {isUpcoming ? "Jadwal Aktif" : isCancelled ? "Dibatalkan" : "Selesai"}
          </span>
       </div>
 
@@ -287,27 +302,25 @@ function RiwayatCard({ data, router }) {
       <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100 mb-5 space-y-2">
          <div>
             <p className="text-xs text-neutral-400 mb-0.5 uppercase font-semibold tracking-wider">
-               {isUpcoming ? "Keluhan Awal" : "Diagnosa"}
+               {isUpcoming ? "Keluhan / Keperluan" : "Catatan / Keluhan"}
             </p>
-            <p className="text-neutral-800 font-medium text-sm leading-relaxed">{data.diagnosa}</p>
+            <p className="text-neutral-800 font-medium text-sm leading-relaxed line-clamp-2">
+                {data.diagnosa || "-"}
+            </p>
          </div>
-         {isUpcoming && (
-             <p className="text-xs text-blue-600 flex items-center gap-1 mt-2">
-                <Clock className="w-3 h-3" /> Menunggu pemeriksaan
-             </p>
-         )}
       </div>
 
       {/* Actions */}
       {isUpcoming ? (
-          <button onClick={() => router.push('/user/antrian')} className="w-full bg-blue-800 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-blue-900 transition">
-              Lihat Antrian
+          <button onClick={() => router.push('/user/dashboard')} className="w-full bg-blue-800 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-blue-900 transition text-sm">
+              Lihat Antrian di Dashboard
           </button>
       ) : (
           <div className="flex gap-3">
-             <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm">
+             <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm cursor-not-allowed opacity-60">
                  <FileText className="w-4 h-4" /> Detail
              </button>
+             {/* Tombol Lab (Disembunyikan jika tidak ada lab) */}
              {data.hasLab && (
                  <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm">
                      <Download className="w-4 h-4" /> Hasil Lab
