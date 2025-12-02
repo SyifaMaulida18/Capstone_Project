@@ -392,18 +392,18 @@ export default function MedicalRecordsPage() {
 
                 <div className="flex justify-center gap-4">
                   <button
-                    onClick={handleOpenViewDialog}
+                    onClick={() => router.push(`/superadmin/rekam-medis/riwayat?patient_id=${selectedPatient.id}&patient_name=${encodeURIComponent(selectedPatient.name)}`)}
                     className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-gray-700"
                   >
                     Lihat Riwayat
                   </button>
-<button
-  onClick={() => router.push("/superadmin/rekam-medis/add")}
-  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded shadow-sm hover:bg-blue-700"
->
-  <PlusIcon className="h-5 w-5" />
-  Tambah Rekam Medis
-</button>
+                  <button
+                    onClick={() => router.push("/superadmin/rekam-medis/add")}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded shadow-sm hover:bg-blue-700"
+                  >
+                    <PlusIcon className="h-5 w-5" />
+                    Tambah Rekam Medis
+                  </button>
 
                 </div>
               </div>

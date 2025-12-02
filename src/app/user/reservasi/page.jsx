@@ -9,7 +9,6 @@ import {
   Check,
   CheckCircle,
   Clock,
-  Lightbulb,
   Loader2,
   MapPin,
   Sparkles,
@@ -98,6 +97,7 @@ export default function ReservasiPage() {
   const [aiResult, setAiResult] = useState(null); // Hasil Submit Akhir (Success Modal)
 
   // Data master
+  const [allSchedules, setAllSchedules] = useState([]); // MENYIMPAN SEMUA DATA JADWAL
   const [polis, setPolis] = useState([]);
   const [dokters, setDokters] = useState([]);
 
@@ -293,9 +293,24 @@ export default function ReservasiPage() {
       setError("");
 
       try {
-        const poliRes = await api.get("/polis");
-        setPolis(poliRes.data?.data ?? poliRes.data ?? []);
+        // --- MODIFIKASI: Ambil data jadwal sekaligus karena route /polis diblokir ---
+        // Route /jadwal-dokter bersifat publik di api.php Anda
+        const jadwalRes = await api.get("/jadwal-dokter");
+        const rawSchedules = jadwalRes.data?.data ?? jadwalRes.data ?? [];
+        setAllSchedules(rawSchedules);
 
+        // Ekstrak Poli Unik dari data jadwal
+        const uniquePolisMap = new Map();
+        rawSchedules.forEach((item) => {
+            if (item.poli && item.poli.poli_id) {
+                if (!uniquePolisMap.has(item.poli.poli_id)) {
+                    uniquePolisMap.set(item.poli.poli_id, item.poli);
+                }
+            }
+        });
+        setPolis(Array.from(uniquePolisMap.values()));
+
+        // --- User Data ---
         const storedUserStr = typeof window !== "undefined"
           ? localStorage.getItem("user")
           : null;
@@ -317,7 +332,7 @@ export default function ReservasiPage() {
           fillSelfData(storedUser, null);
         }
 
-        // Ambil Riwayat
+        // --- Riwayat ---
         try {
           const historyRes = await api.get("/my-reservations");
           const historyData = historyRes.data?.data ?? historyRes.data ?? [];
@@ -349,7 +364,7 @@ export default function ReservasiPage() {
         }
       } catch (err) {
         console.error("Gagal ambil data awal:", err);
-        setError("Gagal memuat data. Coba refresh.");
+        setError("Gagal memuat data jadwal dokter.");
       } finally {
         setLoadingData(false);
       }
@@ -358,26 +373,18 @@ export default function ReservasiPage() {
     fetchData();
   }, [fillSelfData]);
 
-  // --- FETCH DOKTER ---
-  const fetchDoctorsByPoli = useCallback(async (poliId) => {
+  // --- FETCH DOKTER DARI LOCAL STATE ---
+  const filterDoctorsByPoli = (poliId) => {
     if (!poliId) {
       setDokters([]);
       return;
     }
-    try {
-      setError("");
-      const res = await api.get(`/public/jadwal-dokter/${poliId}`);
-      const list = Array.isArray(res.data)
-        ? res.data
-        : Array.isArray(res.data?.data)
-        ? res.data.data
-        : [];
-      setDokters(list);
-    } catch (err) {
-      setDokters([]);
-      setError("Gagal mengambil daftar dokter.");
-    }
-  }, []);
+    // Filter dari allSchedules yang sudah diambil di awal
+    const filteredSchedules = allSchedules.filter(
+        (schedule) => String(schedule.poli_id) === String(poliId)
+    );
+    setDokters(filteredSchedules);
+  };
 
   // --- HANDLERS ---
   const handleProfileChange = (e) => {
@@ -405,7 +412,7 @@ export default function ReservasiPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handlePoliChange = async (e) => {
+  const handlePoliChange = (e) => {
     const selectedPoliId = e.target.value;
     setFormData((prev) => ({
       ...prev,
@@ -416,7 +423,9 @@ export default function ReservasiPage() {
     setSelectedDoctorSchedule(null);
     setAvailableDaysText("");
     setError("");
-    await fetchDoctorsByPoli(selectedPoliId);
+    
+    // Gunakan fungsi filter client-side
+    filterDoctorsByPoli(selectedPoliId);
   };
 
   const handleDokterChange = (e) => {
@@ -429,6 +438,7 @@ export default function ReservasiPage() {
     setError("");
 
     if (docId) {
+      // Cari jadwal di dokters (yang isinya adalah object JadwalDokter)
       const selectedSchedule = dokters.find(
         (d) => String(d.dokter_id) === String(docId)
       );
@@ -513,11 +523,6 @@ export default function ReservasiPage() {
         if (res.data && res.data.success) {
             const result = res.data.data;
             setAiRecommendation(result);
-            
-            // Opsional: Auto select poli jika ID nya ada
-            // if (result.rekomendasi_poli_id) {
-            //     handlePoliChange({ target: { value: result.rekomendasi_poli_id } });
-            // }
         }
       } catch (err) {
         console.warn("Gagal cek AI:", err);
@@ -548,7 +553,6 @@ export default function ReservasiPage() {
     const finalIsSelf = selectedProfileId === "self";
 
     const normalizePenjaminan = (val) => {
-      if (val === "bpjs" || val === "BPJS") return "asuransi";
       if (val === "asuransi") return "asuransi";
       return "cash";
     };

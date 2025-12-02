@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import AdminLayout from "@/app/admin/components/admin_layout";
 import {
@@ -8,10 +9,11 @@ import {
   PencilIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
-// --- UBAH ---
-import Link from "next/link"; // Impor Link
+import Link from "next/link";
+import api from "@/services/api"; // ✅ pakai axios service
 
-// Komponen Dialog (Hanya untuk Verifikasi/Lihat Detail)
+
+
 function Dialog({ show, onClose, children }) {
   if (!show) return null;
   return (
@@ -29,89 +31,175 @@ function Dialog({ show, onClose, children }) {
   );
 }
 
-// --- DATA SIMULASI ---
-const initialReservations = [
-  {
-    id: 1,
-    nama: "Ayu Gideon",
-    email: "ayugideon@gmail.com",
-    telp: "081254345678",
-    tglLahir: "1997-07-12", // Format YYYY-MM-DD untuk input date
-    jk: "Perempuan",
-    nik: "12321323",
-    wa: "08123123123",
-    penjamin: "BPJS",
-    keluhan: "Sering sakit kepala",
-    rekomPoli: "Saraf",
-  },
-  {
-    id: 2,
-    nama: "Niko Affandi",
-    email: "nikoaffandi@gmail.com",
-    telp: "0822123212321",
-    tglLahir: "1995-03-05",
-    jk: "Laki-laki",
-    nik: "12345678",
-    wa: "0821123123123",
-    penjamin: "Swasta",
-    keluhan: "Demam dan batuk",
-    rekomPoli: "Umum",
-  },
-  {
-    id: 3,
-    nama: "Angger Karis",
-    email: "anggerkaris@gmail.com",
-    telp: "0821321321321",
-    tglLahir: "1997-07-12",
-    jk: "Laki-laki",
-    nik: "132132133",
-    wa: "0821321321321",
-    penjamin: "Swasta",
-    keluhan: "Sering mual saat ingin BAB",
-    rekomPoli: "Organ Dalam",
-  },
-];
-
-// --- Hapus Opsi Form (pindah ke FormReservasi.jsx) ---
-
-// --- KOMPONEN UTAMA ---
 export default function VerifikasiReservasiPage() {
-  const [reservations, setReservations] = useState(initialReservations);
+  const [reservations, setReservations] = useState([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // State untuk Dialog Verifikasi (yang sudah ada)
   const [verifyingPatient, setVerifyingPatient] = useState(null);
   const [showVerifyDialog, setShowVerifyDialog] = useState(false);
+  const [processingVerify, setProcessingVerify] = useState(false);
 
-  // --- HAPUS STATE FORM DI SINI ---
-  // (isFormOpen, editingReservation, formData)
+  // === FETCH DATA RESERVASI DARI LARAVEL (ADMIN) ===
+  const fetchReservations = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg("");
 
-  // --- HANDLERS ---
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-  // --- HAPUS useEffect FORM ---
+      if (!token) {
+        setErrorMsg("Token tidak ditemukan. Silakan login ulang.");
+        setLoading(false);
+        return;
+      }
 
-  // Handler untuk DIALOG VERIFIKASI (Tetap ada)
+      // 🔎 ambil cuma status pending (kalau backend support query ?status=pending)
+      const res = await api.get("/reservations", {
+        params: { status: "pending" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = res.data?.data ?? res.data ?? [];
+
+      // support dua bentuk:
+      // - array langsung
+      // - paginate: { data: [...] }
+      const raw = Array.isArray(data) ? data : data?.data || [];
+
+      const mapped = (raw || []).map((r) => {
+        const id = r.reservid ?? r.id ?? r.reservation_id;
+
+        return {
+          id,
+          nama: r.nama,
+          email: r.email,
+          telp: r.nomor_whatsapp,
+          tglLahir: r.tanggal_lahir,
+          jk: r.jenis_kelamin,
+          nik: r.nomor_ktp,
+          wa: r.nomor_whatsapp,
+          penjamin:
+            r.penjaminan === "asuransi"
+              ? r.nama_asuransi || "Asuransi"
+              : "Cash",
+          keluhan: r.keluhan,
+          poli: r.poli?.poli_name ?? "-",
+          tanggal: r.tanggal_reservasi ?? "-",
+          status: r.status ?? "-",
+        };
+      });
+
+      setReservations(mapped);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(
+        err.response?.data?.message ||
+          err.message ||
+          "Terjadi kesalahan saat mengambil data."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReservations();
+  }, []);
+
   const handleDetail = (pasien) => {
     setVerifyingPatient(pasien);
     setShowVerifyDialog(true);
   };
 
-  // --- HAPUS SEMUA HANDLER FORM (pindah ke FormReservasi.jsx) ---
-  // (handleOpenAddForm, handleOpenEditForm, handleCloseForm, handleFormChange, handleSubmit)
-
-  // --- UBAH: Buat fungsi handleDelete ---
   const handleDelete = (id) => {
+    if (typeof window === "undefined") return;
     if (window.confirm("Yakin ingin menghapus reservasi ini?")) {
-      setReservations(reservations.filter((r) => r.id !== id));
+      setReservations((prev) => prev.filter((r) => r.id !== id));
+      // Kalau mau benar-benar hapus / cancel di backend, pakai handleCancel
+      // atau bikin endpoint delete khusus.
     }
   };
 
-  // --- Filtering Data ---
-  const filteredReservations = reservations.filter(
-    (r) =>
-      r.nama.toLowerCase().includes(search.toLowerCase()) ||
-      r.email.toLowerCase().includes(search.toLowerCase())
+  // ✅ VERIFIKASI RESERVASI (✔)
+  const handleVerify = async () => {
+    if (!verifyingPatient) return;
+    const id = verifyingPatient.id;
+
+    try {
+      setProcessingVerify(true);
+      const token = localStorage.getItem("token");
+
+      await api.post(
+        `/reservations/${id}/verify`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // update list di FE: hapus dari pending
+      setReservations((prev) => prev.filter((r) => r.id !== id));
+      setShowVerifyDialog(false);
+      setVerifyingPatient(null);
+} catch (err) {
+  console.error("VERIFY ERROR RAW:", err);
+
+  console.error("VERIFY ERROR DATA:", err.response?.data);
+
+  alert(
+    "Error 422:\n" + JSON.stringify(err.response?.data, null, 2)
   );
+}
+
+  };
+
+  // ❌ BATALKAN / CANCEL RESERVASI (✖)
+  const handleCancel = async () => {
+    if (!verifyingPatient) return;
+    const id = verifyingPatient.id;
+
+    try {
+      setProcessingVerify(true);
+      const token = localStorage.getItem("token");
+
+      await api.post(
+        `/reservations/${id}/cancel`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setReservations((prev) => prev.filter((r) => r.id !== id));
+      setShowVerifyDialog(false);
+      setVerifyingPatient(null);
+    } catch (err) {
+      console.error(err);
+      alert(
+        err.response?.data?.message || "Gagal membatalkan reservasi pasien."
+      );
+    } finally {
+      setProcessingVerify(false);
+    }
+  };
+
+  const filteredReservations = reservations.filter((r) => {
+    const q = search.toLowerCase();
+    return (
+      r.nama?.toLowerCase().includes(q) ||
+      r.email?.toLowerCase().includes(q) ||
+      r.poli?.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <AdminLayout>
@@ -125,7 +213,7 @@ export default function VerifikasiReservasiPage() {
             <div className="relative w-full max-w-xs">
               <input
                 type="text"
-                placeholder="Cari nama, email..."
+                placeholder="Cari nama, email, poli..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
@@ -138,7 +226,6 @@ export default function VerifikasiReservasiPage() {
               <span>Filter</span>
             </button>
 
-            {/* --- UBAH: Tombol Add menjadi Link --- */}
             <Link
               href="/admin/reservasi/add"
               className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold"
@@ -149,12 +236,29 @@ export default function VerifikasiReservasiPage() {
           </div>
         </div>
 
-        {/* Tabel Data */}
+        {loading && (
+          <p className="text-center text-sm text-neutral-600 mb-4">
+            Mengambil data reservasi...
+          </p>
+        )}
+        {errorMsg && (
+          <p className="text-center text-sm text-red-600 mb-4">{errorMsg}</p>
+        )}
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-neutral-200">
             <thead className="bg-primary-600 rounded-t-lg">
               <tr>
-                {["Id", "Nama", "Email", "No Telp", "Aksi"].map((header) => (
+                {[
+                  "Id",
+                  "Nama",
+                  "Email",
+                  "No Telp",
+                  "Poli",
+                  "Tanggal",
+                  "Status",
+                  "Aksi",
+                ].map((header) => (
                   <th
                     key={header}
                     className="px-6 py-3 text-left text-sm font-semibold text-white uppercase tracking-wider"
@@ -165,6 +269,17 @@ export default function VerifikasiReservasiPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-neutral-100">
+              {!loading && filteredReservations.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-6 py-4 text-center text-sm text-neutral-500"
+                  >
+                    Tidak ada data reservasi pending.
+                  </td>
+                </tr>
+              )}
+
               {filteredReservations.map((p, i) => (
                 <tr
                   key={p.id}
@@ -182,15 +297,35 @@ export default function VerifikasiReservasiPage() {
                   <td className="px-6 py-4 text-sm text-neutral-800">
                     {p.telp}
                   </td>
+                  <td className="px-6 py-4 text-sm text-neutral-800">
+                    {p.poli}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-neutral-800">
+                    {p.tanggal}
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        p.status === "pending"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : p.status === "verified"
+                          ? "bg-green-100 text-green-700"
+                          : p.status === "cancelled"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-neutral-100 text-neutral-700"
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm font-medium">
-                    {/* --- UBAH: Tombol Edit menjadi Link --- */}
                     <div className="flex space-x-2">
-                      <Link
+                      {/* <Link
                         href={`/admin/reservasi/edit/${p.id}`}
                         className="text-neutral-600 hover:text-primary-600 p-1 rounded-md hover:bg-primary-50"
                       >
                         <PencilIcon className="h-5 w-5" />
-                      </Link>
+                      </Link> */}
                       <button
                         onClick={() => handleDelete(p.id)}
                         className="text-neutral-600 hover:text-red-600 p-1 rounded-md hover:bg-red-50"
@@ -211,10 +346,12 @@ export default function VerifikasiReservasiPage() {
           </table>
         </div>
 
-        {/* --- Dialog Detail Verifikasi (TETAP ADA) --- */}
         <Dialog
           show={showVerifyDialog}
-          onClose={() => setShowVerifyDialog(false)}
+          onClose={() => {
+            if (processingVerify) return;
+            setShowVerifyDialog(false);
+          }}
         >
           <h2 className="text-xl font-semibold text-center mb-4 text-neutral-700">
             Verifikasi Reservasi Pasien
@@ -246,27 +383,33 @@ export default function VerifikasiReservasiPage() {
                 <strong>Keluhan:</strong> {verifyingPatient.keluhan}
               </p>
               <p>
-                <strong>Rekomendasi Poli:</strong> {verifyingPatient.rekomPoli}
+                <strong>Poli:</strong> {verifyingPatient.poli}
+              </p>
+              <p>
+                <strong>Tanggal Reservasi:</strong> {verifyingPatient.tanggal}
+              </p>
+              <p>
+                <strong>Status Saat Ini:</strong> {verifyingPatient.status}
               </p>
             </div>
           )}
           <div className="flex justify-center mt-6 space-x-4">
             <button
-              onClick={() => setShowVerifyDialog(false)}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-lg font-bold"
+              onClick={handleCancel}
+              disabled={processingVerify}
+              className="bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white px-4 py-2 rounded-lg text-lg font-bold"
             >
-              ✖ {/* Tolak */}
+              ✖
             </button>
             <button
-              onClick={() => setShowVerifyDialog(false)}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-lg font-bold"
+              onClick={handleVerify}
+              disabled={processingVerify}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-4 py-2 rounded-lg text-lg font-bold"
             >
-              ✔ {/* Terima */}
+              ✔
             </button>
           </div>
         </Dialog>
-
-        {/* --- DIALOG FORM ADD/EDIT (DIHAPUS DARI SINI) --- */}
       </div>
     </AdminLayout>
   );

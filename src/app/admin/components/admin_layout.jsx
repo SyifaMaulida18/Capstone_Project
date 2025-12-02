@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Header from "../components/header";
@@ -9,14 +9,33 @@ import { Bars3Icon } from "@heroicons/react/24/outline";
 
 const adminNavItems = [
   { name: "Manajemen Jadwal Dokter", href: "/admin/schedule" },
-  { name: "Manajemen User", href: "/admin/users" },
+  // { name: "Manajemen User", href: "/admin/users" },
   { name: "Manajemen Reservasi", href: "/admin/reservasi" },
   { name: "Manajemen Antrian", href: "/admin/antrian" },
   { name: "Manajemen Rekam Medis", href: "/admin/rekam-medis" },
+  { name: "Dashboard", href: "/admin/dashboard" },
 ];
 
 function AdminSidebar() {
   const pathname = usePathname();
+  const [adminName, setAdminName] = useState("Admin");
+
+  // Ambil nama admin dari localStorage (sama seperti di Header)
+  useEffect(() => {
+    try {
+      const storedAdmin = localStorage.getItem("admin");
+      if (storedAdmin) {
+        const parsed = JSON.parse(storedAdmin);
+        if (parsed?.Nama) {
+          setAdminName(parsed.Nama);
+        } else if (parsed?.name) {
+          setAdminName(parsed.name);
+        }
+      }
+    } catch (error) {
+      console.error("Gagal membaca admin dari localStorage:", error);
+    }
+  }, []);
 
   return (
     <aside className="w-64 bg-primary-800 text-white shadow-xl flex flex-col p-4 space-y-6 h-full">
@@ -24,7 +43,7 @@ function AdminSidebar() {
         <div className="w-20 h-20 rounded-full bg-primary-500 flex items-center justify-center border-4 border-primary-200">
           <UserCircleIcon className="h-16 w-16 text-white" />
         </div>
-        <h2 className="text-xl font-bold mt-3">Admin</h2>
+        <h2 className="text-xl font-bold mt-3">{adminName}</h2>
       </div>
 
       <nav className="flex flex-col space-y-2 flex-grow overflow-y-auto pr-2 scrollbar-hide">
