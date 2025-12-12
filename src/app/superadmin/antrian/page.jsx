@@ -172,7 +172,7 @@ export default function AntrianDashboardPage() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_BASE}/antrian/selesaikan`, {
+      const res = await fetch(`${API_BASE}/antrian/selesai-dipanggil`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
