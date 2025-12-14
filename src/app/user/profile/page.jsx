@@ -1,7 +1,7 @@
 "use client";
 
 import Sidebar from "@/components/user/Sidebar";
-import api from "@/services/api"; // Pastikan path ini sesuai dengan konfigurasi axios Anda
+import api from "@/services/api"; // Pastikan path ini sesuai
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,7 +9,6 @@ import {
   Clipboard,
   CreditCard,
   Loader2,
-  Lock,
   MapPin,
   Menu,
   Save,
@@ -21,7 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// --- KOMPONEN UI: InputField ---
+// --- KOMPONEN UI: InputField (Standard) ---
 const InputField = ({ 
   label, 
   type, 
@@ -87,7 +86,6 @@ const InputField = ({
           />
         )}
       </div>
-      {/* Tampilkan Error Message dari Backend jika ada */}
       {helperText && (
         <p className={`text-xs mt-1 ${hasError ? "text-red-600 font-medium" : "text-neutral-500"}`}>
           {helperText}
@@ -97,9 +95,48 @@ const InputField = ({
   );
 };
 
-// --- KOMPONEN FORM (Create / Edit Data Profil) ---
+// --- KOMPONEN BANTUAN: RegionSelect ---
+// Menangani logic: Value = ID (untuk API), Label = Nama (untuk User & DB)
+const RegionSelect = ({ label, name, value, onChange, options, disabled, placeholder, hasError, helperText }) => {
+  return (
+    <div className="space-y-1.5 w-full">
+      <label htmlFor={name} className="block text-sm font-semibold text-neutral-700">
+        {label} <span className="text-red-500">*</span>
+      </label>
+      <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <MapPin className={`h-5 w-5 ${hasError ? "text-red-400" : "text-neutral-400"}`} />
+        </div>
+        <select
+          id={name}
+          name={name}
+          value={value} // Ini akan berisi ID wilayah
+          onChange={onChange}
+          disabled={disabled}
+          className={`block w-full rounded-xl border ${
+            hasError
+              ? "border-red-500 bg-red-50 text-red-900 focus:ring-red-200"
+              : disabled
+              ? "border-neutral-200 bg-neutral-100 text-neutral-500 cursor-not-allowed"
+              : "border-neutral-200 text-neutral-900 focus:ring-primary-500/20 focus:border-primary-500"
+          } py-2.5 pl-10 pr-4 focus:ring-2 sm:text-sm transition duration-200 appearance-none`}
+        >
+          <option value="">-- {placeholder} --</option>
+          {options.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {helperText && <p className="text-xs mt-1 text-red-600 font-medium">{helperText}</p>}
+    </div>
+  );
+};
+
+// --- KOMPONEN FORM UTAMA (Create / Edit) ---
 const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refreshProfile, isComplete }) => {
-  // State Data Profil (Sesuai Controller & Model Laravel)
+  // 1. State Data Form (Disimpan sebagai STRING/NAMA)
   const [formData, setFormData] = useState({
     noKTP: "",
     jenis_kelamin: "",
@@ -110,59 +147,137 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
     agama: "",
     suku: "",
     nomor_pegawai: "",
-    nomor_telepon: "", // Di backend: Rule::unique('profiles')
-    
-    // Keluarga
+    nomor_telepon: "",
     status_keluarga: "",
     nama_keluarga: "",
-
-    // Alamat
     alamat: "",
     provinsi: "",
-    "kota/kabupaten": "", // Perhatikan key ini menggunakan slash sesuai database
+    "kota/kabupaten": "", // Sesuai kolom database
     kecamatan: "",
     kelurahan: "",
     lokasi: "", 
-
-    // Penjaminan
-    penjaminan: "cash", // Default cash sesuai logika controller
+    penjaminan: "cash",
     nama_asuransi: "",
     nomor_asuransi: "",
+  });
+
+  // 2. State Logic Wilayah
+  const [regions, setRegions] = useState({
+    provinces: [],
+    regencies: [],
+    districts: [],
+    villages: [],
+  });
+
+  const [selectedRegionIds, setSelectedRegionIds] = useState({
+    provinceId: "",
+    regencyId: "",
+    districtId: "",
+    villageId: "",
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState("");
 
-  // Sinkronisasi data saat komponen dimuat (Pre-fill)
+  // --- LOGIC UTAMA: FETCH DATA & REVERSE LOOKUP ---
+  // Ini adalah perbaikan agar dropdown terisi saat Edit Mode
   useEffect(() => {
-    if (initialProfileData && Object.keys(initialProfileData).length > 0) {
-      setFormData((prev) => {
-        const newData = { ...prev };
-        Object.keys(newData).forEach((key) => {
-          // Ambil value dari initialData jika ada, jika null set string kosong
-          if (initialProfileData[key] !== undefined && initialProfileData[key] !== null) {
-            newData[key] = initialProfileData[key];
+    const loadInitialData = async () => {
+      try {
+        // 1. Load Semua Provinsi dulu (Wajib)
+        const provRes = await fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json");
+        const provinces = await provRes.json();
+        
+        // Simpan list provinsi ke state
+        setRegions(prev => ({ ...prev, provinces }));
+
+        // Cek apakah ini mode EDIT (ada data awal)
+        if (initialProfileData && Object.keys(initialProfileData).length > 0) {
+          // A. Masukkan data teks biasa ke FormData
+          setFormData((prev) => {
+            const newData = { ...prev };
+            Object.keys(newData).forEach((key) => {
+              if (initialProfileData[key] !== undefined && initialProfileData[key] !== null) {
+                newData[key] = initialProfileData[key];
+              }
+            });
+            // Pastikan default value
+            if (!newData.penjaminan) newData.penjaminan = "cash";
+            return newData;
+          });
+
+          // B. LOGIKA PENCARIAN ID WILAYAH (REVERSE LOOKUP)
+          // Kita cari ID berdasarkan NAMA yang tersimpan di DB
+          
+          // 1. Cari ID Provinsi
+          const savedProvName = initialProfileData.provinsi;
+          const matchedProv = provinces.find(p => p.name === savedProvName);
+
+          if (matchedProv) {
+            const provId = matchedProv.id;
+            
+            // Set ID Provinsi terpilih
+            setSelectedRegionIds(prev => ({ ...prev, provinceId: provId }));
+            
+            // 2. Fetch Kota berdasarkan ID Provinsi
+            const regRes = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${provId}.json`);
+            const regencies = await regRes.json();
+            setRegions(prev => ({ ...prev, regencies }));
+
+            // 3. Cari ID Kota
+            const savedCityName = initialProfileData["kota/kabupaten"];
+            const matchedCity = regencies.find(c => c.name === savedCityName);
+
+            if (matchedCity) {
+              const cityId = matchedCity.id;
+              setSelectedRegionIds(prev => ({ ...prev, regencyId: cityId }));
+
+              // 4. Fetch Kecamatan berdasarkan ID Kota
+              const distRes = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/districts/${cityId}.json`);
+              const districts = await distRes.json();
+              setRegions(prev => ({ ...prev, districts }));
+
+              // 5. Cari ID Kecamatan
+              const savedDistName = initialProfileData.kecamatan;
+              const matchedDist = districts.find(d => d.name === savedDistName);
+
+              if (matchedDist) {
+                const distId = matchedDist.id;
+                setSelectedRegionIds(prev => ({ ...prev, districtId: distId }));
+
+                // 6. Fetch Kelurahan berdasarkan ID Kecamatan
+                const villRes = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/villages/${distId}.json`);
+                const villages = await villRes.json();
+                setRegions(prev => ({ ...prev, villages }));
+
+                // 7. Cari ID Kelurahan (Hanya untuk set selected ID)
+                const savedVillName = initialProfileData.kelurahan;
+                const matchedVill = villages.find(v => v.name === savedVillName);
+                
+                if (matchedVill) {
+                   setSelectedRegionIds(prev => ({ ...prev, villageId: matchedVill.id }));
+                }
+              }
+            }
           }
-        });
-        
-        // Pastikan penjaminan terisi default jika kosong
-        if (!newData.penjaminan) newData.penjaminan = "cash";
-        
-        return newData;
-      });
-    } else {
-      // Jika profil baru, pre-fill nomor telepon dari data User Akun
-      if (userData?.nomor_telepon) {
-        setFormData(prev => ({ ...prev, nomor_telepon: userData.nomor_telepon }));
+        } else {
+          // Jika Data Baru (Create Mode) - Pre-fill nomor telepon dari User Akun
+          if (userData?.nomor_telepon) {
+            setFormData((prev) => ({ ...prev, nomor_telepon: userData.nomor_telepon }));
+          }
+        }
+      } catch (error) {
+        console.error("Error loading region data:", error);
       }
-    }
+    };
+
+    loadInitialData();
   }, [initialProfileData, userData]);
 
+  // --- HANDLER UPDATE INPUT BIASA ---
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // Logika Reset Asuransi: Jika pindah ke cash, kosongkan data asuransi
     if (name === "penjaminan" && value === "cash") {
         setFormData(prev => ({ 
           ...prev, 
@@ -173,8 +288,6 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
     } else {
         setFormData(prev => ({ ...prev, [name]: value }));
     }
-
-    // Hapus error field saat user mengetik
     if (errors[name]) {
         setErrors(prev => {
             const newErrors = { ...prev };
@@ -184,6 +297,67 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
     }
   };
 
+  // --- HANDLER UPDATE WILAYAH (CASCADING) ---
+  const handleRegionChange = (type, e) => {
+    const selectedId = e.target.value;
+    const index = e.target.selectedIndex;
+    const selectedName = e.target.options[index].text; // Ambil Nama Wilayah
+
+    // Hapus error visual
+    if(errors[type === 'kota' ? 'kota/kabupaten' : type]) {
+         setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[type === 'kota' ? 'kota/kabupaten' : type];
+            return newErrors;
+         });
+    }
+
+    if (type === "provinsi") {
+      setSelectedRegionIds({ provinceId: selectedId, regencyId: "", districtId: "", villageId: "" });
+      setFormData(prev => ({ 
+          ...prev, 
+          provinsi: selectedName, 
+          "kota/kabupaten": "", 
+          kecamatan: "", 
+          kelurahan: "" 
+      }));
+      setRegions(prev => ({ ...prev, regencies: [], districts: [], villages: [] }));
+      
+      if (selectedId) {
+        fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${selectedId}.json`)
+          .then(res => res.json())
+          .then(data => setRegions(prev => ({ ...prev, regencies: data })));
+      }
+
+    } else if (type === "kota") {
+      setSelectedRegionIds(prev => ({ ...prev, regencyId: selectedId, districtId: "", villageId: "" }));
+      setFormData(prev => ({ ...prev, "kota/kabupaten": selectedName, kecamatan: "", kelurahan: "" }));
+      setRegions(prev => ({ ...prev, districts: [], villages: [] }));
+
+      if (selectedId) {
+        fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/districts/${selectedId}.json`)
+          .then(res => res.json())
+          .then(data => setRegions(prev => ({ ...prev, districts: data })));
+      }
+
+    } else if (type === "kecamatan") {
+      setSelectedRegionIds(prev => ({ ...prev, districtId: selectedId, villageId: "" }));
+      setFormData(prev => ({ ...prev, kecamatan: selectedName, kelurahan: "" }));
+      setRegions(prev => ({ ...prev, villages: [] }));
+
+      if (selectedId) {
+        fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/villages/${selectedId}.json`)
+          .then(res => res.json())
+          .then(data => setRegions(prev => ({ ...prev, villages: data })));
+      }
+
+    } else if (type === "kelurahan") {
+      setSelectedRegionIds(prev => ({ ...prev, villageId: selectedId }));
+      setFormData(prev => ({ ...prev, kelurahan: selectedName }));
+    }
+  };
+
+  // --- SUBMIT ---
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -191,16 +365,12 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
     setGeneralError("");
 
     try {
-      // Endpoint: Route::post('/profile', [ProfileController::class, 'store']);
       await api.post("/profile", formData);
-      
       await refreshProfile();
       setViewMode("summary");
-      
     } catch (error) {
       console.error("Error saving profile:", error);
       if (error.response) {
-        // Handle Error Validasi Laravel (422)
         if (error.response.status === 422) {
           setErrors(error.response.data.errors);
           setGeneralError("Terdapat kesalahan pada input data. Mohon periksa field bertanda merah.");
@@ -242,7 +412,7 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
 
       <form onSubmit={handleSaveProfile} className="space-y-8 pb-24">
         
-        {/* SECTION 1: Data Identitas (KTP) */}
+        {/* SECTION 1: Identitas */}
         <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
            <h2 className="text-lg font-bold text-neutral-800 mb-5 flex items-center pb-2 border-b border-neutral-100">
              <Clipboard className="w-5 h-5 mr-2 text-primary-600" /> Identitas Diri (Sesuai KTP)
@@ -257,7 +427,7 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
                         required 
                         value={formData.noKTP} 
                         onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').slice(0, 16); // Hanya angka, max 16
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 16);
                             handleChange({ target: { name: 'noKTP', value: val } });
                         }}
                         icon={Clipboard}
@@ -266,7 +436,6 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
                     />
                 </div>
                 
-                {/* Opsi harus sama persis dengan Enum Database: 'Laki-laki', 'Perempuan' */}
                 <InputField 
                     label="Jenis Kelamin" 
                     type="select" 
@@ -393,7 +562,7 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
            </div>
         </div>
 
-        {/* SECTION 3: Domisili */}
+        {/* SECTION 3: Domisili (UPDATED WITH DROPDOWN) */}
         <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm">
            <h2 className="text-lg font-bold text-neutral-800 mb-5 flex items-center pb-2 border-b border-neutral-100">
              <MapPin className="w-5 h-5 mr-2 text-primary-600" /> Alamat Domisili
@@ -412,39 +581,51 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
                         hasError={!!errors.alamat}
                     />
                 </div>
-                <InputField 
-                    label="Provinsi" 
-                    type="text" 
-                    name="provinsi" 
-                    required 
-                    value={formData.provinsi} 
-                    onChange={handleChange} 
+                
+                {/* Dependent Dropdowns */}
+                <RegionSelect 
+                  label="Provinsi"
+                  name="provinsi"
+                  placeholder="Pilih Provinsi"
+                  value={selectedRegionIds.provinceId}
+                  onChange={(e) => handleRegionChange("provinsi", e)}
+                  options={regions.provinces}
+                  hasError={!!errors.provinsi}
                 />
-                {/* Perhatikan name menggunakan 'kota/kabupaten' sesuai backend */}
-                <InputField 
-                    label="Kota / Kabupaten" 
-                    type="text" 
-                    name="kota/kabupaten" 
-                    required 
-                    value={formData["kota/kabupaten"]} 
-                    onChange={handleChange} 
+
+                <RegionSelect 
+                  label="Kota / Kabupaten"
+                  name="kota/kabupaten"
+                  placeholder="Pilih Kota/Kab"
+                  value={selectedRegionIds.regencyId}
+                  onChange={(e) => handleRegionChange("kota", e)}
+                  options={regions.regencies}
+                  disabled={!selectedRegionIds.provinceId}
+                  hasError={!!errors["kota/kabupaten"]}
                 />
-                <InputField 
-                    label="Kecamatan" 
-                    type="text" 
-                    name="kecamatan" 
-                    required 
-                    value={formData.kecamatan} 
-                    onChange={handleChange} 
+
+                <RegionSelect 
+                  label="Kecamatan"
+                  name="kecamatan"
+                  placeholder="Pilih Kecamatan"
+                  value={selectedRegionIds.districtId}
+                  onChange={(e) => handleRegionChange("kecamatan", e)}
+                  options={regions.districts}
+                  disabled={!selectedRegionIds.regencyId}
+                  hasError={!!errors.kecamatan}
                 />
-                <InputField 
-                    label="Kelurahan / Desa" 
-                    type="text" 
-                    name="kelurahan" 
-                    required 
-                    value={formData.kelurahan} 
-                    onChange={handleChange} 
+
+                <RegionSelect 
+                  label="Kelurahan / Desa"
+                  name="kelurahan"
+                  placeholder="Pilih Kelurahan"
+                  value={selectedRegionIds.villageId}
+                  onChange={(e) => handleRegionChange("kelurahan", e)}
+                  options={regions.villages}
+                  disabled={!selectedRegionIds.districtId}
+                  hasError={!!errors.kelurahan}
                 />
+
                 <div className="col-span-full">
                      <InputField 
                         label="Lokasi / Patokan (Opsional)" 
@@ -493,7 +674,6 @@ const ProfileCompletionForm = ({ setViewMode, initialProfileData, userData, refr
                     </div>
                 </div>
 
-                {/* Logika Tampilan Field Asuransi: Hanya muncul jika penjaminan = asuransi */}
                 {formData.penjaminan === 'asuransi' && (
                     <div className="grid md:grid-cols-2 gap-5 p-5 bg-neutral-50 rounded-xl border border-neutral-200 mt-4 animate-in fade-in slide-in-from-top-2">
                         <InputField 
@@ -631,7 +811,6 @@ const ProfileSummaryView = ({ profileData, userData, isComplete, setViewMode }) 
              <div className="grid md:grid-cols-2 gap-6">
                  <div>
                     <h4 className="text-sm font-bold text-neutral-900 mb-3">Kontak Pribadi</h4>
-                    {/* Tampilkan nomor telepon dari tabel profil */}
                     <InfoItem label="Nomor Telepon" value={profileData?.nomor_telepon} />
                  </div>
                  <div className="bg-neutral-50 p-4 rounded-xl">
@@ -654,7 +833,6 @@ const ProfileSummaryView = ({ profileData, userData, isComplete, setViewMode }) 
                     <div className="grid grid-cols-2 gap-4">
                         <InfoItem label="Kelurahan" value={profileData?.kelurahan} />
                         <InfoItem label="Kecamatan" value={profileData?.kecamatan} />
-                        {/* Mengakses key dengan bracket notation karena ada slash */}
                         <InfoItem label="Kota/Kab" value={profileData?.["kota/kabupaten"]} />
                         <InfoItem label="Provinsi" value={profileData?.provinsi} />
                     </div>
@@ -707,26 +885,20 @@ export default function ProfilePage() {
         return;
       }
 
-      // Ambil data User dari localStorage (untuk nama dan email)
       const storedUser = localStorage.getItem("user");
       setUserData(storedUser ? JSON.parse(storedUser) : { name: "Loading..." });
 
-      // GET data profil dari backend (ProfileController@show)
       const response = await api.get("/profile");
       
-      // Response backend: { message: "...", data: { ... } }
       if (response.data && response.data.data) {
          setProfileData(response.data.data);
-         // Jika profil ditemukan, pastikan mode summary
          setViewMode("summary");
       } else {
-         // Fallback jika format response berbeda
          setProfileData(response.data);
       }
 
     } catch (error) {
       if (error.response && error.response.status === 404) {
-        // 404 dari Backend artinya "Profile tidak ditemukan" -> Arahkan user untuk mengisi form
         setProfileData({});
         setViewMode("complete");
       } else if (error.response && error.response.status === 401) {
@@ -744,7 +916,6 @@ export default function ProfilePage() {
     fetchProfileData();
   }, []);
 
-  // Cek apakah data kritikal sudah terisi (sebagai indikator profil lengkap)
   const isProfileComplete = profileData && profileData.noKTP && profileData.noKTP.length >= 16;
 
   if (isLoading) {
@@ -771,7 +942,6 @@ export default function ProfilePage() {
         <Sidebar
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
-          // Menggabungkan data user (akun) dan data profil untuk ditampilkan di sidebar
           profileData={{ ...userData, ...profileData }} 
         />
 

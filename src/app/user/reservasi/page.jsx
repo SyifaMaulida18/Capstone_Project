@@ -18,6 +18,20 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+// --- DAFTAR KATA KUNCI KELUHAN (DARI GAMBAR) ---
+const VALID_KEYWORDS = [
+  "nyeri", "demam", "flu", "pilek", "pusing", "covid", "virus",
+  "batuk", "sesak", "napas", "dada", "jantung", "telinga", 
+  "radang", "sakit", "mata", "penglihatan", "kabur", "gusi", 
+  "gigi", "mulut", "behel", "cabut", "ruam", "gatal", "jerawat", 
+  "buang air", "mual", "muntah", "diare", "tifus", "hepatitis", 
+  "diabetes", "kesemutan", "mati rasa", "patah", "tulang", "cedera", 
+  "benjolan", "pendarahan", "darah", "bayi", "anak", "hamil", 
+  "kandungan", "asi", "terapi", "fisik", "lansia", "diet", 
+  "hiv", "cek", "kesehatan", "imunisasi", "kejang", "kepala", 
+  "tangan", "bicara"
+];
+
 // --- Helper Input dengan Validasi Error ---
 function InputField({
   label,
@@ -29,7 +43,7 @@ function InputField({
   disabled,
   maxLength,
   placeholder,
-  error, // Props error baru
+  error,
 }) {
   return (
     <div>
@@ -51,22 +65,13 @@ function InputField({
             : "border-gray-300 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600"
         } ${disabled ? "font-medium" : "bg-white"}`}
       />
-      {error && <p className="text-red-500 text-xs mt-1 font-medium">{error}</p>}
+      {error && <p className="text-red-500 text-xs mt-1 font-medium animate-pulse">{error}</p>}
     </div>
   );
 }
 
 // --- Helper Select dengan Validasi Error ---
-function SelectField({
-  label,
-  name,
-  value,
-  onChange,
-  options,
-  required,
-  disabled,
-  error, // Props error baru
-}) {
+function SelectField({ label, name, value, onChange, options, required, disabled, error }) {
   return (
     <div>
       <label className="block text-sm font-bold text-gray-700 mb-1">
@@ -96,44 +101,70 @@ function SelectField({
   );
 }
 
+// --- Helper Region Select ---
+function RegionSelect({ label, name, value, onChange, options, disabled, placeholder, error }) {
+  return (
+    <div>
+      <label className="block text-sm font-bold text-gray-700 mb-1">
+        {label} <span className="text-red-500">*</span>
+      </label>
+      <div className="relative">
+        <select
+          name={name}
+          value={value || ""}
+          onChange={onChange}
+          disabled={disabled}
+          className={`w-full p-3 border rounded-xl outline-none transition-all appearance-none ${
+            error
+              ? "border-red-500 focus:ring-2 focus:ring-red-500 bg-red-50"
+              : disabled
+              ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "border-gray-300 focus:ring-2 focus:ring-blue-500 bg-white"
+          }`}
+        >
+          <option value="">-- {placeholder} --</option>
+          {options.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.name}
+            </option>
+          ))}
+        </select>
+        <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+        </div>
+      </div>
+      {error && <p className="text-red-500 text-xs mt-1 font-medium">{error}</p>}
+    </div>
+  );
+}
+
 export default function ReservasiPage() {
   const router = useRouter();
 
-  // --- STATE UMUM ---
+  // --- STATE ---
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [isCheckingAI, setIsCheckingAI] = useState(false);
-  const [error, setError] = useState(""); // Error global (API)
+  const [error, setError] = useState("");
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [todayStr, setTodayStr] = useState("");
-
-  // State Validasi Form (Per Field)
   const [fieldErrors, setFieldErrors] = useState({});
-
-  // Hasil AI
   const [aiRecommendation, setAiRecommendation] = useState(null);
   const [aiResult, setAiResult] = useState(null);
-
-  // Data master
   const [allSchedules, setAllSchedules] = useState([]);
   const [polis, setPolis] = useState([]);
   const [dokters, setDokters] = useState([]);
-
-  // Jadwal dokter
   const [selectedDoctorSchedule, setSelectedDoctorSchedule] = useState(null);
   const [availableDaysText, setAvailableDaysText] = useState("");
-
-  // Data user & Pasien
   const [isSelf, setIsSelf] = useState(true);
   const [localUserData, setLocalUserData] = useState(null);
   const [apiProfileData, setApiProfileData] = useState(null);
-
-  // State Dropdown Profil
   const [selectedProfileId, setSelectedProfileId] = useState("self");
   const [savedPatients, setSavedPatients] = useState([]);
-
-  // Form Data
+  const [regions, setRegions] = useState({ provinces: [], regencies: [], districts: [], villages: [] });
+  const [selectedRegionIds, setSelectedRegionIds] = useState({ provinceId: "", regencyId: "", districtId: "", villageId: "" });
+  
   const [formData, setFormData] = useState({
     nama: "", email: "", nomor_whatsapp: "", nomor_ktp: "",
     tempat_lahir: "", tanggal_lahir: "", jenis_kelamin: "Laki-laki",
@@ -144,43 +175,105 @@ export default function ReservasiPage() {
     penjaminan: "cash", nama_asuransi: "", nomor_asuransi: "",
   });
 
-  // --- LOGIKA VALIDASI REAL-TIME ---
+  // --- LOGIKA VALIDASI REAL-TIME (DIPERBARUI) ---
   const validateField = (name, value) => {
     let errorMsg = "";
-
+    const letterOnlyRegex = /^[a-zA-Z\s\.\,\']+$/;
+    
     switch (name) {
-      case "email":
-        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-          errorMsg = "Format email tidak valid.";
+      case "keluhan":
+        if (!value) {
+            errorMsg = "Keluhan utama wajib diisi.";
+        } else {
+            // 1. Cek Minimal 2 Kata
+            const wordCount = value.trim().split(/\s+/).length;
+            if (wordCount < 2) {
+                errorMsg = "Keluhan minimal harus terdiri dari 2 kata.";
+            } else {
+                // 2. Cek Keyword (Hanya jika jumlah kata sudah cukup)
+                const lowerVal = value.toLowerCase();
+                const hasKeyword = VALID_KEYWORDS.some(keyword => lowerVal.includes(keyword));
+                if (!hasKeyword) {
+                    errorMsg = "Mohon jelaskan keluhan medis Anda lebih spesifik (contoh: demam, nyeri, pusing, dll).";
+                }
+            }
         }
         break;
-      case "nomor_ktp":
-        if (value && (!/^\d+$/.test(value) || value.length !== 16)) {
-          errorMsg = "Nomor KTP harus 16 digit angka.";
-        }
-        break;
-      case "nomor_whatsapp":
-        if (value && !/^\d+$/.test(value)) {
-          errorMsg = "Nomor HP hanya boleh angka.";
-        }
-        break;
+
       case "nama":
+        if (value) {
+            if (value.trim().length <= 1) {
+                errorMsg = "Nama harus lebih dari 1 huruf.";
+            } else if (!letterOnlyRegex.test(value)) {
+                errorMsg = "Nama hanya boleh berisi huruf.";
+            }
+        } else {
+            errorMsg = "Nama wajib diisi.";
+        }
+        break;
+
+      case "nomor_whatsapp":
+        if (value) {
+            if (!/^\d+$/.test(value)) {
+                errorMsg = "Nomor HP hanya boleh angka.";
+            } else if (value.length < 10) {
+                errorMsg = "Nomor WhatsApp minimal 10 digit.";
+            }
+        } else {
+            errorMsg = "Nomor WhatsApp wajib diisi.";
+        }
+        break;
+
       case "tempat_lahir":
+        if (value && !letterOnlyRegex.test(value)) {
+            errorMsg = "Tempat lahir hanya boleh huruf.";
+        } else if (!value) {
+            errorMsg = "Tempat lahir wajib diisi.";
+        }
+        break;
+
+      case "suku":
+        if (value && !letterOnlyRegex.test(value)) {
+            errorMsg = "Suku hanya boleh huruf.";
+        }
+        break;
+
+      case "status_keluarga":
+        if (value && !letterOnlyRegex.test(value)) {
+            errorMsg = "Status hubungan hanya boleh huruf.";
+        }
+        break;
+
+      case "nama_keluarga":
+        if (value && !letterOnlyRegex.test(value)) {
+            errorMsg = "Nama keluarga hanya boleh huruf.";
+        }
+        break;
+
+      case "email":
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) errorMsg = "Format email tidak valid.";
+        break;
+
+      case "nomor_ktp":
+        if (value && (!/^\d+$/.test(value) || value.length !== 16)) errorMsg = "Nomor KTP harus 16 digit angka.";
+        break;
+
       case "tanggal_lahir":
       case "alamat":
-      case "keluhan":
+      case "provinsi":
+      case "kota_kabupaten":
+      case "kecamatan":
+      case "kelurahan":
         if (!value) errorMsg = "Field ini wajib diisi.";
         break;
+
       default:
         break;
     }
     return errorMsg;
   };
 
-  // --- UTIL: HARI PRAKTEK ---
-  const isPraktekActive = (val) =>
-    val == 1 || val === "1" || val === "Y" || val === "y" || val === true;
-
+  const isPraktekActive = (val) => val == 1 || val === "1" || val === "Y" || val === "y" || val === true;
   const getDoctorActiveDays = (jadwal) => {
     if (!jadwal) return [];
     const days = [];
@@ -193,7 +286,6 @@ export default function ReservasiPage() {
     if (isPraktekActive(jadwal.sabtu_praktek)) days.push(6);
     return days;
   };
-
   const generateAvailableDaysText = (jadwal) => {
     if (!jadwal) return "";
     const mapDay = {
@@ -207,7 +299,6 @@ export default function ReservasiPage() {
     return textArr.length > 0 ? textArr.join(", ") : "Tidak ada jadwal praktek";
   };
 
-  // --- PREFILL DATA ---
   const fillSelfData = useCallback((user, profile) => {
     setFormData((prev) => ({
       ...prev,
@@ -234,7 +325,6 @@ export default function ReservasiPage() {
       nama_asuransi: profile?.nama_asuransi || "",
       nomor_asuransi: profile?.nomor_asuransi || "",
     }));
-    // Reset error saat autofill
     setFieldErrors({});
   }, []);
 
@@ -248,6 +338,7 @@ export default function ReservasiPage() {
       status_keluarga: "", nama_keluarga: "",
       penjaminan: "cash", nama_asuransi: "", nomor_asuransi: "",
     }));
+    setSelectedRegionIds({ provinceId: "", regencyId: "", districtId: "", villageId: "" });
     setFieldErrors({});
   };
 
@@ -280,15 +371,15 @@ export default function ReservasiPage() {
     setFieldErrors({});
   };
 
-  // --- FETCH DATA AWAL ---
   useEffect(() => {
     setTodayStr(new Date().toISOString().split("T")[0]);
-
     const fetchData = async () => {
       setLoadingData(true);
-      setError("");
-
       try {
+        const provRes = await fetch("https://www.emsifa.com/api-wilayah-indonesia/api/provinces.json");
+        const provinces = await provRes.json();
+        setRegions(prev => ({ ...prev, provinces }));
+
         const jadwalRes = await api.get("/jadwal-dokter");
         const rawSchedules = jadwalRes.data?.data ?? jadwalRes.data ?? [];
         setAllSchedules(rawSchedules);
@@ -296,9 +387,7 @@ export default function ReservasiPage() {
         const uniquePolisMap = new Map();
         rawSchedules.forEach((item) => {
           if (item.poli && item.poli.poli_id) {
-            if (!uniquePolisMap.has(item.poli.poli_id)) {
-              uniquePolisMap.set(item.poli.poli_id, item.poli);
-            }
+            if (!uniquePolisMap.has(item.poli.poli_id)) uniquePolisMap.set(item.poli.poli_id, item.poli);
           }
         });
         setPolis(Array.from(uniquePolisMap.values()));
@@ -326,9 +415,8 @@ export default function ReservasiPage() {
           const uniquePatients = [];
           const seenKTP = new Set();
           if (currentProfile?.noKTP) seenKTP.add(currentProfile.noKTP);
-
           historyData.forEach((res) => {
-            if (res.nomor_ktp && res.is_self !== 1 && res.is_self !== "1" && res.is_self !== true) {
+            if (res.nomor_ktp && res.is_self !== 1 && res.is_self !== true) {
               if (!seenKTP.has(res.nomor_ktp)) {
                 seenKTP.add(res.nomor_ktp);
                 uniquePatients.push(res);
@@ -336,36 +424,63 @@ export default function ReservasiPage() {
             }
           });
           setSavedPatients(uniquePatients);
-        } catch (histErr) {
-          console.warn("History fetch warning:", histErr);
-        }
+        } catch (histErr) {}
       } catch (err) {
-        setError("Gagal memuat data jadwal dokter.");
+        setError("Gagal memuat data awal.");
       } finally {
         setLoadingData(false);
       }
     };
-
     fetchData();
   }, [fillSelfData]);
 
   const filterDoctorsByPoli = (poliId) => {
-    if (!poliId) {
-      setDokters([]);
-      return;
-    }
-    const filteredSchedules = allSchedules.filter(
-      (schedule) => String(schedule.poli_id) === String(poliId)
-    );
+    if (!poliId) { setDokters([]); return; }
+    const filteredSchedules = allSchedules.filter(s => String(s.poli_id) === String(poliId));
     setDokters(filteredSchedules);
   };
 
-  // --- HANDLERS DENGAN VALIDASI ---
+  const handleRegionChange = (type, e) => {
+    const selectedId = e.target.value;
+    const index = e.target.selectedIndex;
+    const selectedName = e.target.options[index].text;
+    const fieldName = type === 'kota' ? 'kota_kabupaten' : type;
+    setFieldErrors(prev => ({ ...prev, [fieldName]: "" }));
+
+    if (type === "provinsi") {
+        setSelectedRegionIds({ provinceId: selectedId, regencyId: "", districtId: "", villageId: "" });
+        setFormData(prev => ({ ...prev, provinsi: selectedName, kota_kabupaten: "", kecamatan: "", kelurahan: "" }));
+        setRegions(prev => ({ ...prev, regencies: [], districts: [], villages: [] }));
+        if (selectedId) {
+            fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${selectedId}.json`)
+                .then(res => res.json()).then(data => setRegions(prev => ({ ...prev, regencies: data })));
+        }
+    } else if (type === "kota") {
+        setSelectedRegionIds(prev => ({ ...prev, regencyId: selectedId, districtId: "", villageId: "" }));
+        setFormData(prev => ({ ...prev, kota_kabupaten: selectedName, kecamatan: "", kelurahan: "" }));
+        setRegions(prev => ({ ...prev, districts: [], villages: [] }));
+        if (selectedId) {
+            fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/districts/${selectedId}.json`)
+                .then(res => res.json()).then(data => setRegions(prev => ({ ...prev, districts: data })));
+        }
+    } else if (type === "kecamatan") {
+        setSelectedRegionIds(prev => ({ ...prev, districtId: selectedId, villageId: "" }));
+        setFormData(prev => ({ ...prev, kecamatan: selectedName, kelurahan: "" }));
+        setRegions(prev => ({ ...prev, villages: [] }));
+        if (selectedId) {
+            fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/villages/${selectedId}.json`)
+                .then(res => res.json()).then(data => setRegions(prev => ({ ...prev, villages: data })));
+        }
+    } else if (type === "kelurahan") {
+        setSelectedRegionIds(prev => ({ ...prev, villageId: selectedId }));
+        setFormData(prev => ({ ...prev, kelurahan: selectedName }));
+    }
+  };
+
   const handleProfileChange = (e) => {
     const val = e.target.value;
     setSelectedProfileId(val);
     setError("");
-
     if (val === "self") {
       setIsSelf(true);
       fillSelfData(localUserData, apiProfileData);
@@ -375,33 +490,21 @@ export default function ReservasiPage() {
     } else {
       setIsSelf(false);
       const patientData = savedPatients[parseInt(val)];
-      if (patientData) {
-        fillHistoryData(patientData);
-      }
+      if (patientData) fillHistoryData(patientData);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Validasi langsung saat mengetik
     const errorMsg = validateField(name, value);
-    setFieldErrors((prev) => ({
-      ...prev,
-      [name]: errorMsg,
-    }));
+    setFieldErrors((prev) => ({ ...prev, [name]: errorMsg }));
   };
 
   const handlePoliChange = (e) => {
     const selectedPoliId = e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      poli_id: selectedPoliId,
-      dokter_id: "",
-      tanggal_reservasi: "",
-    }));
-    setFieldErrors((prev) => ({ ...prev, poli_id: "", dokter_id: "", tanggal_reservasi: "" }));
+    setFormData(prev => ({ ...prev, poli_id: selectedPoliId, dokter_id: "", tanggal_reservasi: "" }));
+    setFieldErrors(prev => ({ ...prev, poli_id: "", dokter_id: "", tanggal_reservasi: "" }));
     setSelectedDoctorSchedule(null);
     setAvailableDaysText("");
     filterDoctorsByPoli(selectedPoliId);
@@ -409,17 +512,10 @@ export default function ReservasiPage() {
 
   const handleDokterChange = (e) => {
     const docId = e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      dokter_id: docId,
-      tanggal_reservasi: "",
-    }));
-    setFieldErrors((prev) => ({ ...prev, dokter_id: "", tanggal_reservasi: "" }));
-
+    setFormData(prev => ({ ...prev, dokter_id: docId, tanggal_reservasi: "" }));
+    setFieldErrors(prev => ({ ...prev, dokter_id: "", tanggal_reservasi: "" }));
     if (docId) {
-      const selectedSchedule = dokters.find(
-        (d) => String(d.dokter_id) === String(docId)
-      );
+      const selectedSchedule = dokters.find(d => String(d.dokter_id) === String(docId));
       setSelectedDoctorSchedule(selectedSchedule || null);
       setAvailableDaysText(generateAvailableDaysText(selectedSchedule));
     } else {
@@ -430,54 +526,104 @@ export default function ReservasiPage() {
 
   const handleDateChange = (e) => {
     const dateVal = e.target.value;
-    setFieldErrors((prev) => ({ ...prev, tanggal_reservasi: "" }));
-
-    if (!dateVal) {
-      setFormData((prev) => ({ ...prev, tanggal_reservasi: "" }));
-      return;
-    }
-
-    if (!selectedDoctorSchedule) {
-      setFieldErrors((prev) => ({ ...prev, dokter_id: "Pilih dokter dulu" }));
-      setFormData((prev) => ({ ...prev, tanggal_reservasi: "" }));
-      return;
-    }
-
+    setFieldErrors(prev => ({ ...prev, tanggal_reservasi: "" }));
+    if (!dateVal) { setFormData(prev => ({ ...prev, tanggal_reservasi: "" })); return; }
+    if (!selectedDoctorSchedule) { setFieldErrors(prev => ({ ...prev, dokter_id: "Pilih dokter dulu" })); setFormData(prev => ({ ...prev, tanggal_reservasi: "" })); return; }
+    
     const selectedDate = new Date(dateVal);
     const dayIndex = selectedDate.getDay();
     const activeDays = getDoctorActiveDays(selectedDoctorSchedule);
-
     if (!activeDays.includes(dayIndex)) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        tanggal_reservasi: `Dokter libur. Tersedia: ${availableDaysText}`,
-      }));
-      setFormData((prev) => ({ ...prev, tanggal_reservasi: "" }));
+      setFieldErrors(prev => ({ ...prev, tanggal_reservasi: `Dokter libur. Tersedia: ${availableDaysText}` }));
+      setFormData(prev => ({ ...prev, tanggal_reservasi: "" }));
     } else {
-      setFormData((prev) => ({ ...prev, tanggal_reservasi: dateVal }));
+      setFormData(prev => ({ ...prev, tanggal_reservasi: dateVal }));
     }
   };
 
-  // --- LOGIKA STEP VALIDATION SEBELUM LANJUT ---
+  // --- LOGIKA STEP VALIDATION (DIPERBARUI) ---
   const validateStep1 = () => {
     const errors = {};
-    if (!formData.keluhan) errors.keluhan = "Keluhan utama wajib diisi.";
+    const letterOnlyRegex = /^[a-zA-Z\s\.\,\']+$/;
+
+    // VALIDASI KELUHAN (Keyword Check + Min 2 Words)
+    if (!formData.keluhan) {
+        errors.keluhan = "Keluhan utama wajib diisi.";
+    } else {
+        // 1. Cek jumlah kata
+        const wordCount = formData.keluhan.trim().split(/\s+/).length;
+        if (wordCount < 2) {
+            errors.keluhan = "Keluhan minimal harus terdiri dari 2 kata.";
+        } else {
+            // 2. Cek keyword jika kata sudah cukup
+            const lowerVal = formData.keluhan.toLowerCase();
+            const hasKeyword = VALID_KEYWORDS.some(keyword => lowerVal.includes(keyword));
+            if (!hasKeyword) {
+                errors.keluhan = "Mohon jelaskan keluhan medis Anda lebih spesifik (contoh: demam, nyeri, pusing, dll).";
+            }
+        }
+    }
 
     if (isSelf) {
       if (!apiProfileData?.noKTP) errors.nomor_ktp = "Profil: KTP belum lengkap.";
       if (!apiProfileData?.tanggal_lahir) errors.tanggal_lahir = "Profil: Tanggal Lahir belum lengkap.";
     } else {
-      if (!formData.nama) errors.nama = "Nama wajib diisi.";
+      // Validasi Nama
+      if (!formData.nama) {
+          errors.nama = "Nama wajib diisi.";
+      } else if (formData.nama.trim().length <= 1) {
+          errors.nama = "Nama harus lebih dari 1 huruf.";
+      } else if (!letterOnlyRegex.test(formData.nama)) {
+          errors.nama = "Nama hanya boleh berisi huruf.";
+      }
+
+      // Validasi KTP
       if (!formData.nomor_ktp) errors.nomor_ktp = "Nomor KTP wajib diisi.";
-      else if (formData.nomor_ktp.length !== 16) errors.nomor_ktp = "KTP harus 16 digit.";
+      else if (!/^\d+$/.test(formData.nomor_ktp) || formData.nomor_ktp.length !== 16) errors.nomor_ktp = "KTP harus 16 digit angka.";
       
+      // Validasi Email
       if (!formData.email) errors.email = "Email wajib diisi.";
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) errors.email = "Format email salah.";
 
-      if (!formData.nomor_whatsapp) errors.nomor_whatsapp = "WhatsApp wajib diisi.";
-      if (!formData.tempat_lahir) errors.tempat_lahir = "Tempat lahir wajib diisi.";
+      // Validasi WhatsApp
+      if (!formData.nomor_whatsapp) {
+          errors.nomor_whatsapp = "WhatsApp wajib diisi.";
+      } else if (!/^\d+$/.test(formData.nomor_whatsapp)) {
+          errors.nomor_whatsapp = "Nomor HP hanya boleh angka.";
+      } else if (formData.nomor_whatsapp.length < 10) {
+          errors.nomor_whatsapp = "Nomor WhatsApp minimal 10 digit.";
+      }
+
+      // Validasi Tempat Lahir
+      if (!formData.tempat_lahir) {
+          errors.tempat_lahir = "Tempat lahir wajib diisi.";
+      } else if (!letterOnlyRegex.test(formData.tempat_lahir)) {
+          errors.tempat_lahir = "Tempat lahir hanya boleh huruf.";
+      }
+
       if (!formData.tanggal_lahir) errors.tanggal_lahir = "Tanggal lahir wajib diisi.";
       if (!formData.alamat) errors.alamat = "Alamat wajib diisi.";
+      
+      // Validasi Suku
+      if (formData.suku && !letterOnlyRegex.test(formData.suku)) {
+          errors.suku = "Suku hanya boleh huruf.";
+      }
+
+      // Validasi Status Keluarga
+      if (formData.status_keluarga && !letterOnlyRegex.test(formData.status_keluarga)) {
+          errors.status_keluarga = "Status hubungan hanya boleh huruf.";
+      }
+
+      // Validasi Nama Keluarga
+      if (formData.nama_keluarga && !letterOnlyRegex.test(formData.nama_keluarga)) {
+          errors.nama_keluarga = "Nama keluarga hanya boleh huruf.";
+      }
+
+      // Validasi Wilayah
+      if (!formData.provinsi) errors.provinsi = "Pilih provinsi.";
+      if (!formData.kota_kabupaten) errors.kota_kabupaten = "Pilih kota.";
+      if (!formData.kecamatan) errors.kecamatan = "Pilih kecamatan.";
+      if (!formData.kelurahan) errors.kelurahan = "Pilih kelurahan.";
     }
 
     setFieldErrors(errors);
@@ -501,20 +647,15 @@ export default function ReservasiPage() {
 
   const nextStep = async () => {
     setError("");
-
     if (currentStep === 1) {
       const isValid = validateStep1();
-      if (!isValid) return; // Stop jika ada error
-
+      if (!isValid) return; 
       setIsCheckingAI(true);
       try {
         const payloadAI = {
           keluhan: formData.keluhan,
           is_self: isSelf,
-          ...(!isSelf && {
-            tanggal_lahir: formData.tanggal_lahir,
-            jenis_kelamin: formData.jenis_kelamin,
-          }),
+          ...(!isSelf && { tanggal_lahir: formData.tanggal_lahir, jenis_kelamin: formData.jenis_kelamin }),
         };
         const res = await api.post("/reservations/check-poli", payloadAI);
         if (res.data && res.data.success) {
@@ -528,12 +669,10 @@ export default function ReservasiPage() {
       }
       return;
     }
-
     if (currentStep === 2) {
       const isValid = validateStep2();
-      if (!isValid) return; // Stop jika ada error
+      if (!isValid) return; 
     }
-
     setCurrentStep((prev) => prev + 1);
   };
 
@@ -808,29 +947,49 @@ export default function ReservasiPage() {
                         />
                         {fieldErrors.alamat && <p className="text-red-500 text-xs mt-1">{fieldErrors.alamat}</p>}
                       </div>
-                      <InputField
+
+                      {/* IMPLEMENTASI DEPENDENT DROPDOWN WILAYAH */}
+                      <RegionSelect 
                         label="Provinsi"
                         name="provinsi"
-                        value={formData.provinsi}
-                        onChange={handleChange}
+                        placeholder="Pilih Provinsi"
+                        value={selectedRegionIds.provinceId}
+                        onChange={(e) => handleRegionChange("provinsi", e)}
+                        options={regions.provinces}
+                        error={fieldErrors.provinsi}
                       />
-                      <InputField
+
+                      <RegionSelect 
                         label="Kota/Kabupaten"
                         name="kota_kabupaten"
-                        value={formData.kota_kabupaten}
-                        onChange={handleChange}
+                        placeholder="Pilih Kota/Kab"
+                        value={selectedRegionIds.regencyId}
+                        onChange={(e) => handleRegionChange("kota", e)}
+                        options={regions.regencies}
+                        disabled={!selectedRegionIds.provinceId}
+                        error={fieldErrors.kota_kabupaten}
                       />
-                      <InputField
+
+                      <RegionSelect 
                         label="Kecamatan"
                         name="kecamatan"
-                        value={formData.kecamatan}
-                        onChange={handleChange}
+                        placeholder="Pilih Kecamatan"
+                        value={selectedRegionIds.districtId}
+                        onChange={(e) => handleRegionChange("kecamatan", e)}
+                        options={regions.districts}
+                        disabled={!selectedRegionIds.regencyId}
+                        error={fieldErrors.kecamatan}
                       />
-                      <InputField
+
+                      <RegionSelect 
                         label="Kelurahan"
                         name="kelurahan"
-                        value={formData.kelurahan}
-                        onChange={handleChange}
+                        placeholder="Pilih Kelurahan"
+                        value={selectedRegionIds.villageId}
+                        onChange={(e) => handleRegionChange("kelurahan", e)}
+                        options={regions.villages}
+                        disabled={!selectedRegionIds.districtId}
+                        error={fieldErrors.kelurahan}
                       />
                     </div>
 
@@ -845,12 +1004,7 @@ export default function ReservasiPage() {
                         value={formData.agama}
                         onChange={handleChange}
                         options={[
-                          "Islam",
-                          "Kristen",
-                          "Katolik",
-                          "Hindu",
-                          "Buddha",
-                          "Konghucu",
+                          "Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu",
                         ]}
                       />
                       <SelectField
@@ -859,10 +1013,7 @@ export default function ReservasiPage() {
                         value={formData.status_perkawinan}
                         onChange={handleChange}
                         options={[
-                          "Belum Kawin",
-                          "Kawin",
-                          "Cerai Hidup",
-                          "Cerai Mati",
+                          "Belum Kawin", "Kawin", "Cerai Hidup", "Cerai Mati",
                         ]}
                       />
                       <InputField
@@ -870,6 +1021,7 @@ export default function ReservasiPage() {
                         name="suku"
                         value={formData.suku}
                         onChange={handleChange}
+                        error={fieldErrors.suku}
                       />
                       <SelectField
                         label="Pendidikan Terakhir"
@@ -877,14 +1029,7 @@ export default function ReservasiPage() {
                         value={formData.pendidikan_terakhir}
                         onChange={handleChange}
                         options={[
-                          "SD",
-                          "SMP",
-                          "SMA/SMK",
-                          "D3",
-                          "S1",
-                          "S2",
-                          "S3",
-                          "Tidak Sekolah",
+                          "SD", "SMP", "SMA/SMK", "D3", "S1", "S2", "S3", "Tidak Sekolah",
                         ]}
                       />
                       <InputField
@@ -902,12 +1047,14 @@ export default function ReservasiPage() {
                         placeholder="Contoh: Suami, Istri, Anak"
                         value={formData.status_keluarga}
                         onChange={handleChange}
+                        error={fieldErrors.status_keluarga}
                       />
                       <InputField
                         label="Nama Keluarga Penanggung Jawab"
                         name="nama_keluarga"
                         value={formData.nama_keluarga}
                         onChange={handleChange}
+                        error={fieldErrors.nama_keluarga}
                       />
                     </div>
                   </div>
@@ -953,8 +1100,7 @@ export default function ReservasiPage() {
                         Poli {aiRecommendation.rekomendasi_nama}
                       </div>
                       <p className="text-xs text-gray-500 mt-2">
-                        *Silakan pilih poli lain jika saran ini dirasa kurang
-                        tepat.
+                        *Silakan pilih poli lain jika saran ini dirasa kurang tepat.
                       </p>
                     </div>
                   </div>
@@ -1062,7 +1208,6 @@ export default function ReservasiPage() {
                       className="w-full p-3 border border-gray-300 rounded-xl bg-white"
                     >
                       <option value="cash">Umum / Cash</option>
-                      <option value="bpjs">BPJS Kesehatan</option>
                       <option value="asuransi">Asuransi Swasta</option>
                     </select>
                   </div>
