@@ -80,8 +80,13 @@ export default function MedicalRecordsPage() {
         const reservation = r.reservasi || null;
         const user = reservation?.user || null; // Reservation::user()
 
-        const patientId = user?.userid;
-        const patientName = user?.name || `Pasien ${patientId}`;
+        // Resolve patient id robustly: prefer reservation.user.userid, fall back to booked_user_id, or top-level fields
+        const patientId =
+          user?.userid || reservation?.booked_user_id || r.booked_user_id || null;
+
+        // Resolve patient name with sensible fallbacks
+        const patientName =
+          user?.name || reservation?.booked_user?.name || reservation?.name || `Pasien ${patientId}`;
 
         if (!patientId) return;
 

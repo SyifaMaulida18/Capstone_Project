@@ -61,6 +61,22 @@ export default function AdminChatPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // If another page requested opening a chat, read localStorage intent
+  useEffect(() => {
+    const pendingId = localStorage.getItem('chat_open_with_id');
+    const pendingName = localStorage.getItem('chat_open_with_name');
+    if (pendingId) {
+      // set active after a short delay to allow contacts to load
+      setTimeout(() => {
+        setActiveChatId(Number(pendingId));
+        if (pendingName) setActiveChatName(pendingName);
+        // clear intent keys
+        localStorage.removeItem('chat_open_with_id');
+        localStorage.removeItem('chat_open_with_name');
+      }, 300);
+    }
+  }, []);
+
   // --- 3. Fetch Isi Percakapan ---
   const fetchConversation = async (userId) => {
     if (!userId) return;

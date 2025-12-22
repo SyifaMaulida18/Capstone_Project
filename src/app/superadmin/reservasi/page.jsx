@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 import {
   MagnifyingGlassIcon,
@@ -30,6 +31,16 @@ function Dialog({ show, onClose, children }) {
 }
 
 export default function ReservasiPage() {
+  const formatDateOnly = (d) => {
+    if (!d || d === "-") return d;
+    try {
+      const dt = new Date(d);
+      if (isNaN(dt)) return String(d).split("T")[0] || d;
+      return dt.toLocaleDateString("id-ID");
+    } catch (e) {
+      return String(d).split("T")[0] || d;
+    }
+  };
   const [reservations, setReservations] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -75,6 +86,7 @@ export default function ReservasiPage() {
 
         return {
           id,
+          userId: r.booked_user_id ?? r.userid ?? r.user?.userid ?? null,
           nama: r.nama,
           email: r.email,
           telp: r.nomor_whatsapp,
@@ -141,6 +153,20 @@ export default function ReservasiPage() {
     }
 
     setShowDetailDialog(true);
+  };
+
+  const router = useRouter();
+
+  const handleOpenChat = (reservasi) => {
+    const userId = reservasi.userId ?? reservasi.id;
+    if (!userId) {
+      alert('User ID pasien tidak tersedia.');
+      return;
+    }
+
+    localStorage.setItem('chat_open_with_id', String(userId));
+    localStorage.setItem('chat_open_with_name', reservasi.nama || 'Pasien');
+    router.push('/admin/chat');
   };
 
   // ✅ UBAH POLI RESERVASI (PUT /reservations/{id}/change-poli)
@@ -449,7 +475,7 @@ export default function ReservasiPage() {
                     {p.poli}
                   </td>
                   <td className="px-6 py-4 text-sm text-neutral-800">
-                    {p.tanggal}
+                    {formatDateOnly(p.tanggal)}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <span
@@ -473,6 +499,14 @@ export default function ReservasiPage() {
                         className="text-neutral-600 hover:text-red-600 p-1 rounded-md hover:bg-red-50"
                       >
                         <TrashIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => handleOpenChat(p)}
+                        disabled={!p.userId}
+                        className="text-neutral-600 hover:text-blue-600 p-1 rounded-md hover:bg-blue-50"
+                        title={p.userId ? `Chat dengan ${p.nama}` : 'User ID tidak tersedia'}
+                      >
+                        Chat
                       </button>
                       <button
                         onClick={() => handleDetail(p)}
@@ -506,7 +540,7 @@ export default function ReservasiPage() {
                 <strong>Nama Lengkap:</strong> {selectedReservation.nama}
               </p>
               <p>
-                <strong>Tanggal Lahir:</strong> {selectedReservation.tglLahir}
+                <strong>Tanggal Lahir:</strong> {formatDateOnly(selectedReservation.tglLahir)}
               </p>
               <p>
                 <strong>Jenis Kelamin:</strong> {selectedReservation.jk}
@@ -531,7 +565,7 @@ export default function ReservasiPage() {
               </p>
               <p>
                 <strong>Tanggal Reservasi:</strong>{" "}
-                {selectedReservation.tanggal}
+                {formatDateOnly(selectedReservation.tanggal)}
               </p>
               <p>
                 <strong>Status:</strong> {selectedReservation.status}
@@ -561,14 +595,25 @@ export default function ReservasiPage() {
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  onClick={handleChangePoli}
-                  disabled={processing || !selectedPoliId}
-                  className="mt-3 inline-flex items-center px-4 py-2 rounded-lg bg-secondary-500 text-white text-sm font-semibold hover:bg-secondary-600 disabled:opacity-60"
-                >
-                  Simpan Perubahan Poli
-                </button>
+                <div className="mt-3 flex flex-wrap gap-3 items-center">
+                  <button
+                    type="button"
+                    onClick={handleChangePoli}
+                    disabled={processing || !selectedPoliId}
+                    className="inline-flex items-center px-4 py-2 rounded-lg bg-secondary-500 text-white text-sm font-semibold hover:bg-secondary-600 disabled:opacity-60"
+                  >
+                    Simpan Perubahan Poli
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenChat(selectedReservation)}
+                    disabled={!selectedReservation}
+                    className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    Chat Pasien
+                  </button>
+                </div>
               </div>
 
               {/* TOMBOL VERIFY & CANCEL */}

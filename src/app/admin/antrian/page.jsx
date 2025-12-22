@@ -17,6 +17,7 @@ const MEDICAL_RECORDS_PATH = "/admin/rekam-medis";
 export default function AntrianDashboardPage() {
   const [polis, setPolis] = useState([]);
   const [selectedPoli, setSelectedPoli] = useState("");
+  const [groupedData, setGroupedData] = useState(null);
   // Inisialisasi tanggal hari ini (Format YYYY-MM-DD)
   const [tanggal, setTanggal] = useState(
     new Date().toISOString().slice(0, 10)
@@ -64,15 +65,16 @@ export default function AntrianDashboardPage() {
 
   // === 2. FUNGSI FETCH DASHBOARD ANTRIAN ===
   const fetchDashboard = async () => {
-    if (!selectedPoli || !tanggal) return;
+    if (!tanggal) return;
     try {
       setLoading(true);
       setErrorMsg("");
 
       const token = localStorage.getItem("token");
 
+      const poliParam = selectedPoli || "all";
       const url = `${API_BASE}/antrian/dashboard?poli_id=${encodeURIComponent(
-        selectedPoli
+        poliParam
       )}&tanggal=${encodeURIComponent(tanggal)}`;
 
       const res = await fetch(url, {
@@ -92,9 +94,18 @@ export default function AntrianDashboardPage() {
       const json = await res.json();
       const data = json.data || {};
 
-      setSedangDipanggil(data.sedang_dipanggil || null);
-      setSisaAntrian(data.sisa_antrian || 0);
-      setDaftarTunggu(data.daftar_tunggu || []);
+      // Jika backend mengembalikan object keyed by poli (panggilan all)
+      if (selectedPoli === "all" || (!selectedPoli && typeof data === "object" && !Array.isArray(data))) {
+        setGroupedData(data);
+        setSedangDipanggil(null);
+        setSisaAntrian(0);
+        setDaftarTunggu([]);
+      } else {
+        setGroupedData(null);
+        setSedangDipanggil(data.sedang_dipanggil || null);
+        setSisaAntrian(data.sisa_antrian || 0);
+        setDaftarTunggu(data.daftar_tunggu || []);
+      }
     } catch (err) {
       console.error("Error fetch dashboard:", err);
       setErrorMsg(
@@ -237,6 +248,7 @@ export default function AntrianDashboardPage() {
                 disabled={loadingPoli}
                 className="w-full md:w-64 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white"
               >
+                <option value="all">Semua Poli</option>
                 {loadingPoli && <option>Memuat...</option>}
                 {!loadingPoli &&
                   polis.map((p) => (
@@ -297,7 +309,71 @@ export default function AntrianDashboardPage() {
         )}
 
         {/* KARTU RINGKASAN */}
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
+        {groupedData ? (
+          Object.entries(groupedData).map(([poliId, item]) => (
+            <div key={poliId} className="mb-8">
+              <h2 className="text-xl font-semibold mb-3">{item.poli?.poli_name || poliId}</h2>
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div className="p-4 rounded-xl border border-primary-100 bg-primary-50 flex items-center gap-3">
+                  <div className="p-2 rounded-full bg-primary-600">
+                    <UsersIcon className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-neutral-600">Sisa Antrian</p>
+                    <p className="text-xl font-bold text-primary-700">{item.sisa_antrian}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-amber-100 bg-amber-50">
+                  <p className="text-xs text-neutral-600 mb-1">Sedang Dipanggil</p>
+                  {item.sedang_dipanggil ? (
+                    <>
+                      <p className="text-lg font-bold text-amber-700">{item.sedang_dipanggil.nomor_antrian}</p>
+                      <p className="text-xs text-neutral-600 mt-1">Dipanggil pada: {item.sedang_dipanggil.waktu_panggil ? new Date(item.sedang_dipanggil.waktu_panggil).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-neutral-500">Belum ada antrian aktif</p>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50">
+                  <p className="text-xs text-neutral-600 mb-1">Tanggal</p>
+                  <p className="text-lg font-semibold text-neutral-800">{new Date(tanggal).toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-neutral-200 mb-6">
+                  <thead className="bg-primary-600">
+                    <tr>
+                      {["No", "Nomor Antrian", "Status", "Waktu Panggil", "Waktu Selesai"].map((header) => (
+                        <th key={header} className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">{header}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-neutral-100">
+                    {(!item.daftar_tunggu || item.daftar_tunggu.length === 0) && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-4 text-center text-sm text-neutral-500">Belum ada antrian untuk poli ini.</td>
+                      </tr>
+                    )}
+
+                    {item.daftar_tunggu?.map((row, idx) => (
+                      <tr key={row.id || `${poliId}-${idx}`} className={idx % 2 === 1 ? "bg-neutral-50" : "bg-white"}>
+                        <td className="px-6 py-3 text-sm text-neutral-800">{idx + 1}</td>
+                        <td className="px-6 py-3 text-sm font-semibold text-neutral-900">{row.nomor_antrian}</td>
+                        <td className="px-6 py-3 text-sm"><span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${row.status === "menunggu" ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : row.status === "dipanggil" ? "bg-blue-50 text-blue-700 border border-blue-200" : row.status === "selesai" ? "bg-green-50 text-green-700 border border-green-200" : "bg-neutral-50 text-neutral-700 border border-neutral-200"}`}>{row.status}</span></td>
+                        <td className="px-6 py-3 text-sm text-neutral-800">{row.waktu_panggil ? new Date(row.waktu_panggil).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}</td>
+                        <td className="px-6 py-3 text-sm text-neutral-800">{row.waktu_selesai ? new Date(row.waktu_selesai).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
           <div className="p-4 rounded-xl border border-primary-100 bg-primary-50 flex items-center gap-3">
             <div className="p-2 rounded-full bg-primary-600">
               <UsersIcon className="h-5 w-5 text-white" />
