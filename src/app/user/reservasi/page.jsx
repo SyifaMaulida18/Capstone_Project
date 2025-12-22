@@ -645,34 +645,54 @@ export default function ReservasiPage() {
     return Object.keys(errors).length === 0;
   };
 
-  const nextStep = async () => {
+const nextStep = async () => {
     setError("");
+
+    // --- STEP 1: VALIDASI & CEK AI ---
     if (currentStep === 1) {
       const isValid = validateStep1();
-      if (!isValid) return; 
-      setIsCheckingAI(true);
+      if (!isValid) return;
+
+      setIsCheckingAI(true); // Aktifkan loading indicator
+      
       try {
+        // Persiapkan payload sesuai kebutuhan Backend getRecommendation
         const payloadAI = {
           keluhan: formData.keluhan,
-          is_self: isSelf,
-          ...(!isSelf && { tanggal_lahir: formData.tanggal_lahir, jenis_kelamin: formData.jenis_kelamin }),
+          is_self: isSelf, // Mengambil state isSelf
+          // Jika bukan diri sendiri, kirim data tambahan untuk akurasi prediksi
+          ...(!isSelf && { 
+            tanggal_lahir: formData.tanggal_lahir, 
+            jenis_kelamin: formData.jenis_kelamin,
+            riwayat_penyakit: "" // Opsional, bisa dikosongkan jika tidak ada input
+          }),
         };
+
+        // Panggil Endpoint Backend
         const res = await api.post("/reservations/check-poli", payloadAI);
+        
         if (res.data && res.data.success) {
+          // Simpan hasil rekomendasi dari Backend ke state
           setAiRecommendation(res.data.data);
         }
       } catch (err) {
-        console.warn("Gagal cek AI:", err);
+        console.warn("Gagal mendapatkan rekomendasi AI:", err);
+        // Jika gagal, user tetap bisa lanjut (hanya rekomendasi tidak muncul)
+        setAiRecommendation(null);
       } finally {
-        setIsCheckingAI(false);
-        setCurrentStep((prev) => prev + 1);
+        setIsCheckingAI(false); // Matikan loading
+        setCurrentStep((prev) => prev + 1); // Pindah ke Step 2
       }
       return;
     }
+
+    // --- STEP 2: VALIDASI POLI & JADWAL ---
     if (currentStep === 2) {
       const isValid = validateStep2();
-      if (!isValid) return; 
+      if (!isValid) return;
     }
+
+    // --- LANJUT KE STEP BERIKUTNYA ---
     setCurrentStep((prev) => prev + 1);
   };
 
@@ -785,6 +805,18 @@ export default function ReservasiPage() {
       </div>
     );
   }
+
+  // --- DAFTAR POLI HARDCODE (Sesuai Database Seeder) ---
+const STATIC_POLIS = [
+  { id: "POL-ANK", name: "Poli Anak" },
+  { id: "POL-JTG", name: "Poli Jantung" },
+  { id: "POL-DLM", name: "Poli Penyakit Dalam" },
+  { id: "POL-GIG", name: "Poli Gigi & Mulut" },
+  { id: "POL-ANS", name: "Poli Anastesi" },
+  { id: "POL-NEU", name: "Poli Neurologi" },
+  { id: "POL-THT", name: "Poli THT" },
+  { id: "POL-BDH", name: "Poli Bedah Tulang" },
+];
 
   return (
     <div className="min-h-screen bg-neutral-50 flex justify-center items-start py-8 md:py-12 px-4">
@@ -1077,164 +1109,221 @@ export default function ReservasiPage() {
               </div>
             )}
 
-            {/* STEP 2: PILIH POLI & JADWAL */}
-            {currentStep === 2 && (
-              <div className="space-y-6 animate-fadeIn">
-                {aiRecommendation && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-4 shadow-sm">
-                    <div className="bg-blue-100 p-2 rounded-full text-blue-600 mt-1">
-                      <Sparkles size={24} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-[#003B73] mb-1">
-                        Rekomendasi AI
-                      </h4>
-                      <p className="text-sm text-gray-700 mb-2">
-                        Berdasarkan keluhan:{" "}
-                        <span className="italic font-medium">
-                          "{formData.keluhan}"
-                        </span>
-                        , kami menyarankan Anda untuk memilih:
-                      </p>
-                      <div className="inline-block bg-blue-600 text-white font-bold px-3 py-1 rounded-lg text-sm">
-                        Poli {aiRecommendation.rekomendasi_nama}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        *Silakan pilih poli lain jika saran ini dirasa kurang tepat.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Pilih Poli Tujuan
-                    </label>
-                    <select
-                      name="poli_id"
-                      value={formData.poli_id}
-                      onChange={handlePoliChange}
-                      className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 bg-white ${
-                        fieldErrors.poli_id 
-                            ? "border-red-500 ring-1 ring-red-500 bg-red-50"
-                            : aiRecommendation?.rekomendasi_poli_id && String(formData.poli_id) === String(aiRecommendation.rekomendasi_poli_id)
-                                ? "border-green-500 ring-1 ring-green-500"
-                                : "border-gray-300"
-                      }`}
-                    >
-                      <option value="">-- Pilih Poli --</option>
-                      {polis.map((p) => {
-                        const isRecommended =
-                          aiRecommendation?.rekomendasi_poli_id &&
-                          String(p.poli_id) ===
-                            String(aiRecommendation.rekomendasi_poli_id);
-                        return (
-                          <option
-                            key={p.poli_id}
-                            value={p.poli_id}
-                            className={
-                              isRecommended ? "font-bold text-green-700" : ""
-                            }
-                          >
-                            {p.poli_name} {isRecommended ? "(Disarankan ✅)" : ""}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {fieldErrors.poli_id && <p className="text-red-500 text-xs mt-1 font-medium">{fieldErrors.poli_id}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Pilih Dokter
-                    </label>
-                    <select
-                      name="dokter_id"
-                      value={formData.dokter_id}
-                      onChange={handleDokterChange}
-                      disabled={!formData.poli_id}
-                      className={`w-full p-3 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${fieldErrors.dokter_id ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-                    >
-                      <option value="">-- Pilih Dokter --</option>
-                      {dokters.map((d) => (
-                        <option key={d.dokter_id} value={d.dokter_id}>
-                          {d.dokter?.nama_dokter || "Tanpa Nama"}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.dokter_id && <p className="text-red-500 text-xs mt-1 font-medium">{fieldErrors.dokter_id}</p>}
-                    
-                    {selectedDoctorSchedule && (
-                      <div className="mt-2 text-xs flex items-start gap-1.5 text-blue-700 bg-blue-50 p-2 rounded-lg border border-blue-100">
-                        <Clock size={14} className="mt-0.5" />
-                        <span>
-                          <b>Jadwal:</b> {availableDaysText}
-                        </span>
-                      </div>
-                    )}
-                    {formData.poli_id && dokters.length === 0 && (
-                      <p className="text-xs text-red-400 mt-1">
-                        Belum ada jadwal dokter aktif.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Rencana Tanggal
-                    </label>
-                    <input
-                      type="date"
-                      name="tanggal_reservasi"
-                      value={formData.tanggal_reservasi}
-                      onChange={handleDateChange}
-                      min={todayStr || undefined}
-                      disabled={!formData.dokter_id}
-                      className={`w-full p-3 border rounded-xl disabled:bg-gray-100 ${fieldErrors.tanggal_reservasi ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-                      required
-                    />
-                    {fieldErrors.tanggal_reservasi && <p className="text-red-500 text-xs mt-1 font-medium">{fieldErrors.tanggal_reservasi}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Metode Penjaminan
-                    </label>
-                    <select
-                      name="penjaminan"
-                      value={formData.penjaminan}
-                      onChange={handleChange}
-                      className="w-full p-3 border border-gray-300 rounded-xl bg-white"
-                    >
-                      <option value="cash">Umum / Cash</option>
-                      <option value="asuransi">Asuransi Swasta</option>
-                    </select>
-                  </div>
-                </div>
-
-                {formData.penjaminan === "asuransi" && (
-                  <div className="grid md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl">
-                    <InputField
-                      label="Nama Asuransi"
-                      name="nama_asuransi"
-                      value={formData.nama_asuransi}
-                      onChange={handleChange}
-                      required
-                      error={fieldErrors.nama_asuransi}
-                    />
-                    <InputField
-                      label="Nomor Polis"
-                      name="nomor_asuransi"
-                      value={formData.nomor_asuransi}
-                      onChange={handleChange}
-                      required
-                      error={fieldErrors.nomor_asuransi}
-                    />
-                  </div>
-                )}
-              </div>
+{/* STEP 2: PILIH POLI & JADWAL */}
+{currentStep === 2 && (
+  <div className="space-y-6 animate-fadeIn">
+    
+    {/* KOTAK SARAN POLI (DARI BE) */}
+    {aiRecommendation && aiRecommendation.rekomendasi_list && aiRecommendation.rekomendasi_list.length > 0 && (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 flex items-start gap-4 shadow-sm transition-all hover:shadow-md">
+        <div className="bg-blue-100 p-2 rounded-full text-blue-600 mt-1 shrink-0">
+          <Sparkles size={24} />
+        </div>
+        <div className="w-full">
+          <div className="flex justify-between items-center mb-1">
+            <h4 className="font-bold text-[#003B73]">
+              Rekomendasi AI
+            </h4>
+            {aiRecommendation.confidence && (
+              <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full font-medium">
+                Akurasi: {Math.round(aiRecommendation.confidence * 100)}%
+              </span>
             )}
+          </div>
+          
+          <p className="text-sm text-gray-700 mb-3">
+            Berdasarkan keluhan:{" "}
+            <span className="italic font-medium text-gray-900">
+              "{formData.keluhan}"
+            </span>
+            , sistem menyarankan:
+          </p>
+
+          {/* LIST REKOMENDASI */}
+          <div className="flex flex-wrap gap-2">
+            {aiRecommendation.rekomendasi_list.map((rec, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  // Otomatis set Poli saat diklik
+                  const eventMock = { target: { value: rec.poli_id } };
+                  handlePoliChange(eventMock);
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold border transition-all ${
+                  String(formData.poli_id) === String(rec.poli_id)
+                    ? "bg-[#003B73] text-white border-[#003B73] shadow-md"
+                    : "bg-white text-[#003B73] border-blue-200 hover:bg-blue-100"
+                }`}
+              >
+                <span className="bg-blue-100 text-blue-800 text-xs px-1.5 rounded-full">
+                  #{idx + 1}
+                </span>
+                {rec.poli_name}
+                {String(formData.poli_id) === String(rec.poli_id) && <Check size={14} />}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs text-gray-500 mt-3">
+            *Klik salah satu tombol di atas untuk memilih poli secara otomatis.
+          </p>
+        </div>
+      </div>
+    )}
+
+    {/* ... (Sisa kode Dropdown Poli dan Dokter tetap sama) ... */}
+    
+    <div className="grid md:grid-cols-2 gap-5">
+      {/* DROPDOWN PILIH POLI */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-2">
+          Pilih Poli Tujuan <span className="text-red-500">*</span>
+        </label>
+        <select
+          name="poli_id"
+          value={formData.poli_id}
+          onChange={handlePoliChange}
+          className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 bg-white ${
+            fieldErrors.poli_id
+              ? "border-red-500 ring-1 ring-red-500 bg-red-50"
+              : aiRecommendation?.rekomendasi_list?.some(r => String(r.poli_id) === String(formData.poli_id))
+              ? "border-green-500 ring-1 ring-green-500"
+              : "border-gray-300"
+          }`}
+        >
+          <option value="">-- Pilih Poli --</option>
+          {polis.map((p) => {
+            // Cek apakah poli ini direkomendasikan AI
+            const isRecommended = aiRecommendation?.rekomendasi_list?.some(
+              (rec) => String(rec.poli_id) === String(p.poli_id)
+            );
+
+            return (
+              <option
+                key={p.poli_id}
+                value={p.poli_id}
+                className={isRecommended ? "font-bold text-green-700 bg-green-50" : ""}
+              >
+                {p.poli_name} {isRecommended ? "✅ (Disarankan)" : ""}
+              </option>
+            );
+          })}
+        </select>
+        {fieldErrors.poli_id && (
+          <p className="text-red-500 text-xs mt-1 font-medium">{fieldErrors.poli_id}</p>
+        )}
+      </div>  
+
+      {/* DROPDOWN PILIH DOKTER */}
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-2">
+          Pilih Dokter <span className="text-red-500">*</span>
+        </label>
+        <select
+          name="dokter_id"
+          value={formData.dokter_id}
+          onChange={handleDokterChange}
+          disabled={!formData.poli_id}
+          className={`w-full p-3 border rounded-xl bg-white focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 ${
+            fieldErrors.dokter_id ? "border-red-500 bg-red-50" : "border-gray-300"
+          }`}
+        >
+          <option value="">-- Pilih Dokter --</option>
+          {dokters.map((d) => (
+            <option key={d.dokter_id} value={d.dokter_id}>
+              {d.dokter?.nama_dokter || "Tanpa Nama"}
+            </option>
+          ))}
+        </select>
+        {fieldErrors.dokter_id && (
+          <p className="text-red-500 text-xs mt-1 font-medium">
+            {fieldErrors.dokter_id}
+          </p>
+        )}
+
+        {selectedDoctorSchedule && (
+          <div className="mt-2 text-xs flex items-start gap-1.5 text-blue-700 bg-blue-50 p-2 rounded-lg border border-blue-100">
+            <Clock size={14} className="mt-0.5" />
+            <span>
+              <b>Jadwal Praktek:</b> {availableDaysText}
+            </span>
+          </div>
+        )}
+        
+        {formData.poli_id && dokters.length === 0 && (
+          <p className="text-xs text-red-400 mt-1 font-medium flex items-center gap-1">
+            <AlertCircle size={12} />
+            Tidak ada dokter aktif untuk poli ini.
+          </p>
+        )}
+      </div>
+    </div>
+
+    {/* INPUT TANGGAL & PENJAMINAN (Tetap sama) */}
+    <div className="grid md:grid-cols-2 gap-5">
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-2">
+          Rencana Tanggal <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="date"
+          name="tanggal_reservasi"
+          value={formData.tanggal_reservasi}
+          onChange={handleDateChange}
+          min={todayStr || undefined}
+          disabled={!formData.dokter_id}
+          className={`w-full p-3 border rounded-xl disabled:bg-gray-100 ${
+            fieldErrors.tanggal_reservasi
+              ? "border-red-500 bg-red-50"
+              : "border-gray-300"
+          }`}
+          required
+        />
+        {fieldErrors.tanggal_reservasi && (
+          <p className="text-red-500 text-xs mt-1 font-medium">
+            {fieldErrors.tanggal_reservasi}
+          </p>
+        )}
+      </div>
+      <div>
+        <label className="block text-sm font-bold text-gray-700 mb-2">
+          Metode Penjaminan
+        </label>
+        <select
+          name="penjaminan"
+          value={formData.penjaminan}
+          onChange={handleChange}
+          className="w-full p-3 border border-gray-300 rounded-xl bg-white"
+        >
+          <option value="cash">Umum / Cash</option>
+          <option value="asuransi">Asuransi Swasta</option>
+        </select>
+      </div>
+    </div>
+
+    {formData.penjaminan === "asuransi" && (
+      <div className="grid md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+        <InputField
+          label="Nama Asuransi"
+          name="nama_asuransi"
+          value={formData.nama_asuransi}
+          onChange={handleChange}
+          required
+          error={fieldErrors.nama_asuransi}
+        />
+        <InputField
+          label="Nomor Polis"
+          name="nomor_asuransi"
+          value={formData.nomor_asuransi}
+          onChange={handleChange}
+          required
+          error={fieldErrors.nomor_asuransi}
+        />
+      </div>
+    )}
+  </div>
+)}
 
             {/* STEP 3: KONFIRMASI */}
             {currentStep === 3 && (

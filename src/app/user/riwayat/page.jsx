@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/services/api"; // Pastikan import api service benar
-import Sidebar from "../../../components/user/Sidebar"; 
+import api from "@/services/api";
+import Sidebar from "../../../components/user/Sidebar";
 import {
   ArrowLeft,
   Search,
@@ -14,9 +14,7 @@ import {
   User,
   Users,
   Calendar,
-  Clock,
-  CheckCircle,
-  XCircle
+  CheckCircle
 } from "lucide-react";
 
 // Helper Format Tanggal
@@ -38,11 +36,10 @@ export default function RiwayatKunjunganPage() {
   // State Sidebar & User
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [isProfileComplete, setIsProfileComplete] = useState(true); 
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
 
   // --- FETCH DATA ---
   useEffect(() => {
-    // 1. Ambil data User dari LocalStorage
     let currentUser = null;
     if (typeof window !== "undefined") {
         const storedUser = localStorage.getItem("user");
@@ -59,36 +56,34 @@ export default function RiwayatKunjunganPage() {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        // 2. Fetch Reservasi dari API
-        const response = await api.get("/my-reservations");
-        const data = response.data; // Array reservasi
+        
+        // 1. Fetch Reservasi & Rekam Medis
+        const [resReservations, resRekamMedis] = await Promise.all([
+            api.get("/my-reservations"),
+            api.get("/rekam-medis")
+        ]);
 
-        // 3. Proses Data
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const reservationsData = Array.isArray(resReservations.data) 
+            ? resReservations.data 
+            : (resReservations.data?.data || []);
 
-        const processedData = data.map((item) => {
-            // Cek apakah reservasi milik sendiri atau keluarga
-            // Logic: Jika nama di reservasi SAMA dengan nama akun login -> Self
+        const rekamMedisData = Array.isArray(resRekamMedis.data) 
+            ? resRekamMedis.data 
+            : (resRekamMedis.data?.data || []);
+
+        // Buat Set ID reservasi yang SUDAH ADA rekam medisnya (artinya SELESAI)
+        const completedReservationIds = new Set(
+            rekamMedisData.map(rm => String(rm.reservasi_id))
+        );
+
+        // 2. Proses Data
+        const processedData = reservationsData.map((item) => {
             const currentUserName = currentUser?.name || currentUser?.Nama || "";
             const isSelf = item.nama.toLowerCase() === currentUserName.toLowerCase();
-
-            // Cek Tanggal untuk Status
             const resDate = new Date(item.tanggal_reservasi);
-            resDate.setHours(0, 0, 0, 0);
 
-            // Tentukan Status Tampilan (Upcoming / Completed / Cancelled)
-            // Syarat Completed (Riwayat): Status Confirmed DAN Tanggal di masa lampau
-            let displayStatus = "upcoming";
-            
-            if (item.status === "cancelled") {
-                displayStatus = "cancelled";
-            } else if (item.status === "confirmed" && resDate < today) {
-                displayStatus = "completed";
-            } else {
-                // Pending atau Confirmed hari ini/masa depan
-                displayStatus = "upcoming";
-            }
+            // Cek apakah data ini Selesai (Ada di rekam medis)
+            const isCompleted = completedReservationIds.has(String(item.reservid));
 
             return {
                 id: item.reservid,
@@ -96,17 +91,17 @@ export default function RiwayatKunjunganPage() {
                 rawDate: resDate,
                 poli: item.poli?.poli_name || "Poli Umum",
                 dokter: item.dokter?.nama_dokter || "Dokter Jaga",
-                diagnosa: item.keluhan, // Menggunakan keluhan sebagai info awal
+                diagnosa: item.keluhan, // Bisa diganti diagnosa asli dr rekam medis jika mau
                 patient_name: item.nama,
                 relation: isSelf ? "self" : "family",
-                relation_label: isSelf ? "Anda" : item.status_keluarga || "Keluarga",
-                status: displayStatus,
-                originalStatus: item.status,
-                hasLab: false, // Default false karena belum ada integrasi lab di BE
+                status: isCompleted ? "completed" : "pending_or_cancelled", 
+                hasLab: false,
             };
-        });
+        })
+        // 3. FILTER HANYA YANG "COMPLETED" (Sudah ada rekam medis)
+        .filter(item => item.status === "completed");
 
-        // Urutkan: Yang terbaru di atas
+        // Urutkan: Terbaru di atas
         const sortedData = processedData.sort((a, b) => b.rawDate - a.rawDate);
         setRiwayatData(sortedData);
 
@@ -120,28 +115,21 @@ export default function RiwayatKunjunganPage() {
     fetchData();
   }, []);
 
-  // --- FILTERING ---
+  // --- FILTERING SEARCH & TAB ---
   const filteredRiwayat = riwayatData.filter((item) => {
-    // 1. Filter Search (Nama Pasien, Dokter, atau Poli)
+    // 1. Filter Search
     const matchSearch = 
       item.poli.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.dokter.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.patient_name.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // 2. Filter Tab (Semua, Diri Sendiri, Keluarga)
+    // 2. Filter Tab
     let matchTab = true;
     if (activeFilter === "self") matchTab = item.relation === "self";
     if (activeFilter === "family") matchTab = item.relation === "family";
 
     return matchSearch && matchTab;
   });
-
-  // Hitung Statistik
-  const stats = {
-    selesai: filteredRiwayat.filter((i) => i.status === "completed").length,
-    akanDatang: filteredRiwayat.filter((i) => i.status === "upcoming").length,
-    total: filteredRiwayat.length,
-  };
 
   return (
     <div className="min-h-screen bg-neutral-50 flex md:p-6 font-sans">
@@ -173,14 +161,13 @@ export default function RiwayatKunjunganPage() {
                                 <ArrowLeft className="w-6 h-6" />
                              </button>
                              <div>
-                                 <h1 className="text-2xl font-bold text-neutral-800">Riwayat & Jadwal</h1>
-                                 <p className="text-sm text-neutral-500">Pantau kunjungan medis Anda dan Keluarga.</p>
+                                 <h1 className="text-2xl font-bold text-neutral-800">Riwayat Medis</h1>
+                                 <p className="text-sm text-neutral-500">Daftar kunjungan yang telah selesai diperiksa.</p>
                              </div>
                         </div>
 
                         {/* --- FILTER BAR --- */}
                         <div className="flex flex-col sm:flex-row justify-between gap-4">
-                            {/* Tabs Filter */}
                             <div className="flex bg-white p-1 rounded-xl border border-neutral-200 w-fit shadow-sm">
                                 <button 
                                     onClick={() => setActiveFilter("all")}
@@ -202,11 +189,10 @@ export default function RiwayatKunjunganPage() {
                                 </button>
                             </div>
 
-                            {/* Search Bar */}
                             <div className="relative w-full sm:w-64">
                                 <input 
                                     type="text" 
-                                    placeholder="Cari nama, poli..." 
+                                    placeholder="Cari diagnosa, poli..." 
                                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition shadow-sm bg-white"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -220,25 +206,18 @@ export default function RiwayatKunjunganPage() {
                     {isLoading ? (
                           <div className="flex flex-col items-center justify-center py-20">
                              <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-3" />
-                             <p className="text-neutral-500">Memuat data...</p>
+                             <p className="text-neutral-500">Memuat riwayat...</p>
                           </div>
                     ) : (
                         <>
-                            {/* Stats Bar */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-100 flex justify-around items-center text-center">
-                                <div>
-                                    <span className="block text-2xl font-bold text-neutral-800">{stats.selesai}</span>
-                                    <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wide">Selesai</span>
+                            {/* Stats Bar Sederhana (Hanya Selesai) */}
+                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100 flex items-center gap-4">
+                                <div className="p-3 bg-green-100 rounded-full text-green-600">
+                                    <CheckCircle className="w-6 h-6" />
                                 </div>
-                                <div className="h-8 w-px bg-neutral-200"></div>
                                 <div>
-                                    <span className="block text-2xl font-bold text-blue-600">{stats.akanDatang}</span>
-                                    <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wide">Akan Datang</span>
-                                </div>
-                                <div className="h-8 w-px bg-neutral-200"></div>
-                                <div>
-                                    <span className="block text-2xl font-bold text-neutral-800">{stats.total}</span>
-                                    <span className="text-[10px] md:text-xs text-neutral-500 font-bold uppercase tracking-wide">Total</span>
+                                    <p className="text-sm text-neutral-500 font-medium">Total Kunjungan Selesai</p>
+                                    <p className="text-2xl font-bold text-neutral-800">{filteredRiwayat.length}</p>
                                 </div>
                             </div>
 
@@ -246,12 +225,12 @@ export default function RiwayatKunjunganPage() {
                             <div className="space-y-4">
                                 {filteredRiwayat.length > 0 ? (
                                     filteredRiwayat.map((item) => (
-                                        <RiwayatCard key={item.id} data={item} router={router} />
+                                        <RiwayatCard key={item.id} data={item} />
                                     ))
                                 ) : (
                                     <div className="text-center py-12 text-neutral-400 bg-white rounded-2xl border border-dashed border-neutral-200">
                                         <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                        <p>Tidak ada data ditemukan.</p>
+                                        <p>Belum ada riwayat medis selesai.</p>
                                     </div>
                                 )}
                             </div>
@@ -264,10 +243,8 @@ export default function RiwayatKunjunganPage() {
   );
 }
 
-// --- COMPONENT: KARTU RIWAYAT ---
-function RiwayatCard({ data, router }) {
-  const isUpcoming = data.status === "upcoming";
-  const isCancelled = data.status === "cancelled";
+// --- COMPONENT: KARTU RIWAYAT (Versi Bersih) ---
+function RiwayatCard({ data }) {
   const isSelf = data.relation === "self";
 
   return (
@@ -278,19 +255,15 @@ function RiwayatCard({ data, router }) {
             <span className="flex items-center gap-1"><Calendar size={14}/> {data.tanggal}</span>
             <span className="w-1 h-1 bg-neutral-300 rounded-full"></span>
             
-            {/* Badge Pemilik Data */}
             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs border ${isSelf ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
                 {isSelf ? <User size={12} /> : <Users size={12} />}
                 <span className="font-bold truncate max-w-[100px]">{isSelf ? "Anda" : data.patient_name}</span>
             </div>
          </div>
 
-         {/* Status Badge */}
-         <span className={`text-[10px] md:text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 ${
-           isUpcoming ? "bg-blue-100 text-blue-700" : isCancelled ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-         }`}>
-            {isUpcoming ? <Clock size={12}/> : isCancelled ? <XCircle size={12}/> : <CheckCircle size={12}/>}
-            {isUpcoming ? "Jadwal Aktif" : isCancelled ? "Dibatalkan" : "Selesai"}
+         <span className="text-[10px] md:text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 bg-green-100 text-green-700">
+            <CheckCircle size={12}/>
+            Selesai
          </span>
       </div>
 
@@ -299,35 +272,27 @@ function RiwayatCard({ data, router }) {
          <p className="text-sm text-neutral-500">{data.dokter}</p>
       </div>
 
-      <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100 mb-5 space-y-2">
-         <div>
-            <p className="text-xs text-neutral-400 mb-0.5 uppercase font-semibold tracking-wider">
-               {isUpcoming ? "Keluhan / Keperluan" : "Catatan / Keluhan"}
-            </p>
-            <p className="text-neutral-800 font-medium text-sm leading-relaxed line-clamp-2">
-                {data.diagnosa || "-"}
-            </p>
-         </div>
+      <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100 mb-5">
+         <p className="text-xs text-neutral-400 mb-0.5 uppercase font-semibold tracking-wider">
+            Diagnosa / Keluhan
+         </p>
+         <p className="text-neutral-800 font-medium text-sm leading-relaxed line-clamp-2">
+            {data.diagnosa || "-"}
+         </p>
       </div>
 
-      {/* Actions */}
-      {isUpcoming ? (
-          <button onClick={() => router.push('/user/dashboard')} className="w-full bg-blue-800 text-white font-semibold py-3 rounded-xl shadow-lg hover:bg-blue-900 transition text-sm">
-              Lihat Antrian di Dashboard
-          </button>
-      ) : (
-          <div className="flex gap-3">
-             <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm cursor-not-allowed opacity-60">
-                 <FileText className="w-4 h-4" /> Detail
+      {/* Tombol Detail */}
+      <div className="flex gap-3">
+         <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm">
+             <FileText className="w-4 h-4" /> Detail Medis
+         </button>
+         
+         {data.hasLab && (
+             <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm">
+                 <Download className="w-4 h-4" /> Hasil Lab
              </button>
-             {/* Tombol Lab (Disembunyikan jika tidak ada lab) */}
-             {data.hasLab && (
-                 <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm">
-                     <Download className="w-4 h-4" /> Hasil Lab
-                 </button>
-             )}
-          </div>
-      )}
+         )}
+      </div>
     </div>
   );
 }
