@@ -13,6 +13,7 @@ const adminNavItems = [
   { name: "Manajemen Reservasi", href: "/admin/reservasi" },
   { name: "Manajemen Antrian", href: "/admin/antrian" },
   { name: "Manajemen Rekam Medis", href: "/admin/rekam-medis" },
+  { name: "Manajemen Feedback", href: "/admin/feedback" },
   { name: "Dashboard", href: "/admin/dashboard" },
 ];
 

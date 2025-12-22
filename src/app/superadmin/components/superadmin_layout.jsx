@@ -21,6 +21,7 @@ const superAdminNavItems = [
   { name: "Manajemen Reservasi", href: "/superadmin/reservasi" },
   { name: "Manajemen Antrian", href: "/superadmin/antrian" },
   { name: "Manajemen Rekam Medis", href: "/superadmin/rekam-medis" },
+  { name: "Manajemen Feedback", href: "/superadmin/feedback" },
 ];
 
 // --- Sidebar Super Admin (responsive: drawer di mobile, fixed di desktop) ---

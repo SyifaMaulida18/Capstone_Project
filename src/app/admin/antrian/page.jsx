@@ -18,9 +18,8 @@ export default function AntrianDashboardPage() {
   const [polis, setPolis] = useState([]);
   const [selectedPoli, setSelectedPoli] = useState("");
   const [groupedData, setGroupedData] = useState(null);
-  // Inisialisasi tanggal hari ini (Format YYYY-MM-DD)
   const [tanggal, setTanggal] = useState(
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   );
 
   const [loading, setLoading] = useState(false);
@@ -94,7 +93,6 @@ export default function AntrianDashboardPage() {
       const json = await res.json();
       const data = json.data || {};
 
-      // Jika backend mengembalikan object keyed by poli (panggilan all)
       if (selectedPoli === "all" || (!selectedPoli && typeof data === "object" && !Array.isArray(data))) {
         setGroupedData(data);
         setSedangDipanggil(null);
@@ -130,10 +128,6 @@ export default function AntrianDashboardPage() {
       alert("Silakan pilih poli terlebih dahulu.");
       return;
     }
-    if (!tanggal) {
-      alert("Tanggal tidak boleh kosong.");
-      return;
-    }
 
     try {
       setLoading(true);
@@ -148,10 +142,9 @@ export default function AntrianDashboardPage() {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
         },
-        // PERBAIKAN: Pastikan 'tanggal' dikirim dalam body
         body: JSON.stringify({
           poli_id: selectedPoli,
-          tanggal: tanggal, 
+          tanggal, // ✅ kirim tanggal yang sama dengan dashboard
         }),
       });
 
@@ -163,11 +156,7 @@ export default function AntrianDashboardPage() {
       }
 
       if (!res.ok || !json.success) {
-        // Cek jika error validasi tanggal muncul spesifik
-        const serverError = json.errors?.tanggal 
-            ? `Error Tanggal: ${json.errors.tanggal[0]}` 
-            : json.message || "Gagal memanggil antrian berikutnya.";
-        throw new Error(serverError);
+        throw new Error(json.message || "Gagal memanggil antrian berikutnya.");
       }
 
       await fetchDashboard();
@@ -193,8 +182,10 @@ export default function AntrianDashboardPage() {
 
       const token = localStorage.getItem("token");
 
-      // Perbaikan Endpoint: Sesuaikan dengan Backend
-      const res = await fetch(`${API_BASE}/antrian/selesai-dipanggil`, {
+      // backend currently does not implement a dedicated "selesaikan" endpoint,
+      // so call `panggil-berikutnya` which finishes the current called entry
+      // (the controller marks the current as 'selesai' before picking next).
+      const res = await fetch(`${API_BASE}/antrian/panggil-berikutnya`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -202,23 +193,28 @@ export default function AntrianDashboardPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          // Kirim ID antrian sesuai validasi backend 'antrian_id'
-          antrian_id: sedangDipanggil.id, 
+            poli_id: selectedPoli,
+            tanggal, // keep same tanggal as dashboard
         }),
       });
 
       const json = await res.json();
 
-      if (!res.ok || !json.success) {
-        const msgFromValidation =
-          json?.errors?.antrian_id?.[0] ||
-          json.message;
+      // If there are no more queues, backend returns 404 with message 'Tidak ada antrian lagi.'
+      if (res.status === 404 && json.message === "Tidak ada antrian lagi.") {
+        // That means current was finished and there's no next one.
+        await fetchDashboard();
+        alert("Panggilan diselesaikan. Tidak ada antrian berikutnya.");
+        return;
+      }
 
-        throw new Error(msgFromValidation || "Gagal menyelesaikan panggilan.");
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Gagal menyelesaikan panggilan.");
       }
 
       await fetchDashboard();
-      alert(json.message || "Panggilan antrian telah diselesaikan.");
+      // Show message returned by panggilBerikutnya (e.g., 'Antrian X dipanggil')
+      alert(json.message || "Operasi selesai.");
     } catch (err) {
       console.error("Error selesaikan panggilan:", err);
       alert(err.message || "Terjadi kesalahan saat menyelesaikan panggilan.");
@@ -373,156 +369,79 @@ export default function AntrianDashboardPage() {
             </div>
           ))
         ) : (
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <div className="p-4 rounded-xl border border-primary-100 bg-primary-50 flex items-center gap-3">
-            <div className="p-2 rounded-full bg-primary-600">
-              <UsersIcon className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <p className="text-xs text-neutral-600">Sisa Antrian</p>
-              <p className="text-xl font-bold text-primary-700">
-                {sisaAntrian}
-              </p>
-            </div>
-          </div>
+          <>
+            <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <div className="p-4 rounded-xl border border-primary-100 bg-primary-50 flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary-600">
+                  <UsersIcon className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-600">Sisa Antrian</p>
+                  <p className="text-xl font-bold text-primary-700">{sisaAntrian}</p>
+                </div>
+              </div>
 
-          <div className="p-4 rounded-xl border border-amber-100 bg-amber-50">
-            <p className="text-xs text-neutral-600 mb-1">Sedang Dipanggil</p>
-            {sedangDipanggil ? (
-              <>
-                <p className="text-lg font-bold text-amber-700">
-                  {sedangDipanggil.nomor_antrian}
-                </p>
-                <p className="text-xs text-neutral-600 mt-1">
-                  Dipanggil pada:{" "}
-                  {sedangDipanggil.waktu_panggil
-                    ? new Date(
-                        sedangDipanggil.waktu_panggil
-                      ).toLocaleTimeString("id-ID", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "-"}
-                </p>
+              <div className="p-4 rounded-xl border border-amber-100 bg-amber-50">
+                <p className="text-xs text-neutral-600 mb-1">Sedang Dipanggil</p>
+                {sedangDipanggil ? (
+                  <>
+                    <p className="text-lg font-bold text-amber-700">{sedangDipanggil.nomor_antrian}</p>
+                    <p className="text-xs text-neutral-600 mt-1">Dipanggil pada: {sedangDipanggil.waktu_panggil ? new Date(sedangDipanggil.waktu_panggil).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}</p>
 
-                {sedangDipanggil.reservation_id &&
-                  sedangDipanggil.reservation?.user && (
-                    <div className="mt-3">
-                      <Link
-                        href={`${MEDICAL_RECORDS_PATH}?reservasi_id=${
-                          sedangDipanggil.reservation_id
-                        }&patient_id=${
-                          sedangDipanggil.reservation.user.userid
-                        }&patient_name=${encodeURIComponent(
-                          sedangDipanggil.reservation.user.name || ""
-                        )}`}
-                        className="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
-                      >
-                        Tambah Rekam Medis
-                      </Link>
-                    </div>
+                    {sedangDipanggil.reservation_id && sedangDipanggil.reservation?.user && (
+                      <div className="mt-3">
+                        <Link
+                          href={`${MEDICAL_RECORDS_PATH}?reservasi_id=${sedangDipanggil.reservation_id}&patient_id=${sedangDipanggil.reservation.user.userid}&patient_name=${encodeURIComponent(sedangDipanggil.reservation.user.name || "")}`}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
+                        >
+                          Tambah Rekam Medis
+                        </Link>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-neutral-500">Belum ada antrian aktif</p>
+                )}
+              </div>
+
+              <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50">
+                <p className="text-xs text-neutral-600 mb-1">Tanggal</p>
+                <p className="text-lg font-semibold text-neutral-800">{new Date(tanggal).toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</p>
+              </div>
+            </div>
+
+            {/* TABEL DAFTAR TUNGGU */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-neutral-200">
+                <thead className="bg-primary-600">
+                  <tr>
+                    {["No", "Nomor Antrian", "Status", "Waktu Panggil", "Waktu Selesai"].map((header) => (
+                      <th key={header} className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-neutral-100">
+                  {daftarTunggu.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-4 text-center text-sm text-neutral-500">Belum ada antrian untuk poli dan tanggal ini.</td>
+                    </tr>
                   )}
-              </>
-            ) : (
-              <p className="text-sm text-neutral-500">
-                Belum ada antrian aktif
-              </p>
-            )}
-          </div>
 
-          <div className="p-4 rounded-xl border border-neutral-100 bg-neutral-50">
-            <p className="text-xs text-neutral-600 mb-1">Tanggal</p>
-            <p className="text-lg font-semibold text-neutral-800">
-              {new Date(tanggal).toLocaleDateString("id-ID", {
-                weekday: "long",
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
-              })}
-            </p>
-          </div>
-        </div>
+                  {daftarTunggu.map((row, idx) => (
+                    <tr key={row.id} className={idx % 2 === 1 ? "bg-neutral-50" : "bg-white"}>
+                      <td className="px-6 py-3 text-sm text-neutral-800">{idx + 1}</td>
+                      <td className="px-6 py-3 text-sm font-semibold text-neutral-900">{row.nomor_antrian}</td>
+                      <td className="px-6 py-3 text-sm"><span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${row.status === "menunggu" ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : row.status === "dipanggil" ? "bg-blue-50 text-blue-700 border border-blue-200" : row.status === "selesai" ? "bg-green-50 text-green-700 border border-green-200" : "bg-neutral-50 text-neutral-700 border border-neutral-200"}`}>{row.status}</span></td>
+                      <td className="px-6 py-3 text-sm text-neutral-800">{row.waktu_panggil ? new Date(row.waktu_panggil).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}</td>
+                      <td className="px-6 py-3 text-sm text-neutral-800">{row.waktu_selesai ? new Date(row.waktu_selesai).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
-        {/* TABEL DAFTAR TUNGGU */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-primary-600">
-              <tr>
-                {[
-                  "No",
-                  "Nomor Antrian",
-                  "Status",
-                  "Waktu Panggil",
-                  "Waktu Selesai",
-                ].map((header) => (
-                  <th
-                    key={header}
-                    className="px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-neutral-100">
-              {daftarTunggu.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-6 py-4 text-center text-sm text-neutral-500"
-                  >
-                    Belum ada antrian untuk poli dan tanggal ini.
-                  </td>
-                </tr>
-              )}
-
-              {daftarTunggu.map((row, idx) => (
-                <tr
-                  key={row.id}
-                  className={idx % 2 === 1 ? "bg-neutral-50" : "bg-white"}
-                >
-                  <td className="px-6 py-3 text-sm text-neutral-800">
-                    {idx + 1}
-                  </td>
-                  <td className="px-6 py-3 text-sm font-semibold text-neutral-900">
-                    {row.nomor_antrian}
-                  </td>
-                  <td className="px-6 py-3 text-sm">
-                    <span
-                      className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
-                        row.status === "menunggu"
-                          ? "bg-yellow-50 text-yellow-700 border border-yellow-200"
-                          : row.status === "dipanggil"
-                          ? "bg-blue-50 text-blue-700 border border-blue-200"
-                          : row.status === "selesai"
-                          ? "bg-green-50 text-green-700 border border-green-200"
-                          : "bg-neutral-50 text-neutral-700 border border-neutral-200"
-                      }`}
-                    >
-                      {row.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-neutral-800">
-                    {row.waktu_panggil
-                      ? new Date(row.waktu_panggil).toLocaleTimeString(
-                          "id-ID",
-                          { hour: "2-digit", minute: "2-digit" }
-                        )
-                      : "-"}
-                  </td>
-                  <td className="px-6 py-3 text-sm text-neutral-800">
-                    {row.waktu_selesai
-                      ? new Date(row.waktu_selesai).toLocaleTimeString(
-                          "id-ID",
-                          { hour: "2-digit", minute: "2-digit" }
-                        )
-                      : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </AdminLayout>
   );
