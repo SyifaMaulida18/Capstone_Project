@@ -1124,11 +1124,6 @@ const STATIC_POLIS = [
             <h4 className="font-bold text-[#003B73]">
               Rekomendasi AI
             </h4>
-            {aiRecommendation.confidence && (
-              <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full font-medium">
-                Akurasi: {Math.round(aiRecommendation.confidence * 100)}%
-              </span>
-            )}
           </div>
           
           <p className="text-sm text-gray-700 mb-3">
