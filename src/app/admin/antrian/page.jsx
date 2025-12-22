@@ -169,52 +169,53 @@ export default function AntrianDashboardPage() {
     }
   };
 
-  // === 3b. SELESAIKAN PANGGILAN SAAT INI ===
-  const handleSelesaikanPanggilan = async () => {
-    if (!sedangDipanggil) {
-      alert("Tidak ada antrian yang sedang dipanggil.");
-      return;
+// === 3b. SELESAIKAN PANGGILAN SAAT INI ===
+const handleSelesaikanPanggilan = async () => {
+  if (!sedangDipanggil) {
+    alert("Tidak ada antrian yang sedang dipanggil.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setErrorMsg("");
+
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`${API_BASE}/antrian/selesai-dipanggil`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        // --- PERBAIKAN DISINI ---
+        // Backend meminta 'nomor_antrian', bukan 'antrian_id'
+        nomor_antrian: sedangDipanggil.nomor_antrian, 
+      }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok || !json.success) {
+      // Sesuaikan pembacaan error response
+      const msgFromValidation =
+        json?.errors?.nomor_antrian?.[0] || // Error validasi biasanya ada di key field-nya
+        json.message;
+
+      throw new Error(msgFromValidation || "Gagal menyelesaikan panggilan.");
     }
 
-    try {
-      setLoading(true);
-      setErrorMsg("");
-
-      const token = localStorage.getItem("token");
-
-      // Perbaikan Endpoint: Sesuaikan dengan Backend
-      const res = await fetch(`${API_BASE}/antrian/selesai-dipanggil`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          // Kirim ID antrian sesuai validasi backend 'antrian_id'
-          antrian_id: sedangDipanggil.id, 
-        }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        const msgFromValidation =
-          json?.errors?.antrian_id?.[0] ||
-          json.message;
-
-        throw new Error(msgFromValidation || "Gagal menyelesaikan panggilan.");
-      }
-
-      await fetchDashboard();
-      alert(json.message || "Panggilan antrian telah diselesaikan.");
-    } catch (err) {
-      console.error("Error selesaikan panggilan:", err);
-      alert(err.message || "Terjadi kesalahan saat menyelesaikan panggilan.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    await fetchDashboard();
+    alert(json.message || "Panggilan antrian telah diselesaikan.");
+  } catch (err) {
+    console.error("Error selesaikan panggilan:", err);
+    alert(err.message || "Terjadi kesalahan saat menyelesaikan panggilan.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // === 4. RENDER ===
   return (
