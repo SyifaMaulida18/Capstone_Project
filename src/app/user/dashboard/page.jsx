@@ -47,13 +47,12 @@ const StatBox = ({ number, label, isActive = false, loading = false }) => (
 
 const UpcomingReservationCard = ({
   appointment,
-  antrianData,
   loading,
   onViewQueue,
 }) => {
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 h-full">
         <div className="flex justify-between mb-6">
           <div className="h-4 w-32 bg-neutral-200 rounded animate-pulse" />
           <div className="h-6 w-20 bg-neutral-200 rounded-full animate-pulse" />
@@ -69,34 +68,39 @@ const UpcomingReservationCard = ({
     );
   }
 
+  // State Kosong
   if (!appointment) {
     return (
-      <div className="bg-white p-6 rounded-3xl shadow-lg text-center py-8 animate-fadeIn">
+      <div className="bg-white p-6 rounded-3xl shadow-lg text-center py-8 animate-fadeIn h-full flex flex-col justify-center items-center">
         <div className="bg-blue-50 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
           <Calendar className="w-10 h-10 text-blue-400" />
         </div>
         <h3 className="font-bold text-neutral-800 text-lg">Belum Ada Jadwal</h3>
         <p className="text-sm text-neutral-500 mb-4 px-6">
-          Tidak ada reservasi aktif atau antrian yang sedang berjalan.
+          Tidak ada reservasi aktif saat ini.
         </p>
         <a
           href="/user/reservasi"
           className="inline-block px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition"
         >
-          Buat Reservasi Baru
+          Buat Reservasi
         </a>
       </div>
     );
   }
 
+  // Cek Status Antrian dari data yang sudah ditempel ke appointment
+  const queueData = appointment.queueData || null;
   const isConfirmed = appointment.status === "confirmed";
+  
+  // Logika "Sedang Dipanggil": Status confirmed DAN ada di list 'sedang_dipanggil' antrian
   const isDipanggil =
     isConfirmed &&
-    antrianData?.sedang_dipanggil?.reservation_id === appointment.reservid;
+    queueData?.sedang_dipanggil?.reservation_id === appointment.reservid;
 
   return (
     <div
-      className={`p-6 rounded-3xl shadow-xl border relative overflow-hidden transition-all duration-500 animate-slideUp ${
+      className={`p-6 rounded-3xl shadow-xl border relative overflow-hidden transition-all duration-500 h-full flex flex-col justify-between ${
         isDipanggil
           ? "bg-green-600 text-white border-green-500 ring-4 ring-green-200"
           : "bg-white text-neutral-800 border-neutral-100"
@@ -106,62 +110,76 @@ const UpcomingReservationCard = ({
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full animate-ping" />
       )}
 
-      <div className="flex justify-between items-start mb-6 relative z-10">
+      {/* Header Card */}
+      <div className="flex justify-between items-start mb-4 relative z-10">
         <div>
           <h3 className={`text-lg font-bold ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
-            {isDipanggil ? "GILIRAN ANDA!" : "Reservasi Mendatang"}
+            {isDipanggil ? "GILIRAN ANDA!" : "Reservasi Aktif"}
           </h3>
-          <p className={`text-xs flex items-center gap-1 ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
+          <p className={`text-xs flex items-center gap-1 mt-1 ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
             <Clock size={12} /> {formatDateLong(appointment.tanggal_reservasi)}
           </p>
         </div>
 
-        <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm ${
+        <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap ${
             isDipanggil
               ? "bg-white text-green-700 animate-bounce"
               : isConfirmed
               ? "bg-green-100 text-green-700"
               : "bg-yellow-100 text-yellow-700"
           }`}>
-          {isDipanggil ? "SEGERA MASUK" : isConfirmed ? "Terkonfirmasi" : "Menunggu Verifikasi"}
+          {isDipanggil ? "MASUK RUANGAN" : isConfirmed ? "Terkonfirmasi" : "Pending"}
         </span>
       </div>
 
-      <div className="flex items-center space-x-4 mb-6 relative z-10">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${isDipanggil ? "bg-white/20 text-white" : "bg-blue-100 text-blue-600"}`}>
+      {/* Body Card */}
+      <div className="flex items-center space-x-4 mb-4 relative z-10">
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${isDipanggil ? "bg-white/20 text-white" : "bg-blue-100 text-blue-600"}`}>
           <FileText className="w-6 h-6" />
         </div>
-        <div>
-          <p className={`font-bold text-lg ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
+        <div className="min-w-0"> {/* min-w-0 ensures text truncation works if needed */}
+          <p className={`font-bold text-lg truncate ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
             {appointment.poli?.poli_name}
           </p>
-          <p className={`text-sm ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
+          <p className={`text-sm truncate ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
             {appointment.dokter?.nama_dokter || "-"}
           </p>
         </div>
       </div>
 
-      {isConfirmed && (
-        <>
-          <div className={`rounded-2xl p-5 border mb-5 relative z-10 ${isDipanggil ? "bg-white/10 border-white/20 text-white" : "bg-neutral-50 border-neutral-200"}`}>
-            <span className={`text-xs ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>Nomor Antrian Anda</span>
-            <div className={`text-4xl font-black ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
-              {appointment.nomor_antrian?.split("-").pop() || "?"}
+      {/* Footer / Antrian / Button */}
+      {isConfirmed ? (
+        <div className="mt-auto">
+          <div className={`rounded-2xl p-4 border mb-3 relative z-10 ${isDipanggil ? "bg-white/10 border-white/20 text-white" : "bg-neutral-50 border-neutral-200"}`}>
+            <div className="flex justify-between items-center">
+                <div>
+                    <span className={`text-[10px] uppercase tracking-wider ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>No. Antrian</span>
+                    <div className={`text-3xl font-black leading-none mt-1 ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
+                    {appointment.nomor_antrian?.split("-").pop() || "?"}
+                    </div>
+                </div>
+                 {/* Jika dipanggil, tampilkan pesan singkat */}
+                 {isDipanggil && (
+                    <div className="text-right text-xs font-medium bg-white/20 px-2 py-1 rounded">
+                        Segera Masuk
+                    </div>
+                 )}
             </div>
-            <div className={`text-xs mt-1 ${isDipanggil ? "text-green-100" : "text-neutral-400"}`}>
-              ({appointment.nomor_antrian})
-            </div>
-            {isDipanggil && (
-              <div className="mt-2 text-sm font-semibold bg-white text-green-700 py-1 px-3 rounded-lg inline-block">
-                Silakan Masuk ke Ruangan
-              </div>
-            )}
           </div>
-          <button onClick={onViewQueue} className={`w-full py-3.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors ${isDipanggil ? "bg-white text-green-700 hover:bg-green-50" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
-            <Users size={18} />
-            {isDipanggil ? "Lihat Monitor Antrian" : "Lihat Status Antrian"}
+          <button 
+            onClick={() => onViewQueue(appointment, queueData)} 
+            className={`w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors ${isDipanggil ? "bg-white text-green-700 hover:bg-green-50 shadow-lg" : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 shadow-lg"}`}
+          >
+            <Users size={16} />
+            {isDipanggil ? "Monitor Antrian" : "Lihat Antrian"}
           </button>
-        </>
+        </div>
+      ) : (
+        <div className="mt-auto pt-2 border-t border-dashed border-neutral-200">
+             <p className="text-xs text-neutral-400 text-center italic">
+                Menunggu verifikasi admin...
+             </p>
+        </div>
       )}
     </div>
   );
@@ -183,27 +201,34 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [showAntrian, setShowAntrian] = useState(false);
-  const [userData, setUserData] = useState(null); // Simpan Full User Data
-  const [nextAppointment, setNextAppointment] = useState(null);
-  const [antrianInfo, setAntrianInfo] = useState(null);
+  const [showAntrianModal, setShowAntrianModal] = useState(false);
+  const [userData, setUserData] = useState(null);
+  
+  // Menyimpan LIST reservasi aktif, bukan cuma satu
+  const [activeAppointments, setActiveAppointments] = useState([]);
+  
+  // Untuk modal antrian, kita perlu tahu data mana yang sedang dilihat
+  const [selectedQueueAppt, setSelectedQueueAppt] = useState(null);
+  const [selectedQueueData, setSelectedQueueData] = useState(null);
+
   const [stats, setStats] = useState({
     active: 0,
     visits: 0,
     messages: 0,
   });
 
+  // State untuk Carousel dots
+  const [currentSlide, setCurrentSlide] = useState(0);
+
   useEffect(() => {
     let currentUserId = null;
 
-    // 1. Ambil Data User (terutama ID)
     if (typeof window !== "undefined") {
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
         try {
           const parsedUser = JSON.parse(storedUser);
           setUserData(parsedUser);
-          // Asumsi ID user ada di field 'userid' atau 'id'
           currentUserId = parsedUser.userid || parsedUser.id; 
         } catch (e) {
           console.error("Gagal parse user data", e);
@@ -222,28 +247,22 @@ export default function DashboardPage() {
         const reservations = resReservations.data;
         const rawRekamMedis = resRekamMedis.data?.data || resRekamMedis.data || [];
 
-        // --- FILTERING REKAM MEDIS DI FRONTEND (TANPA UBAH BE) ---
-        // Kita hitung rekam medis yang dimiliki oleh user yang sedang login saja
+        // Hitung total kunjungan user
         let myTotalVisits = 0;
-        
         if (currentUserId) {
             const myRekamMedis = rawRekamMedis.filter(rm => {
-                // Cek relasi reservasi -> booked_user_id
                 const bookedUserId = rm.reservasi?.booked_user_id;
-                // Pastikan tipe data sama (String vs Number) saat membandingkan
                 return String(bookedUserId) === String(currentUserId);
             });
             myTotalVisits = myRekamMedis.length;
-        } else {
-            // Fallback jika id tidak ketemu (seharusnya tidak terjadi jika login)
-            console.warn("User ID tidak ditemukan, menampilkan 0 kunjungan");
         }
 
-        // --- LOGIC JADWAL MENDATANG ---
+        // --- LOGIC LIST RESERVASI AKTIF ---
         const todayStr = new Date().toLocaleDateString('en-CA'); 
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
 
+        // Filter kandidat yang valid (pending/confirmed dan tanggal >= hari ini)
         const potentialList = reservations
           .filter((r) => {
             const isStatusActive = ["pending", "confirmed"].includes(r.status);
@@ -253,60 +272,39 @@ export default function DashboardPage() {
           })
           .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
 
-        let finalAppointment = null;
-        let finalQueueData = null;
+        // Proses setiap reservasi aktif
+        // Jika hari ini dan confirmed -> cek antrian
+        const processedList = await Promise.all(potentialList.map(async (appt) => {
+             const apptDateStr = new Date(appt.tanggal_reservasi).toLocaleDateString('en-CA');
+             
+             // Default: tidak ada data antrian
+             let queueData = null;
 
-        for (const candidate of potentialList) {
-          if (candidate.status === "pending") {
-            finalAppointment = candidate;
-            break; 
-          }
-
-          if (candidate.status === "confirmed") {
-            const candidateDateStr = new Date(candidate.tanggal_reservasi).toLocaleDateString('en-CA');
-
-            if (candidateDateStr > todayStr) {
-              finalAppointment = candidate;
-              break; 
-            }
-
-            if (candidateDateStr === todayStr) {
-              try {
-                const antrianRes = await api.get("/antrian/dashboard", {
-                  params: {
-                    poli_id: candidate.poli_id,
-                    tanggal: candidate.tanggal_reservasi,
-                  },
-                });
-
-                if (antrianRes.data.success) {
-                  const qData = antrianRes.data.data;
-                  const isDipanggil = qData.sedang_dipanggil?.reservation_id === candidate.reservid;
-                  const isMenunggu = qData.daftar_tunggu?.some(
-                    (item) => item.reservation_id === candidate.reservid
-                  );
-
-                  if (isDipanggil || isMenunggu) {
-                    finalAppointment = candidate;
-                    finalQueueData = qData;
-                    break;
-                  } 
+             if (appt.status === "confirmed" && apptDateStr === todayStr) {
+                try {
+                    const antrianRes = await api.get("/antrian/dashboard", {
+                      params: {
+                        poli_id: appt.poli_id,
+                        tanggal: appt.tanggal_reservasi,
+                      },
+                    });
+                    if (antrianRes.data.success) {
+                        queueData = antrianRes.data.data;
+                    }
+                } catch (e) {
+                    console.warn("Gagal fetch antrian untuk poli", appt.poli_id);
                 }
-              } catch (err) {
-                console.error("Gagal validasi antrian:", err);
-                finalAppointment = candidate;
-                break;
-              }
-            }
-          }
-        }
+             }
 
-        setNextAppointment(finalAppointment);
-        setAntrianInfo(finalQueueData);
+             // Kembalikan object appointment ditambah data antrian (jika ada)
+             return { ...appt, queueData };
+        }));
+
+        setActiveAppointments(processedList);
 
         setStats({
-          active: finalAppointment ? 1 : 0, 
-          visits: myTotalVisits, // Menggunakan hasil filter frontend
+          active: processedList.length, 
+          visits: myTotalVisits,
           messages: 0,
         });
 
@@ -320,12 +318,27 @@ export default function DashboardPage() {
     fetchData();
   }, []);
 
-  if (showAntrian && nextAppointment) {
+  // Handler scroll carousel untuk update dots
+  const handleScroll = (e) => {
+    const scrollLeft = e.target.scrollLeft;
+    const width = e.target.offsetWidth;
+    const index = Math.round(scrollLeft / width);
+    setCurrentSlide(index);
+  };
+
+  const handleOpenQueue = (appt, qData) => {
+      setSelectedQueueAppt(appt);
+      setSelectedQueueData(qData);
+      setShowAntrianModal(true);
+  };
+
+  // --- RENDER MODAL ANTRIAN ---
+  if (showAntrianModal && selectedQueueAppt) {
     return (
       <StatusAntrian
-        onBack={() => setShowAntrian(false)}
-        reservation={nextAppointment}
-        initialData={antrianInfo}
+        onBack={() => setShowAntrianModal(false)}
+        reservation={selectedQueueAppt}
+        initialData={selectedQueueData}
       />
     );
   }
@@ -342,6 +355,7 @@ export default function DashboardPage() {
       />
 
       <main className="flex-1 pb-24">
+        {/* Banner Biru */}
         <div className="bg-blue-600 px-6 pt-8 pb-32 rounded-b-[2.5rem] shadow-xl">
           <p className="text-blue-100 text-sm mb-1">Selamat Datang,</p>
           <h1 className="text-3xl font-bold text-white capitalize">
@@ -354,24 +368,74 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="px-6 -mt-20 space-y-6">
-          <UpcomingReservationCard
-            appointment={nextAppointment}
-            loading={loading}
-            antrianData={antrianInfo}
-            onViewQueue={() => setShowAntrian(true)}
-          />
+        <div className="px-6 -mt-20 space-y-8">
+          
+          {/* CAROUSEL RESERVASI */}
+          <div>
+            {loading ? (
+                // Loading Skeleton
+                <UpcomingReservationCard loading={true} />
+            ) : activeAppointments.length > 0 ? (
+                <>
+                    {/* Container Scroll */}
+                    <div 
+                        className="flex overflow-x-auto snap-x snap-mandatory pb-4 gap-4 scrollbar-hide -mx-2 px-2"
+                        onScroll={handleScroll}
+                    >
+                        {activeAppointments.map((appt, idx) => (
+                            <div key={appt.reservid} className="min-w-full snap-center">
+                                <UpcomingReservationCard
+                                    appointment={appt}
+                                    onViewQueue={handleOpenQueue}
+                                />
+                            </div>
+                        ))}
+                    </div>
 
-          <h3 className="text-lg font-bold text-neutral-800">Menu Utama</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <MenuButton icon={Clock} label="Buat Reservasi" href="/user/reservasi" />
-            <MenuButton icon={Calendar} label="Jadwal Dokter" href="/jadwal_DokterPoli" />
-            <MenuButton icon={History} label="Riwayat Medis" href="/user/riwayat" />
-            <MenuButton icon={MessageSquare} label="Chat Admin" href="/user/chat" />
+                    {/* Dots Indicator (Hanya jika > 1 item) */}
+                    {activeAppointments.length > 1 && (
+                        <div className="flex justify-center gap-2 mt-[-10px]">
+                            {activeAppointments.map((_, idx) => (
+                                <div 
+                                    key={idx} 
+                                    className={`h-2 rounded-full transition-all duration-300 ${
+                                        currentSlide === idx ? "w-6 bg-blue-600" : "w-2 bg-neutral-300"
+                                    }`} 
+                                />
+                            ))}
+                        </div>
+                    )}
+                </>
+            ) : (
+                // State Kosong
+                <UpcomingReservationCard appointment={null} />
+            )}
           </div>
+
+          <div>
+             <h3 className="text-lg font-bold text-neutral-800 mb-4">Menu Utama</h3>
+             <div className="grid grid-cols-2 gap-4">
+                <MenuButton icon={Clock} label="Buat Reservasi" href="/user/reservasi" />
+                <MenuButton icon={Calendar} label="Jadwal Dokter" href="/jadwal_DokterPoli" />
+                <MenuButton icon={History} label="Riwayat Medis" href="/user/riwayat" />
+                <MenuButton icon={MessageSquare} label="Chat Admin" href="/user/chat" />
+             </div>
+          </div>
+
         </div>
       </main>
       <Footer />
+
+      {/* Helper CSS untuk hide scrollbar tapi tetap bisa scroll */}
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }

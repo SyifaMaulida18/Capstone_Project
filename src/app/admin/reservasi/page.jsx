@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import AdminLayout from "@/app/admin/components/admin_layout";
-import {
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  TrashIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from "@heroicons/react/24/outline";
 import api from "@/services/api";
+import {
+  CheckCircleIcon,
+  FunnelIcon,
+  MagnifyingGlassIcon,
+  XCircleIcon
+} from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // Simple dialog component
 function Dialog({ show, onClose, children }) {
@@ -496,12 +495,12 @@ export default function ReservasiPage() {
                   </td>
                   <td className="px-6 py-4 text-sm font-medium">
                     <div className="flex space-x-2">
-                      <button
+                      {/* <button
                         onClick={() => handleDelete(p.id)}
                         className="text-neutral-600 hover:text-red-600 p-1 rounded-md hover:bg-red-50"
                       >
                         <TrashIcon className="h-5 w-5" />
-                      </button>
+                      </button> */}
                       <button
                         onClick={() => handleOpenChat(p)}
                         disabled={!p.userId}
@@ -598,14 +597,14 @@ export default function ReservasiPage() {
                   ))}
                 </select>
                 <div className="mt-3 flex flex-wrap gap-3 items-center">
-                  <button
+                  {/* <button
                     type="button"
                     onClick={handleChangePoli}
                     disabled={processing || !selectedPoliId}
                     className="inline-flex items-center px-4 py-2 rounded-lg bg-secondary-500 text-white text-sm font-semibold hover:bg-secondary-600 disabled:opacity-60"
                   >
                     Simpan Perubahan Poli
-                  </button>
+                  </button> */}
 
                   <button
                     type="button"
@@ -640,17 +639,7 @@ export default function ReservasiPage() {
                 </button>
               </div>
 
-              {/* TOMBOL CHAT */}
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => handleOpenChat(selectedReservation)}
-                  disabled={!selectedReservation}
-                  className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
-                >
-                  Chat Pasien
-                </button>
-              </div>
+
             </div>
           )}
         </Dialog>

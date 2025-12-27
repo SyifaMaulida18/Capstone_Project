@@ -1,21 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import api from "@/services/api";
-import Sidebar from "../../../components/user/Sidebar";
 import {
-  ArrowLeft,
-  Search,
-  FileText,
-  Download,
-  Loader2,
-  Menu,
-  User,
-  Users,
-  Calendar,
-  CheckCircle
+    ArrowLeft,
+    Calendar,
+    CheckCircle,
+    FileText,
+    Loader2,
+    Menu,
+    Search,
+    User,
+    Users
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import Sidebar from "../../../components/user/Sidebar";
 
 // Helper Format Tanggal
 const formatDate = (dateString) => {
@@ -279,19 +278,6 @@ function RiwayatCard({ data }) {
          <p className="text-neutral-800 font-medium text-sm leading-relaxed line-clamp-2">
             {data.diagnosa || "-"}
          </p>
-      </div>
-
-      {/* Tombol Detail */}
-      <div className="flex gap-3">
-         <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm">
-             <FileText className="w-4 h-4" /> Detail Medis
-         </button>
-         
-         {data.hasLab && (
-             <button className="flex-1 bg-white border border-neutral-200 text-neutral-700 font-semibold py-2.5 rounded-xl hover:bg-neutral-50 transition flex items-center justify-center gap-2 text-sm">
-                 <Download className="w-4 h-4" /> Hasil Lab
-             </button>
-         )}
       </div>
     </div>
   );

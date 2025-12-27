@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
+import api from "@/services/api";
 import {
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  TrashIcon,
   CheckCircleIcon,
+  FunnelIcon,
+  MagnifyingGlassIcon,
+  TrashIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
-import api from "@/services/api";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 // Simple dialog component
 function Dialog({ show, onClose, children }) {
@@ -596,14 +596,14 @@ export default function ReservasiPage() {
                   ))}
                 </select>
                 <div className="mt-3 flex flex-wrap gap-3 items-center">
-                  <button
+                  {/* <button
                     type="button"
                     onClick={handleChangePoli}
                     disabled={processing || !selectedPoliId}
                     className="inline-flex items-center px-4 py-2 rounded-lg bg-secondary-500 text-white text-sm font-semibold hover:bg-secondary-600 disabled:opacity-60"
                   >
                     Simpan Perubahan Poli
-                  </button>
+                  </button> */}
 
                   <button
                     type="button"

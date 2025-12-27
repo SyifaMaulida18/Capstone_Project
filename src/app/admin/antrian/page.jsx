@@ -14,12 +14,23 @@ const API_BASE =
 
 const MEDICAL_RECORDS_PATH = "/admin/rekam-medis";
 
+// --- 1. TAMBAHKAN HELPER INI DI LUAR COMPONENT ---
+const getLocalTodayString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function AntrianDashboardPage() {
   const [polis, setPolis] = useState([]);
   const [selectedPoli, setSelectedPoli] = useState("");
   const [groupedData, setGroupedData] = useState(null);
+
+  // --- 2. UBAH INISIALISASI STATE TANGGAL DI SINI ---
   const [tanggal, setTanggal] = useState(
-    new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    getLocalTodayString() // Menggunakan helper waktu lokal, bukan toISOString()
   );
 
   const [loading, setLoading] = useState(false);
@@ -63,6 +74,7 @@ export default function AntrianDashboardPage() {
   }, []);
 
   // === 2. FUNGSI FETCH DASHBOARD ANTRIAN ===
+  // === 2. FUNGSI FETCH DASHBOARD ANTRIAN ===
   const fetchDashboard = async () => {
     if (!tanggal) return;
     try {
@@ -71,10 +83,16 @@ export default function AntrianDashboardPage() {
 
       const token = localStorage.getItem("token");
 
-      const poliParam = selectedPoli || "all";
-      const url = `${API_BASE}/antrian/dashboard?poli_id=${encodeURIComponent(
-        poliParam
-      )}&tanggal=${encodeURIComponent(tanggal)}`;
+      // --- PERBAIKAN DI SINI ---
+      // Jangan kirim "all" karena backend akan menganggapnya sebagai ID palsu.
+      // Kita susun URL secara dinamis.
+      let url = `${API_BASE}/antrian/dashboard?tanggal=${encodeURIComponent(tanggal)}`;
+
+      // Hanya tambahkan poli_id jika user memilih poli spesifik (bukan "all")
+      if (selectedPoli && selectedPoli !== "all") {
+        url += `&poli_id=${encodeURIComponent(selectedPoli)}`;
+      }
+      // -------------------------
 
       const res = await fetch(url, {
         headers: {
@@ -85,14 +103,19 @@ export default function AntrianDashboardPage() {
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(
-          `Gagal mengambil data antrian (status ${res.status}): ${text}`
-        );
+        // Coba parsing JSON error jika ada, agar pesan lebih rapi
+        try {
+            const jsonErr = JSON.parse(text);
+            throw new Error(jsonErr.message || `Error ${res.status}: ${text}`);
+        } catch (e) {
+            throw new Error(`Gagal mengambil data antrian (status ${res.status}): ${text}`);
+        }
       }
 
       const json = await res.json();
       const data = json.data || {};
 
+      // Logika state frontend tetap sama
       if (selectedPoli === "all" || (!selectedPoli && typeof data === "object" && !Array.isArray(data))) {
         setGroupedData(data);
         setSedangDipanggil(null);
