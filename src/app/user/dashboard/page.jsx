@@ -239,6 +239,7 @@ export default function DashboardPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        
         const [resReservations, resRekamMedis] = await Promise.all([
             api.get("/my-reservations"),
             api.get("/rekam-medis")
@@ -247,7 +248,11 @@ export default function DashboardPage() {
         const reservations = resReservations.data;
         const rawRekamMedis = resRekamMedis.data?.data || resRekamMedis.data || [];
 
-        // Hitung total kunjungan user
+        // 1. Identifikasi ID Reservasi yang SUDAH SELESAI (Sudah ada di Rekam Medis)
+        // Jika ID reservasi ada di rekam medis, berarti sudah diperiksa dokter -> SELESAI
+        const finishedReservationIds = rawRekamMedis.map(rm => rm.reservasi?.reservid || rm.reservasi_id);
+
+        // 2. Hitung total kunjungan user (Berdasarkan Rekam Medis)
         let myTotalVisits = 0;
         if (currentUserId) {
             const myRekamMedis = rawRekamMedis.filter(rm => {
@@ -262,22 +267,29 @@ export default function DashboardPage() {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
 
-        // Filter kandidat yang valid (pending/confirmed dan tanggal >= hari ini)
+        // 3. Filter Reservasi Aktif
+        // Syarat: 
+        // a. Status pending/confirmed
+        // b. Tanggal hari ini atau masa depan
+        // c. ID Reservasi TIDAK ADA di daftar finishedReservationIds (Belum diperiksa dokter)
         const potentialList = reservations
           .filter((r) => {
             const isStatusActive = ["pending", "confirmed"].includes(r.status);
             const rDate = new Date(r.tanggal_reservasi);
             rDate.setHours(0, 0, 0, 0);
-            return isStatusActive && rDate >= todayStart;
+
+            // Cek apakah reservasi ini sudah selesai (ada rekam medisnya)
+            const isFinished = finishedReservationIds.includes(r.reservid);
+
+            // Return true jika status aktif, tanggal valid, DAN BELUM SELESAI
+            return isStatusActive && rDate >= todayStart && !isFinished;
           })
           .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
 
-        // Proses setiap reservasi aktif
-        // Jika hari ini dan confirmed -> cek antrian
+        // Proses setiap reservasi aktif untuk cek antrian
         const processedList = await Promise.all(potentialList.map(async (appt) => {
              const apptDateStr = new Date(appt.tanggal_reservasi).toLocaleDateString('en-CA');
              
-             // Default: tidak ada data antrian
              let queueData = null;
 
              if (appt.status === "confirmed" && apptDateStr === todayStr) {
@@ -295,8 +307,6 @@ export default function DashboardPage() {
                     console.warn("Gagal fetch antrian untuk poli", appt.poli_id);
                 }
              }
-
-             // Kembalikan object appointment ditambah data antrian (jika ada)
              return { ...appt, queueData };
         }));
 

@@ -487,7 +487,86 @@ export default function ReservasiPage() {
     }
   };
 
-  const handleProfileChange = (e) => {
+  // --- FUNGSI BARU: PRELOAD WILAYAH BERDASARKAN NAMA ---
+  const loadRegionDataForPatient = async (patientData) => {
+    // 1. Cek apakah ada data provinsi di history
+    if (!patientData.provinsi) return;
+
+    try {
+      setLoadingData(true); // Tampilkan loading sebentar agar user tahu proses sedang berjalan
+
+      // A. Cari ID Provinsi berdasarkan Nama
+      // Kita asumsikan regions.provinces sudah terload di useEffect awal
+      const selectedProv = regions.provinces.find(p => p.name.toUpperCase() === patientData.provinsi.toUpperCase());
+      
+      if (!selectedProv) {
+         setLoadingData(false); 
+         return;
+      }
+
+      // Simpan ID Provinsi & Fetch Kota
+      const regRes = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/regencies/${selectedProv.id}.json`);
+      const regencies = await regRes.json();
+
+      // B. Cari ID Kota berdasarkan Nama
+      const kotaName = patientData.kota_kabupaten || patientData["kota/kabupaten"];
+      const selectedReg = regencies.find(r => r.name.toUpperCase() === kotaName?.toUpperCase());
+
+      if (!selectedReg) {
+        // Jika kota tidak ketemu, set provinsi & list kota saja, lalu berhenti
+        setRegions(prev => ({ ...prev, regencies: regencies, districts: [], villages: [] }));
+        setSelectedRegionIds({ provinceId: selectedProv.id, regencyId: "", districtId: "", villageId: "" });
+        setLoadingData(false);
+        return;
+      }
+
+      // Simpan ID Kota & Fetch Kecamatan
+      const distRes = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/districts/${selectedReg.id}.json`);
+      const districts = await distRes.json();
+
+      // C. Cari ID Kecamatan berdasarkan Nama
+      const selectedDist = districts.find(d => d.name.toUpperCase() === patientData.kecamatan?.toUpperCase());
+
+      if (!selectedDist) {
+        setRegions(prev => ({ ...prev, regencies, districts, villages: [] }));
+        setSelectedRegionIds({ provinceId: selectedProv.id, regencyId: selectedReg.id, districtId: "", villageId: "" });
+        setLoadingData(false);
+        return;
+      }
+
+      // Simpan ID Kecamatan & Fetch Kelurahan
+      const vilRes = await fetch(`https://www.emsifa.com/api-wilayah-indonesia/api/villages/${selectedDist.id}.json`);
+      const villages = await vilRes.json();
+
+      // D. Cari ID Kelurahan
+      const selectedVil = villages.find(v => v.name.toUpperCase() === patientData.kelurahan?.toUpperCase());
+      const vilId = selectedVil ? selectedVil.id : "";
+
+      // --- FINAL UPDATE STATE ---
+      // Update semua list opsi dropdown
+      setRegions(prev => ({
+        ...prev,
+        regencies: regencies,
+        districts: districts,
+        villages: villages
+      }));
+
+      // Update nilai yang terpilih (ID) agar dropdown menampilkan teks yang benar
+      setSelectedRegionIds({
+        provinceId: selectedProv.id,
+        regencyId: selectedReg.id,
+        districtId: selectedDist.id,
+        villageId: vilId
+      });
+
+    } catch (err) {
+      console.error("Gagal merekonstruksi wilayah:", err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+const handleProfileChange = (e) => {
     const val = e.target.value;
     setSelectedProfileId(val);
     setError("");
@@ -504,6 +583,10 @@ export default function ReservasiPage() {
         setIsSelf(true);
         fillSelfData(localUserData, apiProfileData);
         dataForFilter = apiProfileData;
+        
+        // Tambahan: Reset dropdown wilayah jika kembali ke diri sendiri (opsional, tergantung data diri sendiri)
+        if(apiProfileData) loadRegionDataForPatient(apiProfileData); 
+
     } else if (val === "new") {
         isSelfProfile = false;
         setIsSelf(false);
@@ -513,7 +596,14 @@ export default function ReservasiPage() {
         isSelfProfile = false;
         setIsSelf(false);
         const patientData = savedPatients[parseInt(val)];
-        if (patientData) fillHistoryData(patientData);
+        if (patientData) {
+            fillHistoryData(patientData);
+            
+            // --- BAGIAN PENTING YANG DITAMBAHKAN ---
+            // Panggil fungsi reverse lookup untuk mengisi dropdown wilayah
+            loadRegionDataForPatient(patientData);
+            // ----------------------------------------
+        }
         dataForFilter = null;
     }
     const filtered = filterMedicalRecords(medicalRecords, isSelfProfile, dataForFilter, savedPatients, val);
