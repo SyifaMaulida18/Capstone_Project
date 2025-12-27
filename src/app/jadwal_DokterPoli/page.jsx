@@ -317,10 +317,46 @@ export default function JadwalDokterPoliPage() {
             <p className="text-neutral-600">Memuat jadwal terbaru...</p>
           </div>
         ) : filteredSchedules.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSchedules.map((schedule) => (
-              <ScheduleDisplayCard key={schedule.id} schedule={schedule} />
-            ))}
+          <div className="overflow-x-auto bg-white rounded-xl shadow border border-neutral-200">
+            <table className="min-w-full divide-y divide-neutral-200 text-sm">
+              <thead className="bg-primary-600 text-white">
+                <tr>
+                  <th className="px-4 py-3 text-left">Poli</th>
+                  <th className="px-4 py-3 text-left">Dokter</th>
+                  <th className="px-4 py-3 text-left">Tanggal</th>
+                  <th className="px-4 py-3 text-left">Waktu</th>
+                  <th className="px-4 py-3 text-left">Sesi</th>
+                  <th className="px-4 py-3 text-left">Kuota</th>
+                  <th className="px-4 py-3 text-left">Keterangan</th>
+                  <th className="px-4 py-3 text-left">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-neutral-100">
+                {filteredSchedules.map((s, idx) => (
+                  <tr key={s.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
+                    <td className="px-4 py-3 whitespace-nowrap">{s.poli}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{s.doctor}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{new Date(s.dateKey).toLocaleDateString('id-ID', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{s.time}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{s.session}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{s.quota}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-neutral-600">{s.keterangan || '-'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {s.available ? (
+                        <a
+                          href={`/user/reservasi?dokter_id=${s.raw_dokter_id}&poli_id=${s.raw_poli_id}&tanggal=${s.dateKey}&sesi=${s.session}`}
+                          className="inline-block px-3 py-1.5 bg-primary-600 text-white rounded-md text-sm font-semibold hover:bg-primary-700"
+                        >
+                          Reservasi
+                        </a>
+                      ) : (
+                        <span className="text-xs text-red-500">Penuh</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="mt-12 p-8 bg-white rounded-xl shadow border border-neutral-200 text-center text-neutral-600">
