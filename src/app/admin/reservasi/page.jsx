@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import AdminLayout from "@/app/admin/components/admin_layout";
+import AdminLayout from "@/app/admin/components/admin_layout"; // Sesuaikan path layout Anda
+import api from "@/services/api";
 import {
   MagnifyingGlassIcon,
-  FunnelIcon,
   TrashIcon,
-  CheckCircleIcon,
   XCircleIcon,
+  PencilSquareIcon,
+  ChatBubbleLeftRightIcon
 } from "@heroicons/react/24/outline";
 import api from "@/services/api";
 import { useRouter } from "next/navigation";
@@ -16,12 +16,12 @@ import { useRouter } from "next/navigation";
 function Dialog({ show, onClose, children }) {
   if (!show) return null;
   return (
-    <div className="fixed inset-0 bg-black/30 flex justify-center items-center z-50 p-4">
-      <div className="bg-white rounded-xl p-6 shadow-xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-xl p-6 shadow-2xl w-full max-w-lg relative max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
         {children}
         <button
           onClick={onClose}
-          className="absolute top-2 right-3 text-neutral-600 hover:text-neutral-900 text-2xl font-bold"
+          className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-800 text-xl font-bold transition-colors"
         >
           ×
         </button>
@@ -31,40 +31,51 @@ function Dialog({ show, onClose, children }) {
 }
 
 export default function ReservasiPage() {
+  const router = useRouter();
+
+  // Helper Date
   const formatDateOnly = (d) => {
-    if (!d || d === "-") return d;
+    if (!d || d === "-") return "-";
     try {
       const dt = new Date(d);
-      if (isNaN(dt)) return String(d).split("T")[0] || d;
-      return dt.toLocaleDateString("id-ID");
+      if (isNaN(dt)) return String(d).split("T")[0];
+      return dt.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
     } catch (e) {
-      return String(d).split("T")[0] || d;
+      return String(d).split("T")[0];
     }
   };
+
+  // State Data
   const [reservations, setReservations] = useState([]);
+  const [polis, setPolis] = useState([]);
+  const [dokters, setDokters] = useState([]); 
+
+  // State UI & Filter
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-
-  const [selectedReservation, setSelectedReservation] = useState(null);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  // Data poli untuk ubah poli
-  const [polis, setPolis] = useState([]);
-  const [loadingPoli, setLoadingPoli] = useState(false);
-  const [selectedPoliId, setSelectedPoliId] = useState("");
+  // State Dialog Detail
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState(null);
+  
+  // State Form Edit di dalam Dialog
+  const [formPoliId, setFormPoliId] = useState("");
+  const [formDokterId, setFormDokterId] = useState("");
+  const [formTanggal, setFormTanggal] = useState("");
 
-  // === FETCH RESERVASI ===
+  // === 1. FETCH DATA RESERVASI ===
   const fetchReservations = async () => {
     try {
       setLoading(true);
       setErrorMsg("");
-
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
       if (!token) {
         setErrorMsg("Token tidak ditemukan. Silakan login ulang.");
@@ -72,335 +83,242 @@ export default function ReservasiPage() {
         return;
       }
 
-      const res = await api.get("/reservations", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      let url = "/reservations";
+      if (statusFilter !== "all") {
+        url += `?status=${statusFilter}`;
+      }
+
+      const res = await api.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = res.data?.data ?? res.data ?? [];
-      const raw = Array.isArray(data) ? data : data?.data || [];
+      // Handle Laravel Pagination Structure
+      const responseData = res.data?.data ?? res.data; 
+      const rawData = Array.isArray(responseData) ? responseData : responseData?.data || [];
 
-      const mapped = (raw || []).map((r) => {
-        const id = r.reservid ?? r.id ?? r.reservation_id;
-
-        return {
-          id,
-          userId: r.booked_user_id ?? r.userid ?? r.user?.userid ?? null,
-          nama: r.nama,
-          email: r.email,
-          telp: r.nomor_whatsapp,
-          tglLahir: r.tanggal_lahir,
-          jk: r.jenis_kelamin,
-          nik: r.nomor_ktp,
-          wa: r.nomor_whatsapp,
-          penjamin:
-            r.penjaminan === "asuransi"
-              ? r.nama_asuransi || "Asuransi"
-              : "Cash",
-          keluhan: r.keluhan,
-          poli: r.poli?.poli_name ?? "-",
-          poliId: r.poli_id ?? r.poli?.poli_id ?? null,
-          tanggal: r.tanggal_reservasi ?? "-",
-          status: r.status ?? "-",
-        };
-      });
+      const mapped = rawData.map((r) => ({
+        id: r.reservid,
+        userId: r.booked_user_id,
+        nama: r.nama,
+        email: r.email,
+        telp: r.nomor_whatsapp,
+        tglLahir: r.tanggal_lahir,
+        jk: r.jenis_kelamin,
+        nik: r.nomor_ktp,
+        wa: r.nomor_whatsapp,
+        penjamin: r.penjaminan === "asuransi" ? r.nama_asuransi : "Cash",
+        keluhan: r.keluhan,
+        
+        poli: r.poli?.poli_name || "-",
+        poliId: r.poli_id, // Pastikan backend mengirim poli_id
+        dokter: r.dokter?.nama_dokter || "-",
+        dokterId: r.dokter_id, // Pastikan backend mengirim dokter_id
+        
+        tanggal: r.tanggal_reservasi,
+        status: r.status,
+      }));
 
       setReservations(mapped);
     } catch (err) {
       console.error(err);
-      setErrorMsg(
-        err.response?.data?.message ||
-          err.message ||
-          "Terjadi kesalahan saat mengambil data reservasi."
-      );
+      setErrorMsg(err.response?.data?.message || "Gagal mengambil data reservasi.");
     } finally {
       setLoading(false);
     }
   };
 
-  const router = useRouter();
-
-  const handleOpenChat = (reservasi) => {
-    const userId = reservasi.userId ?? reservasi.id;
-    if (!userId) {
-      alert('User ID pasien tidak tersedia.');
-      return;
-    }
-
-    // store a short intent so Admin Chat page can open the conversation
-    localStorage.setItem('chat_open_with_id', String(userId));
-    localStorage.setItem('chat_open_with_name', reservasi.nama || 'Pasien');
-
-    router.push('/admin/chat');
-  };
-
-  // === FETCH POLI ===
-  const fetchPolis = async () => {
+  // === 2. FETCH DATA MASTER (POLI & DOKTER) ===
+  const fetchMasterData = async () => {
     try {
-      setLoadingPoli(true);
       const token = localStorage.getItem("token");
+      
+      // 1. Fetch Poli
+      const resPoli = await api.get("/polis", { headers: { Authorization: `Bearer ${token}` } });
+      const poliData = resPoli.data?.data ?? resPoli.data ?? [];
+      setPolis(Array.isArray(poliData) ? poliData : []);
 
-      const res = await api.get("/polis", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // 2. Fetch Dokter
+      // Pastikan ada endpoint /api/dokters di backend Anda
+      try {
+        const resDokter = await api.get("/dokters", { headers: { Authorization: `Bearer ${token}` } });
+        const dokterData = resDokter.data?.data ?? resDokter.data ?? [];
+        setDokters(Array.isArray(dokterData) ? dokterData : []);
+      } catch (e) {
+        console.warn("Gagal fetch dokter. Pastikan endpoint GET /dokters tersedia.", e);
+      }
 
-      const data = res.data?.data ?? res.data ?? [];
-      const list = Array.isArray(data) ? data : data?.data || [];
-      setPolis(list);
     } catch (err) {
-      console.error("Gagal mengambil data poli:", err);
-    } finally {
-      setLoadingPoli(false);
+      console.error("Master data error:", err);
     }
   };
 
   useEffect(() => {
     fetchReservations();
-  }, []);
+    fetchMasterData();
+  }, [statusFilter]); 
 
-  // === DETAIL + UBAH POLI ===
-  const handleDetail = async (reservasi) => {
+  // === 3. HANDLER BUKA DETAIL ===
+  const handleDetail = (reservasi) => {
     setSelectedReservation(reservasi);
-    setSelectedPoliId(reservasi.poliId ?? "");
-
-    if (polis.length === 0) {
-      await fetchPolis();
-    }
-
+    
+    // Isi form dengan data yang ada
+    setFormPoliId(reservasi.poliId || "");
+    setFormDokterId(reservasi.dokterId || "");
+    setFormTanggal(reservasi.tanggal || "");
+    
     setShowDetailDialog(true);
   };
 
-  // ✅ UBAH POLI RESERVASI (PUT /reservations/{id}/change-poli)
-  const handleChangePoli = async () => {
+  const handleOpenChat = (reservasi) => {
+    const userId = reservasi.userId;
+    if (!userId) return alert('User ID pasien tidak tersedia.');
+    localStorage.setItem('chat_open_with_id', String(userId));
+    localStorage.setItem('chat_open_with_name', reservasi.nama || 'Pasien');
+    router.push('/admin/chat');
+  };
+
+  // === 4. UPDATE RESERVASI ===
+  const handleUpdateReservation = async () => {
     if (!selectedReservation) return;
-    if (!selectedPoliId) {
-      alert("Silakan pilih poli baru terlebih dahulu.");
-      return;
-    }
-
-    const id = selectedReservation.id;
-
+    
     try {
       setProcessing(true);
       const token = localStorage.getItem("token");
+      const id = selectedReservation.id;
 
       await api.put(
-        `/reservations/${id}/change-poli`,
-        { poli_id: selectedPoliId },
+        `/reservations/${id}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+          poli_id: formPoliId,
+          dokter_id: formDokterId,
+          tanggal_reservasi: formTanggal
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const selectedPoliObj = polis.find(
-        (p) =>
-          String(p.poli_id) === String(selectedPoliId) ||
-          String(p.id) === String(selectedPoliId)
-      );
-
-      const poliName =
-        selectedPoliObj?.poli_name ||
-        selectedPoliObj?.nama ||
-        selectedPoliObj?.Nama ||
-        "-";
-
-      // update di list
-      setReservations((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? {
-                ...r,
-                poliId: selectedPoliId,
-                poli: poliName,
-              }
-            : r
-        )
-      );
-
-      // update di dialog
-      setSelectedReservation((prev) =>
-        prev
-          ? {
-              ...prev,
-              poliId: selectedPoliId,
-              poli: poliName,
-            }
-          : prev
-      );
-
-      alert("Poli berhasil diperbarui.");
+      alert("Data reservasi berhasil diperbarui.");
+      setShowDetailDialog(false);
+      fetchReservations(); // Refresh list
     } catch (err) {
-      console.error("ERROR UPDATE POLI:", err);
-      alert(
-        err.response?.data?.message ||
-          "Gagal mengubah poli. Pastikan endpoint update tersedia di backend."
-      );
+      console.error("Update Error:", err);
+      alert(err.response?.data?.message || "Gagal memperbarui data.");
     } finally {
       setProcessing(false);
     }
   };
 
-  // ✅ VERIFIKASI RESERVASI (POST /reservations/{id}/verify)
+  // === 5. VERIFIKASI ===
   const handleVerifyReservation = async () => {
     if (!selectedReservation) return;
-    const id = selectedReservation.id;
+    
+    if (!formDokterId) {
+        alert("Harap pilih DOKTER terlebih dahulu sebelum verifikasi.");
+        return;
+    }
+
+    // Cek jika ada perubahan data, harus disimpan dulu
+    if (String(formDokterId) !== String(selectedReservation.dokterId) || 
+        String(formPoliId) !== String(selectedReservation.poliId)) {
+        if(!confirm("Anda mengubah Poli/Dokter. Data akan disimpan otomatis sebelum verifikasi. Lanjutkan?")) {
+            return;
+        }
+        await handleUpdateReservation(); 
+        // Note: Setelah update, dialog tertutup. Admin perlu buka lagi untuk klik verify jika ingin 2 step.
+        // Atau bisa dilanjut chaining jika UX mengizinkan. Di sini kita refresh list saja.
+        return; 
+    }
 
     try {
       setProcessing(true);
       const token = localStorage.getItem("token");
+      const id = selectedReservation.id;
 
       const res = await api.post(
         `/reservations/${id}/verify`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        {}, 
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // update status di list
-      setReservations((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? {
-                ...r,
-                status: "confirmed",
-              }
-            : r
-        )
-      );
-
-      setSelectedReservation((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: "confirmed",
-            }
-          : prev
-      );
-
-      alert(res.data?.message || "Reservasi berhasil diverifikasi.");
+      alert(res.data?.message || "Berhasil diverifikasi.");
+      setShowDetailDialog(false);
+      fetchReservations();
     } catch (err) {
-      console.error("VERIFY ERROR:", err);
-      alert(
-        err.response?.data?.message ||
-          "Gagal memverifikasi reservasi. Pastikan poli, dokter, dan tanggal sudah benar."
-      );
+      console.error("Verify Error:", err);
+      const msg = err.response?.data?.message;
+      alert(`Gagal Verifikasi: ${msg || "Terjadi kesalahan"}`);
     } finally {
       setProcessing(false);
     }
   };
 
-  // ❌ BATALKAN RESERVASI (POST /reservations/{id}/cancel)
+  // === 6. BATALKAN ===
   const handleCancelReservation = async () => {
     if (!selectedReservation) return;
-    const id = selectedReservation.id;
-
-    if (typeof window !== "undefined") {
-      const ok = window.confirm(
-        "Yakin ingin membatalkan reservasi ini? Tindakan ini tidak dapat dibatalkan."
-      );
-      if (!ok) return;
-    }
+    if (!confirm("Yakin ingin membatalkan reservasi ini?")) return;
 
     try {
       setProcessing(true);
       const token = localStorage.getItem("token");
+      const id = selectedReservation.id;
 
-      const res = await api.post(
+      await api.post(
         `/reservations/${id}/cancel`,
         {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setReservations((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? {
-                ...r,
-                status: "cancelled",
-              }
-            : r
-        )
-      );
-
-      setSelectedReservation((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: "cancelled",
-            }
-          : prev
-      );
-
-      alert(res.data?.message || "Reservasi berhasil dibatalkan.");
+      alert("Reservasi dibatalkan.");
+      setShowDetailDialog(false);
+      fetchReservations();
     } catch (err) {
-      console.error("CANCEL ERROR:", err);
-      alert(
-        err.response?.data?.message ||
-          "Gagal membatalkan reservasi. Pastikan status masih pending."
-      );
+      alert(err.response?.data?.message || "Gagal membatalkan.");
     } finally {
       setProcessing(false);
     }
   };
 
-  const handleDelete = (id) => {
-    if (typeof window === "undefined") return;
-    if (window.confirm("Yakin ingin menghapus reservasi ini dari tampilan?")) {
-      // Hanya hapus di FE; kalau mau benar2 delete dari DB, buat endpoint delete sendiri.
-      setReservations((prev) => prev.filter((r) => r.id !== id));
-    }
-  };
-
-  // FILTER
+  // Filter Frontend (Search Bar)
   const filteredReservations = reservations.filter((r) => {
     const q = search.toLowerCase();
-    const bySearch =
+    return (
       r.nama?.toLowerCase().includes(q) ||
-      r.email?.toLowerCase().includes(q) ||
       r.poli?.toLowerCase().includes(q) ||
-      r.keluhan?.toLowerCase().includes(q);
-
-    const byStatus =
-      statusFilter === "all" ? true : r.status === statusFilter;
-
-    return bySearch && byStatus;
+      r.id?.toString().includes(q)
+    );
   });
+
+  // Filter dokter berdasarkan poli yang dipilih
+  const filteredDokters = dokters.filter(d => 
+    !formPoliId || String(d.poli_id) === String(formPoliId)
+  );
 
   return (
     <AdminLayout>
-      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
+      <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-7xl mx-auto min-h-[70vh]">
         <h1 className="text-2xl font-bold text-center mb-8 text-neutral-800">
           Manajemen Reservasi Pasien
         </h1>
 
         {/* FILTER BAR */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div className="flex items-center space-x-3 md:ml-auto">
-            <div className="relative w-full max-w-xs">
+          <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+            <div className="relative w-full md:w-72">
               <input
                 type="text"
-                placeholder="Cari nama, email, poli, keluhan..."
+                placeholder="Cari ID, Nama, Poli..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all"
               />
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
+              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             </div>
 
-            <div className="flex items-center space-x-2">
-              <FunnelIcon className="h-5 w-5 text-neutral-600" />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <FunnelIcon className="h-5 w-5 text-neutral-500" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-neutral-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white"
+                className="border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none w-full md:w-auto"
               >
                 <option value="all">Semua Status</option>
                 <option value="pending">Pending</option>
@@ -411,246 +329,194 @@ export default function ReservasiPage() {
           </div>
         </div>
 
-        {loading && (
-          <p className="text-center text-sm text-neutral-600 mb-4">
-            Mengambil data reservasi...
-          </p>
-        )}
         {errorMsg && (
-          <p className="text-center text-sm text-red-600 mb-4">{errorMsg}</p>
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm text-center border border-red-200">
+            {errorMsg}
+          </div>
         )}
 
         {/* TABEL */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto border border-neutral-200 rounded-lg shadow-sm">
           <table className="min-w-full divide-y divide-neutral-200">
-            <thead className="bg-primary-600 rounded-t-lg">
+            <thead className="bg-primary-600 text-white">
               <tr>
-                {[
-                  "Id",
-                  "Nama",
-                  "Email",
-                  "No Telp",
-                  "Poli",
-                  "Tanggal",
-                  "Status",
-                  "Aksi",
-                ].map((header) => (
-                  <th
-                    key={header}
-                    className="px-6 py-3 text-left text-sm font-semibold text-white uppercase tracking-wider"
-                  >
-                    {header}
+                {["ID", "Nama", "Poli", "Dokter", "Tanggal", "Status", "Aksi"].map((h) => (
+                  <th key={h} className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                    {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-neutral-100">
-              {!loading && filteredReservations.length === 0 && (
+            <tbody className="bg-white divide-y divide-neutral-100 text-sm">
+              {loading ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-4 text-center text-sm text-neutral-500"
-                  >
+                  <td colSpan={7} className="px-6 py-8 text-center text-neutral-500">
+                    Memuat data...
+                  </td>
+                </tr>
+              ) : filteredReservations.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-neutral-500">
                     Tidak ada data reservasi.
                   </td>
                 </tr>
+              ) : (
+                filteredReservations.map((r, i) => (
+                  <tr key={r.id} className={`hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-neutral-50/50'}`}>
+                    <td className="px-6 py-4 font-mono text-xs text-neutral-500">{r.id}</td>
+                    <td className="px-6 py-4 font-medium text-neutral-900">{r.nama}</td>
+                    <td className="px-6 py-4 text-neutral-600">{r.poli}</td>
+                    <td className="px-6 py-4 text-neutral-600">{r.dokter}</td>
+                    <td className="px-6 py-4 text-neutral-600">{formatDateOnly(r.tanggal)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                        r.status === "confirmed" ? "bg-green-100 text-green-700 border-green-200" :
+                        r.status === "cancelled" ? "bg-red-100 text-red-700 border-red-200" :
+                        "bg-yellow-100 text-yellow-700 border-yellow-200"
+                      }`}>
+                        {r.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => handleOpenChat(r)}
+                                className="text-blue-600 hover:text-blue-800 p-1.5 rounded bg-blue-50 hover:bg-blue-100 transition"
+                                title="Chat Pasien"
+                            >
+                                <ChatBubbleLeftRightIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => handleDetail(r)}
+                                className="text-gray-600 hover:text-gray-800 p-1.5 rounded bg-gray-100 hover:bg-gray-200 transition flex items-center gap-1 text-xs font-semibold"
+                            >
+                                <PencilSquareIcon className="h-4 w-4" /> Detail
+                            </button>
+                        </div>
+                    </td>
+                  </tr>
+                ))
               )}
-
-              {filteredReservations.map((p, i) => (
-                <tr
-                  key={p.id}
-                  className={i % 2 === 1 ? "bg-neutral-50" : "bg-white"}
-                >
-                  <td className="px-6 py-4 text-sm font-medium text-neutral-900">
-                    {p.id}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-neutral-800">
-                    {p.nama}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-neutral-800">
-                    {p.email}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-neutral-800">
-                    {p.telp}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-neutral-800">
-                    {p.poli}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-neutral-800">
-                    {formatDateOnly(p.tanggal)}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        p.status === "pending"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : p.status === "confirmed"
-                          ? "bg-green-100 text-green-700"
-                          : p.status === "cancelled"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-neutral-100 text-neutral-700"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="text-neutral-600 hover:text-red-600 p-1 rounded-md hover:bg-red-50"
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenChat(p)}
-                        disabled={!p.userId}
-                        className="text-neutral-600 hover:text-blue-600 p-1 rounded-md hover:bg-blue-50"
-                        title={p.userId ? `Chat dengan ${p.nama}` : 'User ID tidak tersedia'}
-                      >
-                        Chat
-                      </button>
-                      <button
-                        onClick={() => handleDetail(p)}
-                        className="bg-primary-500 hover:bg-primary-600 text-white text-xs px-3 py-1.5 rounded-md font-semibold transition-all"
-                      >
-                        Lihat detail
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>
 
-        {/* DIALOG DETAIL + GANTI POLI + VERIFY/CANCEL */}
+        {/* DIALOG DETAIL & EDIT */}
         <Dialog
           show={showDetailDialog}
-          onClose={() => {
-            if (processing) return;
-            setShowDetailDialog(false);
-          }}
+          onClose={() => !processing && setShowDetailDialog(false)}
         >
-          <h2 className="text-xl font-semibold text-center mb-4 text-neutral-700">
-            Detail Reservasi
-          </h2>
-
           {selectedReservation && (
-            <div className="space-y-2 text-neutral-700 text-sm leading-relaxed">
-              <p>
-                <strong>Nama Lengkap:</strong> {selectedReservation.nama}
-              </p>
-              <p>
-                <strong>Tanggal Lahir:</strong> {formatDateOnly(selectedReservation.tglLahir)}
-              </p>
-              <p>
-                <strong>Jenis Kelamin:</strong> {selectedReservation.jk}
-              </p>
-              <p>
-                <strong>Nomor KTP:</strong> {selectedReservation.nik}
-              </p>
-              <p>
-                <strong>Email:</strong> {selectedReservation.email}
-              </p>
-              <p>
-                <strong>Nomor WA:</strong> {selectedReservation.wa}
-              </p>
-              <p>
-                <strong>Penjamin:</strong> {selectedReservation.penjamin}
-              </p>
-              <p>
-                <strong>Keluhan:</strong> {selectedReservation.keluhan}
-              </p>
-              <p>
-                <strong>Poli saat ini:</strong> {selectedReservation.poli}
-              </p>
-              <p>
-                <strong>Tanggal Reservasi:</strong>{" "}
-                {formatDateOnly(selectedReservation.tanggal)}
-              </p>
-              <p>
-                <strong>Status:</strong> {selectedReservation.status}
-              </p>
+            <div className="space-y-5">
+              <div className="border-b pb-3 mb-3">
+                <h2 className="text-xl font-bold text-gray-800">Detail Reservasi</h2>
+                <p className="text-xs text-gray-500">ID: {selectedReservation.id}</p>
+              </div>
 
-              {/* GANTI POLI */}
-              <div className="mt-4 pt-3 border-t border-neutral-200">
-                <p className="text-xs text-neutral-500 mb-1">
-                  Jika keluhan tidak sesuai dengan poli yang dipilih, pilih poli
-                  yang lebih tepat:
-                </p>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                  Ubah Poli
-                </label>
-                <select
-                  value={selectedPoliId || ""}
-                  onChange={(e) => setSelectedPoliId(e.target.value)}
-                  disabled={loadingPoli}
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white text-sm"
-                >
-                  <option value="">
-                    {loadingPoli ? "Memuat poli..." : "Pilih poli baru"}
-                  </option>
-                  {polis.map((p) => (
-                    <option key={p.poli_id} value={p.poli_id}>
-                      {p.poli_name}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-3 flex flex-wrap gap-3 items-center">
-                  <button
-                    type="button"
-                    onClick={handleChangePoli}
-                    disabled={processing || !selectedPoliId}
-                    className="inline-flex items-center px-4 py-2 rounded-lg bg-secondary-500 text-white text-sm font-semibold hover:bg-secondary-600 disabled:opacity-60"
-                  >
-                    Simpan Perubahan Poli
-                  </button>
+              {/* DATA PASIEN */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
+                <div><span className="font-semibold">Nama:</span> {selectedReservation.nama}</div>
+                <div><span className="font-semibold">No HP:</span> {selectedReservation.wa}</div>
+                <div><span className="font-semibold">Tgl Lahir:</span> {formatDateOnly(selectedReservation.tglLahir)}</div>
+                <div><span className="font-semibold">Jenis Kelamin:</span> {selectedReservation.jk}</div>
+                <div className="col-span-2"><span className="font-semibold">Keluhan:</span> <span className="italic text-gray-600">{selectedReservation.keluhan}</span></div>
+                <div className="col-span-2"><span className="font-semibold">Penjamin:</span> {selectedReservation.penjamin}</div>
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenChat(selectedReservation)}
-                    disabled={!selectedReservation}
-                    className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
-                  >
-                    Chat Pasien
-                  </button>
+              {/* FORM EDIT (POLI, DOKTER, TANGGAL) */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
+                <h3 className="font-bold text-sm text-gray-800 uppercase mb-2">Jadwal & Penugasan</h3>
+                
+                {/* Tanggal */}
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Tanggal Kunjungan</label>
+                    <input 
+                        type="date" 
+                        value={formTanggal}
+                        onChange={(e) => setFormTanggal(e.target.value)}
+                        disabled={selectedReservation.status !== 'pending' || processing}
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-200"
+                    />
                 </div>
+
+                {/* Poli */}
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Poli Tujuan</label>
+                    <select
+                        value={formPoliId}
+                        onChange={(e) => {
+                            setFormPoliId(e.target.value);
+                            setFormDokterId(""); // Reset dokter jika poli berubah
+                        }}
+                        disabled={selectedReservation.status !== 'pending' || processing}
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-200"
+                    >
+                        <option value="">-- Pilih Poli --</option>
+                        {polis.map(p => (
+                            <option key={p.poli_id} value={p.poli_id}>{p.poli_name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Dokter (WAJIB UNTUK VERIFY) */}
+                {/* <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Dokter Penanggung Jawab <span className="text-red-500">*</span></label>
+                    <select
+                        value={formDokterId}
+                        onChange={(e) => setFormDokterId(e.target.value)}
+                        disabled={selectedReservation.status !== 'pending' || !formPoliId || processing}
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-200"
+                    >
+                        <option value="">-- Pilih Dokter --</option>
+                        {filteredDokters.length > 0 ? (
+                            filteredDokters.map(d => (
+                                <option key={d.dokter_id} value={d.dokter_id}>{d.nama_dokter}</option>
+                            ))
+                        ) : (
+                            <option value="" disabled>Tidak ada dokter di poli ini</option>
+                        )}
+                    </select>
+                    {!formDokterId && <p className="text-[10px] text-red-500 mt-1">Wajib dipilih sebelum verifikasi</p>}
+                </div> */}
+
+                {selectedReservation.status === 'pending' && (
+                    <button
+                        onClick={handleUpdateReservation}
+                        disabled={processing}
+                        className="w-full py-2 bg-gray-800 text-white rounded text-sm font-semibold hover:bg-gray-900 disabled:opacity-50"
+                    >
+                        {processing ? "Menyimpan..." : "Simpan Perubahan"}
+                    </button>
+                )}
               </div>
 
-              {/* TOMBOL VERIFY & CANCEL */}
-              <div className="mt-5 pt-3 border-t border-neutral-200 flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={handleCancelReservation}
-                  disabled={processing || selectedReservation.status !== "pending"}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-60 w-full sm:w-1/2"
-                >
-                  <XCircleIcon className="h-5 w-5 mr-2" />
-                  Batalkan Reservasi
-                </button>
-                <button
-                  type="button"
-                  onClick={handleVerifyReservation}
-                  disabled={processing || selectedReservation.status !== "pending"}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-60 w-full sm:w-1/2"
-                >
-                  <CheckCircleIcon className="h-5 w-5 mr-2" />
-                  Verifikasi Reservasi
-                </button>
-              </div>
+              {/* ACTION BUTTONS (VERIFY / CANCEL) */}
+              {selectedReservation.status === 'pending' && (
+                  <div className="flex gap-3 pt-2">
+                    <button
+                        onClick={handleCancelReservation}
+                        disabled={processing}
+                        className="flex-1 py-2 border border-red-200 bg-red-50 text-red-600 rounded text-sm font-bold hover:bg-red-100 transition disabled:opacity-50"
+                    >
+                        Batalkan
+                    </button>
+                    <button
+                        onClick={handleVerifyReservation}
+                        disabled={processing || !formDokterId}
+                        className="flex-1 py-2 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
+                    >
+                        <CheckCircleIcon className="w-5 h-5" />
+                        Verifikasi
+                    </button>
+                  </div>
+              )}
 
-              {/* TOMBOL CHAT */}
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => handleOpenChat(selectedReservation)}
-                  disabled={!selectedReservation}
-                  className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
-                >
-                  Chat Pasien
-                </button>
-              </div>
+              {selectedReservation.status !== 'pending' && (
+                  <div className={`p-3 text-center rounded text-sm font-bold ${selectedReservation.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      Status: {selectedReservation.status.toUpperCase()}
+                  </div>
+              )}
+
             </div>
           )}
         </Dialog>

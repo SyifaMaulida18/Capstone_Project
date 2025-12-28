@@ -1,75 +1,116 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
+import { Input } from "@/app/superadmin/components/ui/input";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
-export default function RekamMedisListPage() {
-  const [records, setRecords] = useState([]);
+export default function EditRekamMedisPage({ params }) {
+  const router = useRouter();
+  const { id } = params; // Mendapatkan ID dari URL
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchList = async () => {
-      try {
-        const token = localStorage.getItem("token");
+  const [form, setForm] = useState({
+    no_medrec: "",
+    diagnosis: "",
+    tanggal_diperiksa: "",
+    // Field lain ditampilkan readonly karena backend 'update' membatasi input
+    tindakan: "", 
+  });
 
-        const res = await fetch(`${API_BASE}/rekam-medis`, {
-          headers: { Authorization: `Bearer ${token}` },
+  useEffect(() => {
+    const fetchDetail = async () => {
+        const token = localStorage.getItem("token");
+        // Karena route show() mungkin tidak ada, kita filter manual dari list atau endpoint show jika ada
+        // Asumsi: Backend menggunakan Route::apiResource, maka ada endpoint GET /rekam-medis/{id}
+        try {
+            const res = await fetch(`${API_BASE}/rekam-medis/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const json = await res.json();
+            const data = json.data || json; // Sesuaikan wrapper response
+
+            setForm({
+                no_medrec: data.no_medrec || "",
+                diagnosis: data.diagnosis || "",
+                tindakan: data.tindakan || "",
+                tanggal_diperiksa: data.tanggal_diperiksa || "",
+            });
+        } catch(err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    }
+    fetchDetail();
+  }, [id]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("token");
+    try {
+        const res = await fetch(`${API_BASE}/rekam-medis/${id}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                no_medrec: form.no_medrec,
+                diagnosis: form.diagnosis,
+                tanggal_diperiksa: form.tanggal_diperiksa,
+                // tindakan: form.tindakan // (Optional: Jika backend diupdate support tindakan)
+            })
         });
 
-        const json = await res.json();
-        setRecords(json.data || []);
-      } catch (err) {
-        console.error("Error fetch list:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+        if(!res.ok) throw new Error("Gagal update");
+        
+        alert("Berhasil diperbarui");
+        router.push("/superadmin/rekam-medis");
+    } catch(err) {
+        alert(err.message);
+    }
+  };
 
-    fetchList();
-  }, []);
+  if(loading) return <AdminLayout>Loading...</AdminLayout>;
 
   return (
     <AdminLayout>
-      <div className="bg-white p-8 rounded-xl shadow-lg border max-w-4xl mx-auto mt-8">
-        <h1 className="text-2xl font-bold mb-6">Rekam Medis</h1>
-
-        {loading ? (
-          <p>Memuat data...</p>
-        ) : records.length === 0 ? (
-          <p className="text-neutral-500">Belum ada rekam medis.</p>
-        ) : (
-          <table className="min-w-full border">
-            <thead>
-              <tr className="bg-primary-600 text-white">
-                <th className="p-3">No Medrec</th>
-                <th className="p-3">Diagnosis</th>
-                <th className="p-3">Tanggal</th>
-                <th className="p-3">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((rec) => (
-                <tr key={rec.id} className="border-b">
-                  <td className="p-3">{rec.no_medrec}</td>
-                  <td className="p-3">{rec.diagnosis}</td>
-                  <td className="p-3">{rec.tanggal_diperiksa?.slice(0, 10)}</td>
-                  <td className="p-3">
-                    <Link
-                      href={`/superadmin/rekam-medis/${rec.id}`}
-                      className="text-primary-600 hover:underline"
-                    >
-                      Edit
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+       <div className="bg-white p-8 rounded-xl shadow-lg border max-w-2xl mx-auto mt-8">
+         <h1 className="text-xl font-bold mb-6">Edit Rekam Medis</h1>
+         <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium mb-1">No Medrec</label>
+                <Input value={form.no_medrec} onChange={(e) => setForm({...form, no_medrec: e.target.value})} />
+            </div>
+            <div>
+                <label className="block text-sm font-medium mb-1">Tanggal Diperiksa</label>
+                <Input type="date" value={form.tanggal_diperiksa} onChange={(e) => setForm({...form, tanggal_diperiksa: e.target.value})} />
+            </div>
+            <div>
+                <label className="block text-sm font-medium mb-1">Diagnosis</label>
+                <textarea 
+                    className="w-full border rounded p-2" 
+                    rows={3}
+                    value={form.diagnosis} 
+                    onChange={(e) => setForm({...form, diagnosis: e.target.value})} 
+                />
+            </div>
+            {/* Field Readonly (karena backend update tidak menyertakan ini) */}
+            <div>
+                <label className="block text-sm font-medium mb-1 text-gray-400">Tindakan (Read Only)</label>
+                <textarea 
+                    className="w-full border rounded p-2 bg-gray-100 text-gray-500" 
+                    rows={3}
+                    readOnly
+                    value={form.tindakan} 
+                />
+            </div>
+            <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Update</button>
+         </form>
+       </div>
     </AdminLayout>
   );
 }
