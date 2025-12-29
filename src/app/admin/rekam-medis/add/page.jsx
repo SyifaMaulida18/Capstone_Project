@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/app/admin/components/admin_layout";
 import { Input } from "@/app/admin/components/ui/input";
 
@@ -10,6 +10,7 @@ const API_BASE =
 
 export default function AddRekamMedisPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [reservations, setReservations] = useState([]);
   const [loadingReservasi, setLoadingReservasi] = useState(true);
@@ -23,6 +24,14 @@ export default function AddRekamMedisPage() {
     tindakan: "",
     tanggal_diperiksa: "",
   });
+
+  // Prefill dari query param (reservasi_id)
+  useEffect(() => {
+    const qReservasiId = searchParams?.get("reservasi_id");
+    if (qReservasiId) {
+      setForm((prev) => ({ ...prev, reservasi_id: qReservasiId }));
+    }
+  }, [searchParams]);
 
   // ✅ Ambil daftar reservasi (misalnya hanya yang confirmed)
   useEffect(() => {

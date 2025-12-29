@@ -30,8 +30,20 @@ export default function PoliQueuePage() {
   
   const [loadingData, setLoadingData] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showMedicalForm, setShowMedicalForm] = useState(false);
+  const [medicalForm, setMedicalForm] = useState({
+    reservasi_id: "",
+    no_medrec: "",
+    tanggal_diperiksa: "",
+    gejala: "",
+    diagnosis: "",
+    tindakan: "",
+    resep_obat: ""
+  });
+  const [submitLoading, setSubmitLoading] = useState(false);
   
-  const today = new Date().toISOString().slice(0, 10);
+  // Filter tanggal (default ke hari ini)
+  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
 
   // 1. AMBIL DATA ADMIN YANG LOGIN
   useEffect(() => {
@@ -73,7 +85,7 @@ export default function PoliQueuePage() {
       if (!isBackground) setLoadingData(true);
       const token = localStorage.getItem("token");
       
-      const url = `/antrian/dashboard?poli_id=${admin.poli_id}&tanggal=${today}`;
+      const url = `/antrian/dashboard?poli_id=${admin.poli_id}&tanggal=${tanggal}`;
       const res = await api.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -98,7 +110,62 @@ export default function PoliQueuePage() {
     } finally {
       setLoadingData(false);
     }
-  }, [admin, today]);
+  }, [admin, tanggal]);
+
+  const openMedicalForm = () => {
+    if (!queueData.sedang_dipanggil?.reservation?.reservid) {
+      alert("Tidak ada pasien yang sedang dilayani.");
+      return;
+    }
+    setMedicalForm({
+      reservasi_id: queueData.sedang_dipanggil.reservation.reservid.toString(),
+      no_medrec: "",
+      tanggal_diperiksa: tanggal,
+      gejala: "",
+      diagnosis: "",
+      tindakan: "",
+      resep_obat: ""
+    });
+    setShowMedicalForm(true);
+  };
+
+  const submitMedicalRecord = async (e) => {
+    e.preventDefault();
+    
+    if (!medicalForm.reservasi_id) {
+      alert("ID Reservasi wajib diisi.");
+      return;
+    }
+
+    try {
+      setSubmitLoading(true);
+      const token = localStorage.getItem("token");
+      
+      const payload = {
+        reservasi_id: Number(medicalForm.reservasi_id),
+        no_medrec: medicalForm.no_medrec,
+        tanggal_diperiksa: medicalForm.tanggal_diperiksa,
+        gejala: medicalForm.gejala,
+        diagnosis: medicalForm.diagnosis,
+        tindakan: medicalForm.tindakan,
+        resep_obat: medicalForm.resep_obat
+      };
+
+      const res = await api.post('/rekam-medis', payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      alert("Rekam medis berhasil disimpan!");
+      setShowMedicalForm(false);
+      await fetchQueue(true);
+    } catch (err) {
+      const msg = err.response?.data?.message || "Gagal menyimpan rekam medis.";
+      alert(msg);
+      console.error("Error submit medical record:", err);
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
 
   // Trigger fetch
   useEffect(() => {
@@ -107,7 +174,7 @@ export default function PoliQueuePage() {
         const interval = setInterval(() => fetchQueue(true), 30000); // Auto refresh 30s
         return () => clearInterval(interval);
     }
-  }, [admin, fetchQueue]);
+  }, [admin, fetchQueue, tanggal]);
 
 
   // === ACTIONS ===
@@ -182,7 +249,18 @@ export default function PoliQueuePage() {
             </div>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+          {/* Filter Tanggal */}
+          <div className="hidden sm:flex items-center gap-2 text-sm text-gray-700">
+            <label htmlFor="tanggal" className="text-gray-500">Tanggal</label>
+            <input
+              id="tanggal"
+              type="date"
+              value={tanggal}
+              onChange={(e) => setTanggal(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
             <button 
                 onClick={() => fetchQueue(false)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 transition text-gray-700 font-medium"
@@ -236,23 +314,33 @@ export default function PoliQueuePage() {
                     </div>
 
                     {/* TOMBOL AKSI UTAMA */}
-                    <div className="bg-gray-50 p-6 flex gap-4 border-t border-gray-100">
-                        <button
-                            onClick={selesai}
-                            disabled={!queueData.sedang_dipanggil || actionLoading}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-5 rounded-xl font-bold text-xl shadow hover:shadow-lg transition transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
-                        >
-                            <CheckCircleIcon className="w-8 h-8" />
-                            SELESAI
-                        </button>
-                        <button
-                            onClick={panggilNext}
-                            disabled={actionLoading}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-xl font-bold text-xl shadow hover:shadow-lg transition transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
-                        >
-                            <MegaphoneIcon className="w-8 h-8" />
-                            {actionLoading ? 'MEMPROSES...' : 'PANGGIL NEXT'}
-                        </button>
+                    <div className="bg-gray-50 p-6 flex flex-col gap-4 border-t border-gray-100">
+                        <div className="flex gap-4">
+                            <button
+                                onClick={selesai}
+                                disabled={!queueData.sedang_dipanggil || actionLoading}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-5 rounded-xl font-bold text-xl shadow hover:shadow-lg transition transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
+                            >
+                                <CheckCircleIcon className="w-8 h-8" />
+                                SELESAI
+                            </button>
+                            <button
+                                onClick={panggilNext}
+                                disabled={actionLoading}
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-xl font-bold text-xl shadow hover:shadow-lg transition transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-3"
+                            >
+                                <MegaphoneIcon className="w-8 h-8" />
+                                {actionLoading ? 'MEMPROSES...' : 'PANGGIL NEXT'}
+                            </button>
+                        </div>
+                        {queueData.sedang_dipanggil && (
+                            <button
+                                onClick={openMedicalForm}
+                                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold shadow hover:shadow-lg transition"
+                            >
+                                📋 Tambah Rekam Medis
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -342,6 +430,125 @@ export default function PoliQueuePage() {
 
         </div>
       </div>
+
+      {/* MODAL REKAM MEDIS */}
+      {showMedicalForm && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white z-10">
+              <h3 className="text-2xl font-bold text-gray-800">Tambah Rekam Medis</h3>
+              <button
+                onClick={() => setShowMedicalForm(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={submitMedicalRecord} className="p-6 space-y-4">
+              {/* ID RESERVASI */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">ID Reservasi</label>
+                <input
+                  type="number"
+                  value={medicalForm.reservasi_id}
+                  readOnly
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600"
+                />
+              </div>
+
+              {/* NO MEDREC & TANGGAL */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">No. Medrec</label>
+                  <input
+                    type="text"
+                    value={medicalForm.no_medrec}
+                    onChange={(e) => setMedicalForm({ ...medicalForm, no_medrec: e.target.value })}
+                    placeholder="Auto-generated"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Diperiksa</label>
+                  <input
+                    type="date"
+                    value={medicalForm.tanggal_diperiksa}
+                    onChange={(e) => setMedicalForm({ ...medicalForm, tanggal_diperiksa: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* GEJALA */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Gejala</label>
+                <textarea
+                  value={medicalForm.gejala}
+                  onChange={(e) => setMedicalForm({ ...medicalForm, gejala: e.target.value })}
+                  rows={3}
+                  placeholder="Keluhan / gejala pasien"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* DIAGNOSIS */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Diagnosis</label>
+                <textarea
+                  value={medicalForm.diagnosis}
+                  onChange={(e) => setMedicalForm({ ...medicalForm, diagnosis: e.target.value })}
+                  rows={3}
+                  placeholder="Hasil diagnosis dokter"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* TINDAKAN */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Tindakan</label>
+                <textarea
+                  value={medicalForm.tindakan}
+                  onChange={(e) => setMedicalForm({ ...medicalForm, tindakan: e.target.value })}
+                  rows={3}
+                  placeholder="Tindakan medis yang dilakukan"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* RESEP OBAT */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Resep Obat</label>
+                <textarea
+                  value={medicalForm.resep_obat}
+                  onChange={(e) => setMedicalForm({ ...medicalForm, resep_obat: e.target.value })}
+                  rows={4}
+                  placeholder="Daftar obat dan aturan pakai"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                />
+              </div>
+
+              {/* TOMBOL */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowMedicalForm(false)}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitLoading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitLoading ? "Menyimpan..." : "Simpan Rekam Medis"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

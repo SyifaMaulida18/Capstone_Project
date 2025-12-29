@@ -279,8 +279,14 @@ export default function MedicalRecordsPage() {
       <div className="p-6 bg-white rounded-xl shadow-sm min-h-[85vh] border border-gray-100 flex flex-col relative">
         
         {/* === HEADER === */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-gray-800">Manajemen Rekam Medis</h1>
+          <a
+            href="/admin/rekam-medis/add"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 shadow"
+          >
+            Tambah Rekam Medis
+          </a>
         </div>
 
         {errorMsg && (
