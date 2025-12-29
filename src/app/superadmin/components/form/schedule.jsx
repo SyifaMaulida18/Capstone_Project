@@ -43,14 +43,18 @@ export default function JadwalForm({ initialData }) {
       try {
         const token = localStorage.getItem("token");
         const baseUrl =
-          process.env.NEXT_PUBLIC_API_BASE_URL ||
-          "http://127.0.0.1:8000/api";
+          process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
         const headers = { Authorization: `Bearer ${token}` };
 
         const [resDokter, resPoli] = await Promise.all([
           fetch(`${baseUrl}/dokters`, { headers }),
           fetch(`${baseUrl}/polis`, { headers }),
         ]);
+
+        // Cek status authorization
+        if (resDokter.status === 403 || resPoli.status === 403) {
+           console.warn("Akses ditolak (403). Pastikan user memiliki role Admin/Superadmin.");
+        }
 
         const dataDokter = await resDokter.json();
         const dataPoli = await resPoli.json();
@@ -74,24 +78,17 @@ export default function JadwalForm({ initialData }) {
     }
   }, [initialData, isEditMode]);
 
-  // Handle Input Change (dengan proteksi kuota supaya tidak minus)
+  // Handle Input Change
   const handleChange = (e) => {
     const { name, value } = e.target;
     let newValue = value;
 
-    // kalau field kuota → pastikan minimal 0
+    // Proteksi kuota tidak boleh minus
     if (
-      name.endsWith("_pagi_kuota") ||
-      name.endsWith("_siang_kuota") ||
-      name.endsWith("_sore_kuota")
+      name.endsWith("_kuota")
     ) {
       const num = parseInt(value, 10);
-
-      if (isNaN(num)) {
-        newValue = 0; // kosong / bukan angka → 0
-      } else {
-        newValue = Math.max(0, num); // paksa minimal 0
-      }
+      newValue = isNaN(num) ? 0 : Math.max(0, num);
     }
 
     setFormData((prev) => ({
@@ -100,7 +97,7 @@ export default function JadwalForm({ initialData }) {
     }));
   };
 
-  // Handle Submit
+  // Handle Submit (DIPERBAIKI)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -110,11 +107,36 @@ export default function JadwalForm({ initialData }) {
     const baseUrl =
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
+    // Gunakan ID dari initialData saat edit agar URL valid
     const url = isEditMode
       ? `${baseUrl}/jadwal-dokter/${initialData.dokter_id}/${initialData.poli_id}`
       : `${baseUrl}/jadwal-dokter`;
 
     const method = isEditMode ? "PUT" : "POST";
+
+    // --- SANITASI PAYLOAD (Mencegah Error Illegal offset type) ---
+    // Kita copy formData ke variabel baru
+    const payload = { ...formData };
+
+    // Hapus properti Objek/Array yang tidak bisa diproses oleh Backend Anda
+    delete payload.dokter;      // Hapus relasi dokter (objek)
+    delete payload.poli;        // Hapus relasi poli (objek)
+    delete payload.created_at;  // Hapus timestamp
+    delete payload.updated_at;
+    delete payload.last_update;
+    delete payload.last_update_by;
+
+    // --- PENTING: JANGAN PAKAI parseInt UNTUK ID STRING ---
+    // Poli ID Anda formatnya "POL-ANK", jika di-parseInt hasilnya NaN (Error)
+    if (isEditMode) {
+        // Ambil ID asli dari initialData (jangan diubah tipenya)
+        payload.dokter_id = initialData.dokter_id;
+        payload.poli_id = initialData.poli_id;
+    } else {
+        // Ambil dari input form
+        payload.dokter_id = payload.dokter_id;
+        payload.poli_id = payload.poli_id;
+    }
 
     try {
       const response = await fetch(url, {
@@ -124,12 +146,13 @@ export default function JadwalForm({ initialData }) {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload), // Kirim payload yang sudah bersih
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Gagal menyimpan jadwal.");
+        const msg = errorData.message || JSON.stringify(errorData.errors) || "Gagal menyimpan jadwal.";
+        throw new Error(msg);
       }
 
       console.log("Jadwal saved successfully");
@@ -287,7 +310,7 @@ export default function JadwalForm({ initialData }) {
       </h2>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm break-words">
           {error}
         </div>
       )}

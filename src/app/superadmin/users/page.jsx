@@ -1,4 +1,4 @@
-"use client"; // Diperlukan untuk useState dan onClick
+"use client"; // Required for useState and onClick
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -7,23 +7,27 @@ import {
   PencilIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
-  PlusIcon,
 } from "@heroicons/react/24/outline";
-import SuperAdminLayout from "../../superadmin/components/superadmin_layout";
+import SuperAdminLayout from "../../superadmin/components/superadmin_layout"; // Adjusted path based on standard structure
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 🔍 State untuk search & filter
+  // 🔍 State for search & filter
   const [searchTerm, setSearchTerm] = useState("");
   const [phoneFilter, setPhoneFilter] = useState("all"); // "all" | "with-phone" | "without-phone"
 
-  useEffect(() => {
+useEffect(() => {
     const fetchUsers = async () => {
       try {
         const token = localStorage.getItem("token");
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+        
+        // --- PERBAIKAN: Tambahkan Fallback URL ---
+        // Jika env tidak terbaca, otomatis pakai localhost:8000
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
+        
+        console.log("Mencoba fetch ke:", `${baseUrl}/users`); // Cek console browser (F12)
 
         const response = await fetch(`${baseUrl}/users`, {
           method: "GET",
@@ -36,9 +40,10 @@ export default function UserManagementPage() {
 
         if (response.ok) {
           const result = await response.json();
-          setUsers(result.data);
+          // Backend mengirim { data: [...] }, pastikan kita ambil array-nya
+          setUsers(result.data || []); 
         } else {
-          console.error("Gagal mengambil data user");
+          console.error("Gagal mengambil data user. Status:", response.status);
         }
       } catch (error) {
         console.error("Terjadi kesalahan:", error);
@@ -64,6 +69,7 @@ export default function UserManagementPage() {
         });
 
         if (response.ok) {
+          // Filter out the deleted user from state using 'userid'
           setUsers((prev) => prev.filter((u) => u.userid !== id));
           alert("User berhasil dihapus.");
         } else {
@@ -75,10 +81,11 @@ export default function UserManagementPage() {
     }
   };
 
-  // 🧠 Logika filter: search + filter no telp
+  // 🧠 Filter Logic: Search + Phone Number Filter
   const filteredUsers = users.filter((user) => {
     const term = searchTerm.toLowerCase().trim();
 
+    // Check against relevant fields (name, email, nomor_telepon, userid)
     const matchesSearch =
       term === "" ||
       user.name?.toLowerCase().includes(term) ||
@@ -142,7 +149,7 @@ export default function UserManagementPage() {
           </div>
         </div>
 
-        {/* Tabel + Scrollbar horizontal */}
+        {/* Table + Horizontal Scrollbar */}
         <div className="w-full overflow-x-auto overflow-y-hidden border rounded-lg scrollbar-thin scrollbar-thumb-neutral-400 scrollbar-track-neutral-200">
           <table className="min-w-full divide-y divide-neutral-200 text-xs sm:text-sm">
             <thead className="bg-primary-600 rounded-t-lg">

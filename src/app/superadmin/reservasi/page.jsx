@@ -163,25 +163,23 @@ export default function ReservasiPage() {
     fetchMasterData();
   }, [statusFilter]); // Refetch saat filter ganti
 
-  // === 3. HANDLER BUKA DETAIL ===
-  const handleDetail = (reservasi) => {
+// === 3. HANDLER BUKA DETAIL ===
+const handleDetail = (reservasi) => {
     setSelectedReservation(reservasi);
     
     // Set form state
     setFormPoliId(reservasi.poliId || "");
     setFormDokterId(reservasi.dokterId || "");
-    setFormTanggal(reservasi.tanggal || "");
+    
+    // --- PERBAIKAN DI SINI ---
+    // Ambil hanya tanggalnya (YYYY-MM-DD), buang jamnya
+    const rawDate = reservasi.tanggal || "";
+    const cleanDate = rawDate.split("T")[0]; // Memisahkan di huruf 'T' dan ambil bagian depan
+    
+    setFormTanggal(cleanDate);
     
     setShowDetailDialog(true);
-  };
-
-  const handleOpenChat = (reservasi) => {
-    const userId = reservasi.userId;
-    if (!userId) return alert('User ID pasien tidak tersedia.');
-    localStorage.setItem('chat_open_with_id', String(userId));
-    localStorage.setItem('chat_open_with_name', reservasi.nama || 'Pasien');
-    router.push('/admin/chat');
-  };
+};
 
   // === 4. UPDATE RESERVASI (PUT /reservations/{id}) ===
   // Menggantikan handleChangePoli agar sesuai backend update()
@@ -473,7 +471,7 @@ export default function ReservasiPage() {
                 </div>
 
                 {/* Dokter (WAJIB UNTUK VERIFY) */}
-                {/* <div>
+                <div>
                     <label className="block text-xs font-bold text-gray-500 mb-1">Dokter Penanggung Jawab <span className="text-red-500">*</span></label>
                     <select
                         value={formDokterId}
@@ -491,7 +489,7 @@ export default function ReservasiPage() {
                         )}
                     </select>
                     {!formDokterId && <p className="text-[10px] text-red-500 mt-1">Wajib dipilih sebelum verifikasi</p>}
-                </div> */}
+                </div>
 
                 {selectedReservation.status === 'pending' && (
                     <button
