@@ -11,6 +11,7 @@ export default function FormUser({ initialData }) {
     telp: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const isEditMode = Boolean(initialData);
 
@@ -35,22 +36,45 @@ export default function FormUser({ initialData }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMsg("");
 
     try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
+
       if (isEditMode) {
-        console.log("Updating data user:", { ...initialData, ...formData });
-        // Ganti dengan API call PUT/PATCH Anda
-        // await fetch(`/api/users/${initialData.id}`, { ... });
+        // Backend expects: name, email, nomor_telepon, optional password
+        const payload = {
+          name: formData.nama,
+          email: formData.email,
+          nomor_telepon: formData.telp,
+        };
+
+        const res = await fetch(`${baseUrl}/users/${initialData.id}`, {
+          method: "PUT",
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          const msg = errBody?.message || "Gagal memperbarui data user";
+          throw new Error(msg);
+        }
       } else {
-        console.log("Creating data user:", formData);
-        // Ganti dengan API call POST Anda
-        // await fetch('/api/users', { ... });
+        // Tidak ada endpoint POST /users untuk superadmin di backend saat ini
+        throw new Error("Fitur tambah user belum tersedia dari frontend ini.");
       }
 
       router.push("/admin/users"); // Kembali ke halaman list user
       router.refresh();
     } catch (error) {
       console.error("Failed to save data:", error);
+      setErrorMsg(error.message || "Terjadi kesalahan saat menyimpan data");
       setIsLoading(false);
     }
   };
@@ -62,6 +86,11 @@ export default function FormUser({ initialData }) {
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {errorMsg && (
+          <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-lg text-sm">
+            {errorMsg}
+          </div>
+        )}
         <div>
           <label
             htmlFor="nama"

@@ -62,7 +62,7 @@ export default function PoliQueuePage() {
   const handleLogout = () => {
     if(confirm("Keluar dari Counter Poli?")) {
         localStorage.clear();
-        router.push('/auth/login');
+        router.push('/');
     }
   };
 
