@@ -1,18 +1,18 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
-import api from "@/services/api";
 import {
-  CheckCircleIcon,
-  FunnelIcon,
   MagnifyingGlassIcon,
+  FunnelIcon,
   TrashIcon,
+  CheckCircleIcon,
   XCircleIcon,
   PencilSquareIcon,
   ChatBubbleLeftRightIcon
 } from "@heroicons/react/24/outline";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import api from "@/services/api";
 
 // Simple dialog component
 function Dialog({ show, onClose, children }) {
@@ -421,84 +421,76 @@ export default function ReservasiPage() {
           onClose={() => !processing && setShowDetailDialog(false)}
         >
           {selectedReservation && (
-            <div className="space-y-2 text-neutral-700 text-sm leading-relaxed">
-              <p>
-                <strong>Nama Lengkap:</strong> {selectedReservation.nama}
-              </p>
-              <p>
-                <strong>Tanggal Lahir:</strong> {formatDateOnly(selectedReservation.tglLahir)}
-              </p>
-              <p>
-                <strong>Jenis Kelamin:</strong> {selectedReservation.jk}
-              </p>
-              <p>
-                <strong>Nomor KTP:</strong> {selectedReservation.nik}
-              </p>
-              <p>
-                <strong>Email:</strong> {selectedReservation.email}
-              </p>
-              <p>
-                <strong>Nomor WA:</strong> {selectedReservation.wa}
-              </p>
-              <p>
-                <strong>Penjamin:</strong> {selectedReservation.penjamin}
-              </p>
-              <p>
-                <strong>Keluhan:</strong> {selectedReservation.keluhan}
-              </p>
-              <p>
-                <strong>Poli saat ini:</strong> {selectedReservation.poli}
-              </p>
-              <p>
-                <strong>Tanggal Reservasi:</strong>{" "}
-                {formatDateOnly(selectedReservation.tanggal)}
-              </p>
-              <p>
-                <strong>Status:</strong> {selectedReservation.status}
-              </p>
+            <div className="space-y-5">
+              <div className="border-b pb-3 mb-3">
+                <h2 className="text-xl font-bold text-gray-800">Detail Reservasi</h2>
+                <p className="text-xs text-gray-500">ID: {selectedReservation.id}</p>
+              </div>
 
-              {/* GANTI POLI */}
-              <div className="mt-4 pt-3 border-t border-neutral-200">
-                <p className="text-xs text-neutral-500 mb-1">
-                  Jika keluhan tidak sesuai dengan poli yang dipilih, pilih poli
-                  yang lebih tepat:
-                </p>
-                <label className="block text-sm font-semibold text-neutral-700 mb-1">
-                  Ubah Poli
-                </label>
-                <select
-                  value={selectedPoliId || ""}
-                  onChange={(e) => setSelectedPoliId(e.target.value)}
-                  disabled={loadingPoli}
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 bg-white text-sm"
-                >
-                  <option value="">
-                    {loadingPoli ? "Memuat poli..." : "Pilih poli baru"}
-                  </option>
-                  {polis.map((p) => (
-                    <option key={p.poli_id} value={p.poli_id}>
-                      {p.poli_name}
-                    </option>
-                  ))}
-                </select>
-                <div className="mt-3 flex flex-wrap gap-3 items-center">
-                  {/* <button
-                    type="button"
-                    onClick={handleChangePoli}
-                    disabled={processing || !selectedPoliId}
-                    className="inline-flex items-center px-4 py-2 rounded-lg bg-secondary-500 text-white text-sm font-semibold hover:bg-secondary-600 disabled:opacity-60"
-                  >
-                    Simpan Perubahan Poli
-                  </button> */}
+              {/* DATA PASIEN */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
+                <div><span className="font-semibold">Nama:</span> {selectedReservation.nama}</div>
+                <div><span className="font-semibold">No HP:</span> {selectedReservation.wa}</div>
+                <div><span className="font-semibold">Tgl Lahir:</span> {formatDateOnly(selectedReservation.tglLahir)}</div>
+                <div><span className="font-semibold">Jenis Kelamin:</span> {selectedReservation.jk}</div>
+                <div className="col-span-2"><span className="font-semibold">Keluhan:</span> <span className="italic text-gray-600">{selectedReservation.keluhan}</span></div>
+                <div className="col-span-2"><span className="font-semibold">Penjamin:</span> {selectedReservation.penjamin}</div>
+              </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenChat(selectedReservation)}
-                    disabled={!selectedReservation}
-                    className="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
-                  >
-                    Chat Pasien
-                  </button>
+              {/* FORM EDIT (POLI, DOKTER, TANGGAL) */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3">
+                <h3 className="font-bold text-sm text-gray-800 uppercase mb-2">Jadwal & Penugasan</h3>
+                
+                {/* Tanggal */}
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Tanggal Kunjungan</label>
+                    <input 
+                        type="date" 
+                        value={formTanggal}
+                        onChange={(e) => setFormTanggal(e.target.value)}
+                        disabled={selectedReservation.status !== 'pending' || processing}
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-200"
+                    />
+                </div>
+
+                {/* Poli */}
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Poli Tujuan</label>
+                    <select
+                        value={formPoliId}
+                        onChange={(e) => {
+                            setFormPoliId(e.target.value);
+                            setFormDokterId(""); // Reset dokter jika poli berubah
+                        }}
+                        disabled={selectedReservation.status !== 'pending' || processing}
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-200"
+                    >
+                        <option value="">-- Pilih Poli --</option>
+                        {polis.map(p => (
+                            <option key={p.poli_id} value={p.poli_id}>{p.poli_name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Dokter (WAJIB UNTUK VERIFY) */}
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-1">Dokter Penanggung Jawab <span className="text-red-500">*</span></label>
+                    <select
+                        value={formDokterId}
+                        onChange={(e) => setFormDokterId(e.target.value)}
+                        disabled={selectedReservation.status !== 'pending' || !formPoliId || processing}
+                        className="w-full p-2 border rounded text-sm disabled:bg-gray-200"
+                    >
+                        <option value="">-- Pilih Dokter --</option>
+                        {filteredDokters.length > 0 ? (
+                            filteredDokters.map(d => (
+                                <option key={d.dokter_id} value={d.dokter_id}>{d.nama_dokter}</option>
+                            ))
+                        ) : (
+                            <option value="" disabled>Tidak ada dokter di poli ini</option>
+                        )}
+                    </select>
+                    {!formDokterId && <p className="text-[10px] text-red-500 mt-1">Wajib dipilih sebelum verifikasi</p>}
                 </div>
 
                 {selectedReservation.status === 'pending' && (
