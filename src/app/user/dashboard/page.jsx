@@ -7,10 +7,11 @@ import {
   Clock,
   FileText,
   History,
+  Hourglass,
+  Megaphone,
   MessageSquare,
-  Users,
-  CheckCircle2,
-  Hourglass
+  RefreshCw,
+  Users
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -21,7 +22,7 @@ import Header from "../../../components/user/Header";
 import Navbar from "../../../components/user/Navbar";
 import StatusAntrian from "../../../components/user/StatusAntrian";
 
-// Format tanggal helper
+// Helper: Format tanggal tampilan
 const formatDateLong = (dateInput) => {
   if (!dateInput) return "-";
   const date = new Date(dateInput);
@@ -33,7 +34,14 @@ const formatDateLong = (dateInput) => {
   }).format(date);
 };
 
-// Komponen Statistik Kecil
+// Helper: Format tanggal untuk API (YYYY-MM-DD)
+const formatDateForApi = (dateInput) => {
+    if (!dateInput) return "";
+    const date = new Date(dateInput);
+    return date.toLocaleDateString('en-CA'); 
+};
+
+// Component: StatBox
 const StatBox = ({ number, label, isActive = false, loading = false }) => (
   <div
     className={`p-4 rounded-2xl flex flex-col justify-between h-24 w-full transition-all ${
@@ -49,13 +57,12 @@ const StatBox = ({ number, label, isActive = false, loading = false }) => (
   </div>
 );
 
-// Komponen Kartu Reservasi (Logic Utama Disini)
+// --- COMPONENT: UPCOMING RESERVATION CARD ---
 const UpcomingReservationCard = ({
   appointment,
   loading,
   onViewQueue,
 }) => {
-  // 1. Loading State
   if (loading) {
     return (
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 h-full">
@@ -63,52 +70,43 @@ const UpcomingReservationCard = ({
           <div className="h-4 w-32 bg-neutral-200 rounded animate-pulse" />
           <div className="h-6 w-20 bg-neutral-200 rounded-full animate-pulse" />
         </div>
-        <div className="flex gap-4">
-          <div className="h-12 w-12 bg-neutral-200 rounded-2xl animate-pulse" />
-          <div className="space-y-2 flex-1">
-            <div className="h-5 w-3/4 bg-neutral-200 rounded animate-pulse" />
-            <div className="h-4 w-1/2 bg-neutral-200 rounded animate-pulse" />
-          </div>
-        </div>
       </div>
     );
   }
 
-  // 2. Empty State
   if (!appointment) {
     return (
-      <div className="bg-white p-6 rounded-3xl shadow-lg text-center py-8 animate-fadeIn h-full flex flex-col justify-center items-center">
+      <div className="bg-white p-6 rounded-3xl shadow-lg text-center py-8 h-full flex flex-col justify-center items-center">
         <div className="bg-blue-50 w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center">
           <Calendar className="w-10 h-10 text-blue-400" />
         </div>
         <h3 className="font-bold text-neutral-800 text-lg">Belum Ada Jadwal</h3>
-        <p className="text-sm text-neutral-500 mb-4 px-6">
-          Tidak ada reservasi aktif saat ini.
-        </p>
-        <a
-          href="/user/reservasi"
-          className="inline-block px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition"
-        >
-          Buat Reservasi
-        </a>
+        <p className="text-sm text-neutral-500 mb-4 px-6">Tidak ada reservasi aktif.</p>
+        <a href="/user/reservasi" className="px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold">Buat Reservasi</a>
       </div>
     );
   }
 
-  // --- LOGIKA UTAMA STATUS ---
   const { status, queueData } = appointment;
-  
-  // Cek Status Dasar
   const isPending = status === "pending";
   const isConfirmed = status === "confirmed";
 
-  // Cek Status Antrian (Hanya valid jika Confirmed & ada data antrian)
-  // Logic: User sedang dipanggil jika ID Reservasi di 'sedang_dipanggil' sama dengan ID Reservasi User
-  const isDipanggil =
-    isConfirmed &&
-    queueData?.sedang_dipanggil?.reservation_id === appointment.reservid;
+  // --- LOGIKA DETEKSI DIPANGGIL ---
+  let isDipanggil = false;
 
-  // Tentukan Styling berdasarkan kondisi
+  if (isConfirmed && queueData?.sedang_dipanggil) {
+      const idYangDipanggil = String(queueData.sedang_dipanggil.reservation_id);
+      const idSaya = String(appointment.reservid);
+      
+      const noAntrianDipanggil = queueData.sedang_dipanggil.nomor_antrian;
+      const noAntrianSaya = appointment.nomor_antrian;
+
+      if ((idYangDipanggil && idYangDipanggil === idSaya) || (noAntrianDipanggil && noAntrianDipanggil === noAntrianSaya)) {
+          isDipanggil = true;
+      }
+  }
+
+  // --- STYLING ---
   let cardStyle = "bg-white text-neutral-800 border-neutral-100";
   let badgeStyle = "bg-gray-100 text-gray-700";
   let badgeText = "Status Tidak Diketahui";
@@ -117,23 +115,22 @@ const UpcomingReservationCard = ({
   let subTitleClass = "text-neutral-500";
 
   if (isPending) {
-    // STYLE PENDING (KUNING/ORANYE)
     cardStyle = "bg-orange-50 text-neutral-800 border-orange-100";
     badgeStyle = "bg-orange-100 text-orange-700";
     badgeText = "Menunggu Konfirmasi";
     iconBoxStyle = "bg-orange-200 text-orange-700";
     titleText = "Verifikasi Admin";
     subTitleClass = "text-orange-600/80";
-  } else if (isDipanggil) {
-    // STYLE DIPANGGIL (HIJAU + ANIMASI)
-    cardStyle = "bg-green-600 text-white border-green-500 ring-4 ring-green-200 shadow-xl shadow-green-200";
-    badgeStyle = "bg-white text-green-700 animate-bounce";
-    badgeText = "SILAKAN MASUK";
+  } 
+  else if (isDipanggil) {
+    cardStyle = "bg-green-600 text-white border-green-500 ring-4 ring-green-200 shadow-xl shadow-green-200 scale-[1.02]";
+    badgeStyle = "bg-white text-green-700 animate-bounce font-bold px-4";
+    badgeText = "DIPANGGIL - MASUK SEKARANG";
     iconBoxStyle = "bg-white/20 text-white";
     titleText = "GILIRAN ANDA!";
     subTitleClass = "text-green-100";
-  } else if (isConfirmed) {
-    // STYLE CONFIRMED MENUNGGU (BIRU/PUTIH)
+  } 
+  else if (isConfirmed) {
     cardStyle = "bg-white text-neutral-800 border-neutral-100 shadow-md";
     badgeStyle = "bg-blue-50 text-blue-700";
     badgeText = "Menunggu Giliran";
@@ -145,12 +142,11 @@ const UpcomingReservationCard = ({
   return (
     <div className={`p-6 rounded-3xl border relative overflow-hidden transition-all duration-500 h-full flex flex-col justify-between ${cardStyle}`}>
       
-      {/* Animasi Ping Background jika Dipanggil */}
       {isDipanggil && (
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full animate-ping duration-1000" />
+        <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/20 rounded-full animate-ping duration-1000" />
       )}
 
-      {/* Header Card */}
+      {/* Header */}
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div>
           <h3 className={`text-lg font-bold ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
@@ -161,15 +157,22 @@ const UpcomingReservationCard = ({
           </p>
         </div>
 
-        <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap ${badgeStyle}`}>
-          {badgeText}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+             <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap ${badgeStyle}`}>
+                {badgeText}
+             </span>
+             {isConfirmed && (
+                 <span className={`text-[10px] flex items-center gap-1 ${isDipanggil ? "text-green-100" : "text-neutral-400"}`}>
+                    <RefreshCw size={8} className="animate-spin"/> Live Update
+                 </span>
+             )}
+        </div>
       </div>
 
-      {/* Body: Info Poli & Dokter */}
+      {/* Body */}
       <div className="flex items-center space-x-4 mb-4 relative z-10">
         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${iconBoxStyle}`}>
-          {isPending ? <Hourglass className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
+          {isDipanggil ? <Megaphone className="w-6 h-6 animate-pulse" /> : (isPending ? <Hourglass className="w-6 h-6" /> : <FileText className="w-6 h-6" />)}
         </div>
         <div className="min-w-0">
           <p className={`font-bold text-lg truncate ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
@@ -181,20 +184,17 @@ const UpcomingReservationCard = ({
         </div>
       </div>
 
-      {/* Footer: Nomor Antrian & Tombol */}
+      {/* Footer */}
       <div className="mt-auto relative z-10">
-        
-        {/* TAMPILAN PENDING */}
         {isPending && (
            <div className="bg-white/60 p-3 rounded-xl border border-orange-100">
              <div className="flex gap-2 text-xs text-orange-800 leading-relaxed">
                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-               <p>Reservasi Anda sedang ditinjau. Nomor antrian akan muncul setelah dikonfirmasi.</p>
+               <p>Sedang ditinjau admin.</p>
              </div>
            </div>
         )}
 
-        {/* TAMPILAN CONFIRMED (Menunggu / Dipanggil) */}
         {isConfirmed && (
           <>
             <div className={`rounded-2xl p-4 border mb-3 flex justify-between items-center ${isDipanggil ? "bg-white/10 border-white/20 text-white" : "bg-neutral-50 border-neutral-200"}`}>
@@ -207,33 +207,35 @@ const UpcomingReservationCard = ({
                   </div>
                </div>
                
-               {/* Status Kanan Bawah */}
                <div className="text-right">
                   {isDipanggil ? (
-                     <span className="bg-white/20 px-2 py-1 rounded text-xs font-medium">
-                       Segera Masuk
-                     </span>
+                     <div className="flex flex-col items-end">
+                       <span className="bg-white/20 px-2 py-1 rounded text-xs font-bold animate-pulse mb-1">
+                         GILIRAN ANDA
+                       </span>
+                       <span className="text-[10px] text-green-100">Silakan masuk ke poli</span>
+                     </div>
                   ) : (
                     <>
-                      <span className="text-[10px] text-neutral-400 block">Estimasi</span>
+                      <span className="text-[10px] text-neutral-400 block">Sisa Antrian</span>
                       <span className="font-bold text-sm text-neutral-700">
-                         {queueData ? `${queueData.sisa_antrian} Org Lagi` : "-"}
+                          {queueData ? `${queueData.sisa_antrian} Org Lagi` : "-"}
                       </span>
                     </>
                   )}
                </div>
             </div>
 
-            <button
+            <button 
               onClick={() => onViewQueue(appointment, queueData)} 
               className={`w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg ${
                 isDipanggil 
-                  ? "bg-white text-green-700 hover:bg-green-50" 
+                  ? "bg-white text-green-700 hover:bg-green-50 shadow-green-900/20" 
                   : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200"
               }`}
             >
               <Users size={16} />
-              {isDipanggil ? "Monitor Antrian" : "Lihat Antrian"}
+              {isDipanggil ? "Lihat Detail Panggilan" : "Lihat Antrian"}
             </button>
           </>
         )}
@@ -242,7 +244,7 @@ const UpcomingReservationCard = ({
   );
 };
 
-// Komponen Menu Button
+// Component: MenuButton
 const MenuButton = ({ icon: Icon, label, href }) => (
   <a href={href} className="p-5 rounded-3xl bg-white shadow-sm border flex flex-col justify-between h-32 hover:shadow-md transition-shadow">
     <div className="flex justify-between items-start">
@@ -253,11 +255,10 @@ const MenuButton = ({ icon: Icon, label, href }) => (
 );
 
 /* ============================================================
-   PAGE: Dashboard
+   PAGE: DASHBOARD UTAMA
 ============================================================ */
 export default function DashboardPage() {
   const router = useRouter();
-
   const [loading, setLoading] = useState(true);
   const [showAntrianModal, setShowAntrianModal] = useState(false);
   const [showProfileAlert, setShowProfileAlert] = useState(false);
@@ -266,18 +267,12 @@ export default function DashboardPage() {
   const [activeAppointments, setActiveAppointments] = useState([]);
   const [selectedQueueAppt, setSelectedQueueAppt] = useState(null);
   const [selectedQueueData, setSelectedQueueData] = useState(null);
-
-  const [stats, setStats] = useState({
-    active: 0,
-    visits: 0,
-    messages: 0,
-  });
-
+  const [stats, setStats] = useState({ active: 0, visits: 0, messages: 0 });
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  // 1. FETCH INITIAL DATA
   useEffect(() => {
     let currentUserId = null;
-
     if (typeof window !== "undefined") {
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
@@ -285,26 +280,18 @@ export default function DashboardPage() {
           const parsedUser = JSON.parse(storedUser);
           setUserData(parsedUser);
           currentUserId = parsedUser.userid || parsedUser.id; 
-        } catch (e) {
-          console.error("Gagal parse user data", e);
-        }
+        } catch (e) { console.error(e); }
       }
     }
 
     const fetchData = async () => {
       setLoading(true);
       try {
-        
-        // Cek Profile
         try {
             const profileRes = await api.get("/profile");
-            if (!profileRes.data) {
-                setShowProfileAlert(true);
-            }
-        } catch (profileError) {
-            if (profileError.response && profileError.response.status === 404) {
-                setShowProfileAlert(true);
-            }
+            if (!profileRes.data) setShowProfileAlert(true);
+        } catch (e) { 
+             if (e.response?.status === 404) setShowProfileAlert(true); 
         }
 
         const [resReservations, resRekamMedis] = await Promise.all([
@@ -312,10 +299,14 @@ export default function DashboardPage() {
             api.get("/rekam-medis")
         ]);
 
-        const reservations = resReservations.data;
-        const rawRekamMedis = resRekamMedis.data?.data || resRekamMedis.data || [];
+        let reservations = [];
+        if (Array.isArray(resReservations.data)) {
+            reservations = resReservations.data;
+        } else if (resReservations.data?.data && Array.isArray(resReservations.data.data)) {
+            reservations = resReservations.data.data;
+        }
 
-        // Hitung total kunjungan (history)
+        const rawRekamMedis = resRekamMedis.data?.data || resRekamMedis.data || [];
         let myTotalVisits = 0;
         if (currentUserId) {
             const myRekamMedis = rawRekamMedis.filter(rm => {
@@ -325,61 +316,61 @@ export default function DashboardPage() {
             myTotalVisits = myRekamMedis.length;
         }
 
-        const todayStr = new Date().toLocaleDateString('en-CA'); 
+        const todayStr = formatDateForApi(new Date());
 
-        // --- FILTERING LOGIC ---
-        // 1. Ambil yang PENDING (semua tanggal di masa depan atau hari ini)
-        // 2. Ambil yang CONFIRMED (khusus hari ini untuk cek antrian)
         const potentialList = reservations
           .filter((r) => {
             const isPending = r.status === "pending";
-            
-            // Cek apakah confirmed hari ini
-            const rDate = new Date(r.tanggal_reservasi).toLocaleDateString('en-CA');
+            const rDate = formatDateForApi(r.tanggal_reservasi);
             const isConfirmedToday = r.status === "confirmed" && rDate === todayStr;
-
-            // Jika backend sudah memfilter status 'menunggu'/'dipanggil' lewat relasi antrian,
-            // kita cukup percaya status confirmed, tapi validasi tanggal tetap penting.
-            
             return isPending || isConfirmedToday;
           })
           .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
 
-        // --- FETCH ANTRIAN LOGIC ---
-        // Hanya fetch antrian jika status 'confirmed' dan tanggal hari ini
+        // Initial Fetch Queue Data
         const processedList = await Promise.all(potentialList.map(async (appt) => {
-             const apptDateStr = new Date(appt.tanggal_reservasi).toLocaleDateString('en-CA');
+             const apptDateStr = formatDateForApi(appt.tanggal_reservasi);
              let queueData = null;
 
              if (appt.status === "confirmed" && apptDateStr === todayStr) {
                 try {
-                    // Kita ambil data dashboard antrian untuk mendapatkan konteks (sisa antrian, siapa yg dipanggil)
                     const antrianRes = await api.get("/antrian/dashboard", {
                       params: {
                         poli_id: appt.poli_id,
-                        tanggal: appt.tanggal_reservasi,
+                        tanggal: apptDateStr,
                       },
                     });
                     if (antrianRes.data.success) {
                         queueData = antrianRes.data.data;
                     }
-                } catch (e) {
-                    console.warn("Gagal fetch antrian untuk poli", appt.poli_id);
-                }
+                } catch (e) { console.error("Err fetch queue init:", e); }
              }
              return { ...appt, queueData };
         }));
 
-        setActiveAppointments(processedList);
+        // --- FILTER FINAL: HAPUS JIKA SUDAH SELESAI ---
+        const finalActiveList = processedList.filter(appt => {
+             // Jika status pending, tetap tampilkan
+             if (appt.status === "pending") return true;
 
-        setStats({
-          active: processedList.length, 
-          visits: myTotalVisits,
-          messages: 0,
+             // Jika tidak ada queueData (mungkin error koneksi), tetap tampilkan sementara
+             if (!appt.queueData) return true;
+
+             // Cek apakah ID saya ada di daftar 'sudah_selesai'
+             // Backend AntrianController return 'sudah_selesai' berisi array objek Antrian
+             const isFinished = appt.queueData.sudah_selesai?.some(
+                 q => String(q.reservation_id) === String(appt.reservid)
+             );
+
+             // Jika sudah selesai, JANGAN tampilkan (return false)
+             return !isFinished;
         });
 
+        setActiveAppointments(finalActiveList);
+        setStats({ active: finalActiveList.length, visits: myTotalVisits, messages: 0 });
+
       } catch (err) {
-        console.error("Gagal load dashboard data:", err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -387,6 +378,53 @@ export default function DashboardPage() {
 
     fetchData();
   }, []);
+
+  // 2. POLLING REAL-TIME (AUTO UPDATE)
+  useEffect(() => {
+    const needsPolling = activeAppointments.some(appt => appt.status === "confirmed");
+    if (!needsPolling) return;
+
+    const intervalId = setInterval(async () => {
+      const todayStr = formatDateForApi(new Date());
+
+      // Fetch data baru
+      const rawUpdatedList = await Promise.all(activeAppointments.map(async (appt) => {
+          if (appt.status !== "confirmed") return appt;
+          const apptDateStr = formatDateForApi(appt.tanggal_reservasi);
+          if(apptDateStr !== todayStr) return appt;
+
+          try {
+             const antrianRes = await api.get("/antrian/dashboard", {
+                params: {
+                  poli_id: appt.poli_id,
+                  tanggal: apptDateStr,
+                },
+             });
+             if (antrianRes.data.success) {
+                 return { ...appt, queueData: antrianRes.data.data };
+             }
+          } catch (e) {}
+          return appt;
+      }));
+
+      // --- FILTER POLLING: HAPUS JIKA BARU SAJA SELESAI ---
+      const filteredUpdatedList = rawUpdatedList.filter(appt => {
+           if (appt.status !== "confirmed") return true;
+           if (!appt.queueData) return true;
+
+           // Cek lagi apakah sudah masuk daftar selesai
+           const isFinished = appt.queueData.sudah_selesai?.some(
+               q => String(q.reservation_id) === String(appt.reservid)
+           );
+
+           return !isFinished;
+      });
+
+      setActiveAppointments(filteredUpdatedList);
+    }, 4000); 
+
+    return () => clearInterval(intervalId);
+  }, [activeAppointments]); 
 
   const handleScroll = (e) => {
     const scrollLeft = e.target.scrollLeft;
@@ -422,21 +460,20 @@ export default function DashboardPage() {
         ]}
       />
 
-      {/* POP UP PROFILE ALERT */}
       {showProfileAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all scale-100 flex flex-col items-center text-center">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center">
              <div className="bg-orange-100 p-4 rounded-full mb-4">
                 <AlertCircle className="w-10 h-10 text-orange-600" />
              </div>
              <h2 className="text-xl font-bold text-neutral-800 mb-2">Profil Belum Lengkap</h2>
              <p className="text-sm text-neutral-500 mb-6">
-                Mohon lengkapi data diri Anda (NIK, Tanggal Lahir, Alamat, dll) untuk keperluan administrasi dan rekam medis.
+                Mohon lengkapi data diri Anda (NIK, Tanggal Lahir, Alamat, dll).
              </p>
              <div className="w-full space-y-3">
                 <button 
                   onClick={() => router.push('/user/profile')}
-                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-200"
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition"
                 >
                     Lengkapi Sekarang
                 </button>
@@ -452,7 +489,6 @@ export default function DashboardPage() {
       )}
 
       <main className="flex-1 pb-24">
-        {/* Banner Biru */}
         <div className="bg-blue-600 px-6 pt-8 pb-32 rounded-b-[2.5rem] shadow-xl">
           <p className="text-blue-100 text-sm mb-1">Selamat Datang,</p>
           <h1 className="text-3xl font-bold text-white capitalize">
@@ -466,8 +502,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="px-6 -mt-20 space-y-8">
-          
-          {/* CAROUSEL RESERVASI */}
           <div>
             {loading ? (
                 <UpcomingReservationCard loading={true} />
@@ -477,7 +511,7 @@ export default function DashboardPage() {
                         className="flex overflow-x-auto snap-x snap-mandatory pb-4 gap-4 scrollbar-hide -mx-2 px-2"
                         onScroll={handleScroll}
                     >
-                        {activeAppointments.map((appt, idx) => (
+                        {activeAppointments.map((appt) => (
                             <div key={appt.reservid} className="min-w-full snap-center">
                                 <UpcomingReservationCard
                                     appointment={appt}
@@ -486,7 +520,6 @@ export default function DashboardPage() {
                             </div>
                         ))}
                     </div>
-
                     {activeAppointments.length > 1 && (
                         <div className="flex justify-center gap-2 mt-[-10px]">
                             {activeAppointments.map((_, idx) => (
@@ -514,19 +547,12 @@ export default function DashboardPage() {
                 <MenuButton icon={MessageSquare} label="Chat Admin" href="/user/chat" />
              </div>
           </div>
-
         </div>
       </main>
       <Footer />
-
       <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );
