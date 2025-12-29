@@ -54,10 +54,10 @@ export default function Header() {
           <span className="hidden sm:inline text-base">Keluar</span>
         </button>
 
-        {/* 🔔 Notifikasi */}
+        {/* 🔔 Notifikasi
         <div className="cursor-pointer hover:text-primary-200 transition-colors">
           <BellIcon className="h-7 w-7" />
-        </div>
+        </div> */}
 
         {/* 💬 Pesan → diarahkan ke /admin/chat */}
         <Link

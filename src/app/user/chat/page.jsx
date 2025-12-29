@@ -110,7 +110,7 @@ export default function UserChatPage() {
           </button>
           <MessageSquare className="text-primary-600 w-6 h-6" />
           <div>
-            <h1 className="text-xl font-semibold text-neutral-800">Customer Service</h1>
+            <h1 className="text-xl font-semibold text-neutral-800">Admin RS</h1>
             <p className="text-xs text-green-600 flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               Online Support

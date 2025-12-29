@@ -2,13 +2,13 @@
 
 import api from "@/services/api";
 import {
+  AlertCircle,
   Calendar,
   Clock,
   FileText,
   History,
   MessageSquare,
-  Users,
-  AlertCircle // Icon untuk pop up
+  Users
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -90,11 +90,12 @@ const UpcomingReservationCard = ({
     );
   }
 
-  // Cek Status Antrian dari data yang sudah ditempel ke appointment
+  // --- LOGIKA STATUS TAMPILAN ---
   const queueData = appointment.queueData || null;
   const isConfirmed = appointment.status === "confirmed";
+  const isPending = appointment.status === "pending";
   
-  // Logika "Sedang Dipanggil": Status confirmed DAN ada di list 'sedang_dipanggil' antrian
+  // Cek apakah reservasi ini sedang dipanggil di antrian
   const isDipanggil =
     isConfirmed &&
     queueData?.sedang_dipanggil?.reservation_id === appointment.reservid;
@@ -115,7 +116,7 @@ const UpcomingReservationCard = ({
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div>
           <h3 className={`text-lg font-bold ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
-            {isDipanggil ? "GILIRAN ANDA!" : "Reservasi Aktif"}
+            {isDipanggil ? "GILIRAN ANDA!" : (isPending ? "Reservasi Pending" : "Menunggu Giliran")}
           </h3>
           <p className={`text-xs flex items-center gap-1 mt-1 ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
             <Clock size={12} /> {formatDateLong(appointment.tanggal_reservasi)}
@@ -129,7 +130,7 @@ const UpcomingReservationCard = ({
               ? "bg-green-100 text-green-700"
               : "bg-yellow-100 text-yellow-700"
           }`}>
-          {isDipanggil ? "MASUK RUANGAN" : isConfirmed ? "Terkonfirmasi" : "Pending"}
+          {isDipanggil ? "MASUK RUANGAN" : (isPending ? "Menunggu Verifikasi" : "Terkonfirmasi")}
         </span>
       </div>
 
@@ -138,12 +139,12 @@ const UpcomingReservationCard = ({
         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${isDipanggil ? "bg-white/20 text-white" : "bg-blue-100 text-blue-600"}`}>
           <FileText className="w-6 h-6" />
         </div>
-        <div className="min-w-0"> {/* min-w-0 ensures text truncation works if needed */}
+        <div className="min-w-0">
           <p className={`font-bold text-lg truncate ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
             {appointment.poli?.poli_name}
           </p>
           <p className={`text-sm truncate ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
-            {appointment.dokter?.nama_dokter || "-"}
+            {appointment.dokter?.nama_dokter || "Dokter belum ditentukan"}
           </p>
         </div>
       </div>
@@ -160,9 +161,14 @@ const UpcomingReservationCard = ({
                     </div>
                 </div>
                  {/* Jika dipanggil, tampilkan pesan singkat */}
-                 {isDipanggil && (
+                 {isDipanggil ? (
                     <div className="text-right text-xs font-medium bg-white/20 px-2 py-1 rounded">
                         Segera Masuk
+                    </div>
+                 ) : (
+                    <div className="text-right">
+                        <span className="text-[10px] text-neutral-400 block">Status Antrian</span>
+                        <span className="font-bold text-sm text-neutral-700">Menunggu</span>
                     </div>
                  )}
             </div>
@@ -177,9 +183,10 @@ const UpcomingReservationCard = ({
         </div>
       ) : (
         <div className="mt-auto pt-2 border-t border-dashed border-neutral-200">
-             <p className="text-xs text-neutral-400 text-center italic">
-                Menunggu verifikasi admin...
-             </p>
+             <div className="bg-yellow-50 text-yellow-700 p-3 rounded-xl text-xs flex gap-2 items-start">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p>Reservasi Anda sedang ditinjau oleh admin. Harap tunggu konfirmasi.</p>
+             </div>
         </div>
       )}
     </div>
@@ -203,16 +210,10 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [showAntrianModal, setShowAntrianModal] = useState(false);
-  
-  // NEW STATE: Untuk pop up profile
   const [showProfileAlert, setShowProfileAlert] = useState(false);
-
   const [userData, setUserData] = useState(null);
   
-  // Menyimpan LIST reservasi aktif, bukan cuma satu
   const [activeAppointments, setActiveAppointments] = useState([]);
-  
-  // Untuk modal antrian, kita perlu tahu data mana yang sedang dilihat
   const [selectedQueueAppt, setSelectedQueueAppt] = useState(null);
   const [selectedQueueData, setSelectedQueueData] = useState(null);
 
@@ -222,7 +223,6 @@ export default function DashboardPage() {
     messages: 0,
   });
 
-  // State untuk Carousel dots
   const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
@@ -245,17 +245,13 @@ export default function DashboardPage() {
       setLoading(true);
       try {
         
-        // Cek Profile terlebih dahulu
+        // Cek Profile
         try {
             const profileRes = await api.get("/profile");
-            // Jika response success tapi data kosong (tergantung return backend)
-            // Biasanya backend return 404 kalau profile not found, 
-            // atau return 200 dengan data null. Kita handle keduanya.
             if (!profileRes.data) {
                 setShowProfileAlert(true);
             }
         } catch (profileError) {
-            // Jika error 404, artinya profile belum dibuat
             if (profileError.response && profileError.response.status === 404) {
                 setShowProfileAlert(true);
             }
@@ -269,11 +265,7 @@ export default function DashboardPage() {
         const reservations = resReservations.data;
         const rawRekamMedis = resRekamMedis.data?.data || resRekamMedis.data || [];
 
-        // 1. Identifikasi ID Reservasi yang SUDAH SELESAI (Sudah ada di Rekam Medis)
-        // Jika ID reservasi ada di rekam medis, berarti sudah diperiksa dokter -> SELESAI
-        const finishedReservationIds = rawRekamMedis.map(rm => rm.reservasi?.reservid || rm.reservasi_id);
-
-        // 2. Hitung total kunjungan user (Berdasarkan Rekam Medis)
+        // Hitung total kunjungan (history)
         let myTotalVisits = 0;
         if (currentUserId) {
             const myRekamMedis = rawRekamMedis.filter(rm => {
@@ -283,34 +275,20 @@ export default function DashboardPage() {
             myTotalVisits = myRekamMedis.length;
         }
 
-        // --- LOGIC LIST RESERVASI AKTIF ---
         const todayStr = new Date().toLocaleDateString('en-CA'); 
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
 
-        // 3. Filter Reservasi Aktif
-        // Syarat: 
-        // a. Status pending/confirmed
-        // b. Tanggal hari ini atau masa depan
-        // c. ID Reservasi TIDAK ADA di daftar finishedReservationIds (Belum diperiksa dokter)
+        // --- FILTERING LOGIC ---
+        // Hanya ambil yang statusnya 'pending' atau 'confirmed'
+        // 'completed' dan 'cancelled' diabaikan
         const potentialList = reservations
           .filter((r) => {
-            const isStatusActive = ["pending", "confirmed"].includes(r.status);
-            const rDate = new Date(r.tanggal_reservasi);
-            rDate.setHours(0, 0, 0, 0);
-
-            // Cek apakah reservasi ini sudah selesai (ada rekam medisnya)
-            const isFinished = finishedReservationIds.includes(r.reservid);
-
-            // Return true jika status aktif, tanggal valid, DAN BELUM SELESAI
-            return isStatusActive && rDate >= todayStart && !isFinished;
+            return ["pending", "confirmed"].includes(r.status);
           })
           .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
 
-        // Proses setiap reservasi aktif untuk cek antrian
+        // Proses antrian untuk yang statusnya 'confirmed' hari ini
         const processedList = await Promise.all(potentialList.map(async (appt) => {
              const apptDateStr = new Date(appt.tanggal_reservasi).toLocaleDateString('en-CA');
-             
              let queueData = null;
 
              if (appt.status === "confirmed" && apptDateStr === todayStr) {
@@ -349,7 +327,6 @@ export default function DashboardPage() {
     fetchData();
   }, []);
 
-  // Handler scroll carousel untuk update dots
   const handleScroll = (e) => {
     const scrollLeft = e.target.scrollLeft;
     const width = e.target.offsetWidth;
@@ -363,7 +340,6 @@ export default function DashboardPage() {
       setShowAntrianModal(true);
   };
 
-  // --- RENDER MODAL ANTRIAN ---
   if (showAntrianModal && selectedQueueAppt) {
     return (
       <StatusAntrian
@@ -433,11 +409,9 @@ export default function DashboardPage() {
           {/* CAROUSEL RESERVASI */}
           <div>
             {loading ? (
-                // Loading Skeleton
                 <UpcomingReservationCard loading={true} />
             ) : activeAppointments.length > 0 ? (
                 <>
-                    {/* Container Scroll */}
                     <div 
                         className="flex overflow-x-auto snap-x snap-mandatory pb-4 gap-4 scrollbar-hide -mx-2 px-2"
                         onScroll={handleScroll}
@@ -452,7 +426,6 @@ export default function DashboardPage() {
                         ))}
                     </div>
 
-                    {/* Dots Indicator (Hanya jika > 1 item) */}
                     {activeAppointments.length > 1 && (
                         <div className="flex justify-center gap-2 mt-[-10px]">
                             {activeAppointments.map((_, idx) => (
@@ -467,7 +440,6 @@ export default function DashboardPage() {
                     )}
                 </>
             ) : (
-                // State Kosong
                 <UpcomingReservationCard appointment={null} />
             )}
           </div>
@@ -486,7 +458,6 @@ export default function DashboardPage() {
       </main>
       <Footer />
 
-      {/* Helper CSS untuk hide scrollbar tapi tetap bisa scroll */}
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar {
             display: none;

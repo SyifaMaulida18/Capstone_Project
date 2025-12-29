@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 // Hapus import AdminLayout
 // import AdminLayout from "@/app/admin/components/admin_layout"; 
 import api from "@/services/api";
-import { useRouter } from "next/navigation";
 import {
-  UserIcon,
-  MegaphoneIcon,
+  ArrowPathIcon,
+  ArrowRightStartOnRectangleIcon // Icon untuk Logout
+  ,
   CheckCircleIcon,
   ClockIcon,
-  ArrowPathIcon,
   ForwardIcon,
-  XCircleIcon,
-  ArrowRightStartOnRectangleIcon // Icon untuk Logout
+  MegaphoneIcon,
+  UserIcon,
+  XCircleIcon
 } from "@heroicons/react/24/outline";
+import { useRouter } from "next/navigation";
 
 export default function PoliQueuePage() {
   const router = useRouter();
@@ -215,7 +216,7 @@ export default function PoliQueuePage() {
                         
                         {queueData.sedang_dipanggil ? (
                             <div className="animate-in fade-in zoom-in duration-300">
-                                <span className="text-9xl font-black text-gray-800 tracking-tighter block mb-2">
+                                <span className="text-xl font-black text-gray-800 tracking-tighter block mb-2">
                                     {queueData.sedang_dipanggil.nomor_antrian}
                                 </span>
                                 <div className="inline-flex items-center gap-2 px-5 py-2 bg-blue-50 text-blue-700 rounded-full text-lg font-medium shadow-sm">

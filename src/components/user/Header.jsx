@@ -63,7 +63,7 @@ export default function Header() {
 
         {/* Navigasi Utilitas Kanan */}
         <div className="flex space-x-3 items-center">
-          {/* Tombol Notifikasi */}
+          {/* Tombol Notifikasi
           <button
             type="button"
             className="p-2 rounded-full text-neutral-500 hover:bg-blue-50 hover:text-blue-600 transition duration-150 relative focus:outline-none"
@@ -73,7 +73,7 @@ export default function Header() {
             {notificationCount > 0 && (
               <span className="absolute top-1 right-1 block h-2 w-2 rounded-full ring-2 ring-white bg-red-500"></span>
             )}
-          </button>
+          </button> */}
 
           {/* Tombol Chat */}
           <button
