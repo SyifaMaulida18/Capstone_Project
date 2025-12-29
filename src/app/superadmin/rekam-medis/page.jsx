@@ -168,10 +168,16 @@ export default function MedicalRecordsPage() {
     }
     
     setEditingRecord(null);
+    
+    // Get today's date in WIB timezone
+    const now = new Date();
+    const wibDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const todayWIB = `${wibDate.getFullYear()}-${String(wibDate.getMonth() + 1).padStart(2, '0')}-${String(wibDate.getDate()).padStart(2, '0')}`;
+    
     setRecordForm({
       reservasiId: initialReservasiId || "", 
       noMedrec: "", 
-      tanggalDiperiksa: new Date().toISOString().split('T')[0],
+      tanggalDiperiksa: todayWIB,
       gejala: "",
       diagnosis: "",
       tindakan: "",

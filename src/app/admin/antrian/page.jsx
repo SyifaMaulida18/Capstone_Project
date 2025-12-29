@@ -27,9 +27,17 @@ export default function AntrianDashboardPage() {
   const [sisaAntrian, setSisaAntrian] = useState(0);
   const [daftarAntrianLengkap, setDaftarAntrianLengkap] = useState([]); 
 
-  const [tanggal, setTanggal] = useState(
-    new Date().toISOString().slice(0, 10) 
-  );
+  // Get today's date in WIB timezone (Asia/Jakarta)
+  const getTodayWIB = () => {
+    const now = new Date();
+    const wibDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const year = wibDate.getFullYear();
+    const month = String(wibDate.getMonth() + 1).padStart(2, '0');
+    const day = String(wibDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [tanggal, setTanggal] = useState(getTodayWIB());
 
   // Loading States
   const [loading, setLoading] = useState(false); 
@@ -308,11 +316,11 @@ export default function AntrianDashboardPage() {
                                 <div className="flex flex-col md:flex-row md:items-end justify-between mt-2 gap-4">
                                     <div>
                                         <p className="text-4xl font-extrabold text-amber-600">{sedangDipanggil.nomor_antrian}</p>
-                                        <p className="text-sm text-neutral-600 font-medium">Pasien: {sedangDipanggil.reservation?.user?.name || "Umum"}</p>
+                                        <p className="text-sm text-neutral-600 font-medium">Pasien: {sedangDipanggil.reservation?.nama || "-"}</p>
                                     </div>
                                     <div className="z-10">
                                         {sedangDipanggil.reservation?.reservid && (
-                                            <Link href={`${MEDICAL_RECORDS_PATH}?reservasi_id=${sedangDipanggil.reservation.reservid}&patient_id=${sedangDipanggil.reservation.user?.userid || sedangDipanggil.reservation.user?.id}&patient_name=${encodeURIComponent(sedangDipanggil.reservation.user?.name || "")}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow">
+                                            <Link href={`${MEDICAL_RECORDS_PATH}?reservasi_id=${sedangDipanggil.reservation.reservid}&patient_id=${sedangDipanggil.reservation.booked_user_id || sedangDipanggil.reservation.user?.userid}&patient_name=${encodeURIComponent(sedangDipanggil.reservation.nama || "")}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow">
                                                 <DocumentTextIcon className="w-4 h-4"/> Input Rekam Medis
                                             </Link>
                                         )}
@@ -333,7 +341,7 @@ export default function AntrianDashboardPage() {
                                         <tr key={row.id} className={`hover:bg-gray-50 transition-colors ${row.status === 'dipanggil' ? 'bg-amber-50/50' : row.status === 'selesai' ? 'bg-green-50/30' : ''}`}>
                                             <td className="px-6 py-4 text-sm text-gray-700">{idx + 1}</td>
                                             <td className="px-6 py-4 text-sm font-bold text-gray-900">{row.nomor_antrian}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-700">{row.reservation?.user?.name || "-"}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-700">{row.reservation?.nama || "-"}</td>
                                             <td className="px-6 py-4 text-sm"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(row.status)}`}>{row.status.toUpperCase()}</span></td>
                                             <td className="px-6 py-4 text-sm text-gray-600 font-mono">{row.waktu_panggil ? new Date(row.waktu_panggil).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) : "-"}</td>
                                             <td className="px-6 py-4 text-sm text-gray-600 font-mono">{row.waktu_selesai ? new Date(row.waktu_selesai).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) : "-"}</td>
@@ -400,7 +408,7 @@ export default function AntrianDashboardPage() {
                                                 <td className="px-6 py-3 text-sm text-gray-500">{idx + 1}</td>
                                                 <td className="px-6 py-3 text-sm font-bold text-gray-900">{row.nomor_antrian}</td>
                                                 <td className="px-6 py-3 text-sm text-blue-600 font-medium">{row.poli_name}</td>
-                                                <td className="px-6 py-3 text-sm text-gray-700">{row.reservation?.user?.name || "-"}</td>
+                                                <td className="px-6 py-3 text-sm text-gray-700">{row.reservation?.nama || "-"}</td>
                                                 <td className="px-6 py-3 text-sm"><span className={`text-[10px] px-2 py-0.5 rounded-full border ${getStatusBadge(row.status)}`}>{row.status.toUpperCase()}</span></td>
                                                 <td className="px-6 py-3 text-sm text-gray-500 font-mono">{row.waktu_panggil ? new Date(row.waktu_panggil).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) : "-"}</td>
                                             </tr>
