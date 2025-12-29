@@ -17,15 +17,6 @@ import AdminLayout from "@/app/admin/components/admin_layout";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 const MEDICAL_RECORDS_PATH = "/admin/rekam-medis";
 
-// --- 1. TAMBAHKAN HELPER INI DI LUAR COMPONENT ---
-const getLocalTodayString = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 export default function AntrianDashboardPage() {
   const [polis, setPolis] = useState([]);
   const [selectedPoli, setSelectedPoli] = useState("");

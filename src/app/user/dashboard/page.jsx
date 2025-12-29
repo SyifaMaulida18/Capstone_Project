@@ -8,7 +8,9 @@ import {
   FileText,
   History,
   MessageSquare,
-  Users
+  Users,
+  CheckCircle2,
+  Hourglass
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -31,6 +33,7 @@ const formatDateLong = (dateInput) => {
   }).format(date);
 };
 
+// Komponen Statistik Kecil
 const StatBox = ({ number, label, isActive = false, loading = false }) => (
   <div
     className={`p-4 rounded-2xl flex flex-col justify-between h-24 w-full transition-all ${
@@ -46,11 +49,13 @@ const StatBox = ({ number, label, isActive = false, loading = false }) => (
   </div>
 );
 
+// Komponen Kartu Reservasi (Logic Utama Disini)
 const UpcomingReservationCard = ({
   appointment,
   loading,
   onViewQueue,
 }) => {
+  // 1. Loading State
   if (loading) {
     return (
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-neutral-100 h-full">
@@ -69,7 +74,7 @@ const UpcomingReservationCard = ({
     );
   }
 
-  // State Kosong
+  // 2. Empty State
   if (!appointment) {
     return (
       <div className="bg-white p-6 rounded-3xl shadow-lg text-center py-8 animate-fadeIn h-full flex flex-col justify-center items-center">
@@ -90,109 +95,154 @@ const UpcomingReservationCard = ({
     );
   }
 
-  // --- LOGIKA STATUS TAMPILAN ---
-  const queueData = appointment.queueData || null;
-  const isConfirmed = appointment.status === "confirmed";
-  const isPending = appointment.status === "pending";
+  // --- LOGIKA UTAMA STATUS ---
+  const { status, queueData } = appointment;
   
-  // Cek apakah reservasi ini sedang dipanggil di antrian
+  // Cek Status Dasar
+  const isPending = status === "pending";
+  const isConfirmed = status === "confirmed";
+
+  // Cek Status Antrian (Hanya valid jika Confirmed & ada data antrian)
+  // Logic: User sedang dipanggil jika ID Reservasi di 'sedang_dipanggil' sama dengan ID Reservasi User
   const isDipanggil =
     isConfirmed &&
     queueData?.sedang_dipanggil?.reservation_id === appointment.reservid;
 
+  // Tentukan Styling berdasarkan kondisi
+  let cardStyle = "bg-white text-neutral-800 border-neutral-100";
+  let badgeStyle = "bg-gray-100 text-gray-700";
+  let badgeText = "Status Tidak Diketahui";
+  let iconBoxStyle = "bg-blue-100 text-blue-600";
+  let titleText = "Detail Reservasi";
+  let subTitleClass = "text-neutral-500";
+
+  if (isPending) {
+    // STYLE PENDING (KUNING/ORANYE)
+    cardStyle = "bg-orange-50 text-neutral-800 border-orange-100";
+    badgeStyle = "bg-orange-100 text-orange-700";
+    badgeText = "Menunggu Konfirmasi";
+    iconBoxStyle = "bg-orange-200 text-orange-700";
+    titleText = "Verifikasi Admin";
+    subTitleClass = "text-orange-600/80";
+  } else if (isDipanggil) {
+    // STYLE DIPANGGIL (HIJAU + ANIMASI)
+    cardStyle = "bg-green-600 text-white border-green-500 ring-4 ring-green-200 shadow-xl shadow-green-200";
+    badgeStyle = "bg-white text-green-700 animate-bounce";
+    badgeText = "SILAKAN MASUK";
+    iconBoxStyle = "bg-white/20 text-white";
+    titleText = "GILIRAN ANDA!";
+    subTitleClass = "text-green-100";
+  } else if (isConfirmed) {
+    // STYLE CONFIRMED MENUNGGU (BIRU/PUTIH)
+    cardStyle = "bg-white text-neutral-800 border-neutral-100 shadow-md";
+    badgeStyle = "bg-blue-50 text-blue-700";
+    badgeText = "Menunggu Giliran";
+    iconBoxStyle = "bg-blue-100 text-blue-600";
+    titleText = "Antrian Poli";
+    subTitleClass = "text-neutral-500";
+  }
+
   return (
-    <div
-      className={`p-6 rounded-3xl shadow-xl border relative overflow-hidden transition-all duration-500 h-full flex flex-col justify-between ${
-        isDipanggil
-          ? "bg-green-600 text-white border-green-500 ring-4 ring-green-200"
-          : "bg-white text-neutral-800 border-neutral-100"
-      }`}
-    >
+    <div className={`p-6 rounded-3xl border relative overflow-hidden transition-all duration-500 h-full flex flex-col justify-between ${cardStyle}`}>
+      
+      {/* Animasi Ping Background jika Dipanggil */}
       {isDipanggil && (
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full animate-ping" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full animate-ping duration-1000" />
       )}
 
       {/* Header Card */}
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div>
           <h3 className={`text-lg font-bold ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
-            {isDipanggil ? "GILIRAN ANDA!" : (isPending ? "Reservasi Pending" : "Menunggu Giliran")}
+            {titleText}
           </h3>
-          <p className={`text-xs flex items-center gap-1 mt-1 ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
+          <p className={`text-xs flex items-center gap-1 mt-1 ${subTitleClass}`}>
             <Clock size={12} /> {formatDateLong(appointment.tanggal_reservasi)}
           </p>
         </div>
 
-        <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap ${
-            isDipanggil
-              ? "bg-white text-green-700 animate-bounce"
-              : isConfirmed
-              ? "bg-green-100 text-green-700"
-              : "bg-yellow-100 text-yellow-700"
-          }`}>
-          {isDipanggil ? "MASUK RUANGAN" : (isPending ? "Menunggu Verifikasi" : "Terkonfirmasi")}
+        <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap ${badgeStyle}`}>
+          {badgeText}
         </span>
       </div>
 
-      {/* Body Card */}
+      {/* Body: Info Poli & Dokter */}
       <div className="flex items-center space-x-4 mb-4 relative z-10">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${isDipanggil ? "bg-white/20 text-white" : "bg-blue-100 text-blue-600"}`}>
-          <FileText className="w-6 h-6" />
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${iconBoxStyle}`}>
+          {isPending ? <Hourglass className="w-6 h-6" /> : <FileText className="w-6 h-6" />}
         </div>
         <div className="min-w-0">
           <p className={`font-bold text-lg truncate ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
             {appointment.poli?.poli_name}
           </p>
-          <p className={`text-sm truncate ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
+          <p className={`text-sm truncate ${subTitleClass}`}>
             {appointment.dokter?.nama_dokter || "Dokter belum ditentukan"}
           </p>
         </div>
       </div>
 
-      {/* Footer / Antrian / Button */}
-      {isConfirmed ? (
-        <div className="mt-auto">
-          <div className={`rounded-2xl p-4 border mb-3 relative z-10 ${isDipanggil ? "bg-white/10 border-white/20 text-white" : "bg-neutral-50 border-neutral-200"}`}>
-            <div className="flex justify-between items-center">
-                <div>
-                    <span className={`text-[10px] uppercase tracking-wider ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>No. Antrian</span>
-                    <div className={`text-3xl font-black leading-none mt-1 ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
-                    {appointment.nomor_antrian?.split("-").pop() || "?"}
-                    </div>
-                </div>
-                 {/* Jika dipanggil, tampilkan pesan singkat */}
-                 {isDipanggil ? (
-                    <div className="text-right text-xs font-medium bg-white/20 px-2 py-1 rounded">
-                        Segera Masuk
-                    </div>
-                 ) : (
-                    <div className="text-right">
-                        <span className="text-[10px] text-neutral-400 block">Status Antrian</span>
-                        <span className="font-bold text-sm text-neutral-700">Menunggu</span>
-                    </div>
-                 )}
-            </div>
-          </div>
-          <button 
-            onClick={() => onViewQueue(appointment, queueData)} 
-            className={`w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors ${isDipanggil ? "bg-white text-green-700 hover:bg-green-50 shadow-lg" : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200 shadow-lg"}`}
-          >
-            <Users size={16} />
-            {isDipanggil ? "Monitor Antrian" : "Lihat Antrian"}
-          </button>
-        </div>
-      ) : (
-        <div className="mt-auto pt-2 border-t border-dashed border-neutral-200">
-             <div className="bg-yellow-50 text-yellow-700 p-3 rounded-xl text-xs flex gap-2 items-start">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <p>Reservasi Anda sedang ditinjau oleh admin. Harap tunggu konfirmasi.</p>
+      {/* Footer: Nomor Antrian & Tombol */}
+      <div className="mt-auto relative z-10">
+        
+        {/* TAMPILAN PENDING */}
+        {isPending && (
+           <div className="bg-white/60 p-3 rounded-xl border border-orange-100">
+             <div className="flex gap-2 text-xs text-orange-800 leading-relaxed">
+               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+               <p>Reservasi Anda sedang ditinjau. Nomor antrian akan muncul setelah dikonfirmasi.</p>
              </div>
-        </div>
-      )}
+           </div>
+        )}
+
+        {/* TAMPILAN CONFIRMED (Menunggu / Dipanggil) */}
+        {isConfirmed && (
+          <>
+            <div className={`rounded-2xl p-4 border mb-3 flex justify-between items-center ${isDipanggil ? "bg-white/10 border-white/20 text-white" : "bg-neutral-50 border-neutral-200"}`}>
+               <div>
+                  <span className={`text-[10px] uppercase tracking-wider ${isDipanggil ? "text-green-100" : "text-neutral-500"}`}>
+                    No. Antrian
+                  </span>
+                  <div className={`text-3xl font-black leading-none mt-1 ${isDipanggil ? "text-white" : "text-neutral-800"}`}>
+                    {appointment.nomor_antrian?.split("-").pop() || "?"}
+                  </div>
+               </div>
+               
+               {/* Status Kanan Bawah */}
+               <div className="text-right">
+                  {isDipanggil ? (
+                     <span className="bg-white/20 px-2 py-1 rounded text-xs font-medium">
+                       Segera Masuk
+                     </span>
+                  ) : (
+                    <>
+                      <span className="text-[10px] text-neutral-400 block">Estimasi</span>
+                      <span className="font-bold text-sm text-neutral-700">
+                         {queueData ? `${queueData.sisa_antrian} Org Lagi` : "-"}
+                      </span>
+                    </>
+                  )}
+               </div>
+            </div>
+
+            <button
+              onClick={() => onViewQueue(appointment, queueData)} 
+              className={`w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg ${
+                isDipanggil 
+                  ? "bg-white text-green-700 hover:bg-green-50" 
+                  : "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200"
+              }`}
+            >
+              <Users size={16} />
+              {isDipanggil ? "Monitor Antrian" : "Lihat Antrian"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 };
 
+// Komponen Menu Button
 const MenuButton = ({ icon: Icon, label, href }) => (
   <a href={href} className="p-5 rounded-3xl bg-white shadow-sm border flex flex-col justify-between h-32 hover:shadow-md transition-shadow">
     <div className="flex justify-between items-start">
@@ -278,21 +328,32 @@ export default function DashboardPage() {
         const todayStr = new Date().toLocaleDateString('en-CA'); 
 
         // --- FILTERING LOGIC ---
-        // Hanya ambil yang statusnya 'pending' atau 'confirmed'
-        // 'completed' dan 'cancelled' diabaikan
+        // 1. Ambil yang PENDING (semua tanggal di masa depan atau hari ini)
+        // 2. Ambil yang CONFIRMED (khusus hari ini untuk cek antrian)
         const potentialList = reservations
           .filter((r) => {
-            return ["pending", "confirmed"].includes(r.status);
+            const isPending = r.status === "pending";
+            
+            // Cek apakah confirmed hari ini
+            const rDate = new Date(r.tanggal_reservasi).toLocaleDateString('en-CA');
+            const isConfirmedToday = r.status === "confirmed" && rDate === todayStr;
+
+            // Jika backend sudah memfilter status 'menunggu'/'dipanggil' lewat relasi antrian,
+            // kita cukup percaya status confirmed, tapi validasi tanggal tetap penting.
+            
+            return isPending || isConfirmedToday;
           })
           .sort((a, b) => new Date(a.tanggal_reservasi) - new Date(b.tanggal_reservasi));
 
-        // Proses antrian untuk yang statusnya 'confirmed' hari ini
+        // --- FETCH ANTRIAN LOGIC ---
+        // Hanya fetch antrian jika status 'confirmed' dan tanggal hari ini
         const processedList = await Promise.all(potentialList.map(async (appt) => {
              const apptDateStr = new Date(appt.tanggal_reservasi).toLocaleDateString('en-CA');
              let queueData = null;
 
              if (appt.status === "confirmed" && apptDateStr === todayStr) {
                 try {
+                    // Kita ambil data dashboard antrian untuk mendapatkan konteks (sisa antrian, siapa yg dipanggil)
                     const antrianRes = await api.get("/antrian/dashboard", {
                       params: {
                         poli_id: appt.poli_id,
