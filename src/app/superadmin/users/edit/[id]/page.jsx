@@ -20,7 +20,7 @@ export default function EditUserPage() {
       try {
         setIsLoading(true);
         const token = localStorage.getItem("token");
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
         const response = await fetch(`${baseUrl}/users/${id}`, {
           method: 'GET',
@@ -31,6 +31,9 @@ export default function EditUserPage() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) throw new Error("Token tidak valid atau kadaluarsa. Silakan login ulang.");
+          if (response.status === 403) throw new Error("Akses ditolak. Halaman ini khusus Superadmin.");
+          if (response.status === 404) throw new Error("User tidak ditemukan.");
           throw new Error("Gagal mengambil data user");
         }
 

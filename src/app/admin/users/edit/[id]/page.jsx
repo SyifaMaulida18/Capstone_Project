@@ -2,8 +2,8 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import AdminLayout from "../../../components/admin_layout"; 
-import FormUser from "../../../components/form/formusers"; 
+import AdminLayout from "../../../components/admin_layout";
+import FormUser from "../../../components/form/formusers";
 
 export default function EditUserPage() {
   const params = useParams();
@@ -20,8 +20,10 @@ export default function EditUserPage() {
       try {
         setIsLoading(true);
         const token = localStorage.getItem("token");
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
+        // --- CARA EFISIEN: Langsung panggil ID ---
+        // Karena UserController sudah punya method show($id)
         const response = await fetch(`${baseUrl}/users/${id}`, {
           method: 'GET',
           headers: {
@@ -31,20 +33,26 @@ export default function EditUserPage() {
         });
 
         if (!response.ok) {
+          if (response.status === 401) throw new Error("Token tidak valid atau kadaluarsa. Silakan login ulang.");
+          if (response.status === 403) throw new Error("Akses ditolak. Halaman ini khusus Superadmin.");
+          if (response.status === 404) throw new Error("User tidak ditemukan di database.");
           throw new Error("Gagal mengambil data user");
         }
 
         const result = await response.json();
-        const apiData = result.data; // Data asli dari Laravel (name, email, nomor_telepon)
+        const apiData = result.data; // Mengambil object user dari key 'data'
 
+        // Mapping data dari Backend ke format Form Frontend
+        // Perhatikan: Controller Anda memakai validasi 'userid', jadi kemungkinan primary key-nya 'userid'
         const formattedData = {
-            id: apiData.userid,
-            nama: apiData.name,             // Mapping: name -> nama
-            email: apiData.email,           // Mapping: email -> email
-            telp: apiData.nomor_telepon,    // Mapping: nomor_telepon -> telp
+            id: apiData.userid || apiData.id, 
+            nama: apiData.name,            
+            email: apiData.email,          
+            telp: apiData.nomor_telepon,    
         };
 
         setUserData(formattedData);
+
       } catch (err) {
         console.error("Error:", err);
         setError(err.message);
