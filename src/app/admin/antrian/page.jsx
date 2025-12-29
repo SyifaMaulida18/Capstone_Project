@@ -25,16 +25,17 @@ export default function AntrianDashboardPage() {
   const [groupedData, setGroupedData] = useState(null);
   const [sedangDipanggil, setSedangDipanggil] = useState(null);
   const [sisaAntrian, setSisaAntrian] = useState(0);
-  const [daftarTunggu, setDaftarTunggu] = useState([]);
+  const [daftarAntrianLengkap, setDaftarAntrianLengkap] = useState([]); 
 
   const [tanggal, setTanggal] = useState(
-    new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    new Date().toISOString().slice(0, 10) 
   );
 
   // Loading States
   const [loading, setLoading] = useState(false); 
+  const [actionLoading, setActionLoading] = useState(false);
   const [loadingPoli, setLoadingPoli] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // Background refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false); 
   const [errorMsg, setErrorMsg] = useState("");
 
   // === 1. AMBIL DATA POLI ===
@@ -43,29 +44,20 @@ export default function AntrianDashboardPage() {
       try {
         setLoadingPoli(true);
         const token = localStorage.getItem("token");
-
         const res = await fetch(`${API_BASE}/polis`, {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
         });
-
         const json = await res.json();
         const data = json.data || json;
-
         setPolis(data);
-        if (data.length > 0) {
-          setSelectedPoli(data[0].poli_id.toString());
-        }
+        if (data.length > 0) setSelectedPoli(data[0].poli_id.toString());
       } catch (err) {
-        console.error("Gagal ambil poli:", err);
+        console.error(err);
         setErrorMsg("Gagal mengambil data poli.");
       } finally {
         setLoadingPoli(false);
       }
     };
-
     fetchPolis();
   }, []);
 
@@ -78,43 +70,45 @@ export default function AntrianDashboardPage() {
       setErrorMsg("");
 
       const token = localStorage.getItem("token");
-      
-      // Kirim string kosong jika "all" agar backend membaca null
       const poliParam = selectedPoli === "all" ? "" : selectedPoli;
       
-      const url = `${API_BASE}/antrian/dashboard?poli_id=${encodeURIComponent(
-        poliParam
-      )}&tanggal=${encodeURIComponent(tanggal)}`;
+      const url = `${API_BASE}/antrian/dashboard?poli_id=${encodeURIComponent(poliParam)}&tanggal=${encodeURIComponent(tanggal)}`;
 
       const res = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) {
-        throw new Error(`Gagal mengambil data antrian (${res.status})`);
-      }
+      if (!res.ok) throw new Error(`Gagal mengambil data (${res.status})`);
 
       const json = await res.json();
       const data = json.data || {};
 
-      // Logic Penentuan Tampilan
       if (!poliParam || Array.isArray(data)) {
-        setGroupedData(data); // Array Dashboard per Poli
+        // --- MODE SEMUA POLI ---
+        setGroupedData(data);
         setSedangDipanggil(null);
         setSisaAntrian(0);
-        setDaftarTunggu([]);
+        setDaftarAntrianLengkap([]);
       } else {
+        // --- MODE SINGLE POLI ---
         setGroupedData(null);
         setSedangDipanggil(data.sedang_dipanggil || null);
         setSisaAntrian(data.sisa_antrian || 0);
-        setDaftarTunggu(data.daftar_tunggu || []);
+        
+        // PERBAIKAN: GABUNGKAN 'daftar_tunggu' DAN 'sudah_selesai'
+        const aktif = data.daftar_tunggu || [];
+        const selesai = data.sudah_selesai || [];
+        
+        // Gabung lalu sort berdasarkan nomor antrian
+        const gabungan = [...aktif, ...selesai].sort((a, b) => 
+            a.nomor_antrian.localeCompare(b.nomor_antrian)
+        );
+
+        setDaftarAntrianLengkap(gabungan);
       }
     } catch (err) {
-      console.error("Error fetch dashboard:", err);
-      setErrorMsg(err.message || "Terjadi kesalahan saat mengambil data antrian.");
+      console.error(err);
+      setErrorMsg(err.message || "Terjadi kesalahan sistem.");
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -128,148 +122,87 @@ export default function AntrianDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingPoli, selectedPoli, tanggal]);
 
-  // === 3. LOGIC GABUNGAN DATA (GLOBAL LIST) ===
-  // Menggabungkan semua daftar tunggu dari semua poli menjadi satu array flat
+  // === 3. LOGIC GABUNGAN DATA (GLOBAL LIST untuk ALL POLI) ===
   const allQueues = useMemo(() => {
+    // Jika Single Poli Mode, kita pakai data state langsung
+    if (selectedPoli && selectedPoli !== 'all') {
+        return [...daftarAntrianLengkap].sort((a, b) => {
+             // Custom Sort: Dipanggil -> Menunggu -> Selesai -> Lainnya
+             const statusOrder = { 'dipanggil': 1, 'menunggu': 2, 'selesai': 3, 'terlewat': 4, 'batal': 5 };
+             const orderA = statusOrder[a.status] || 99;
+             const orderB = statusOrder[b.status] || 99;
+             if (orderA !== orderB) return orderA - orderB;
+             return a.nomor_antrian.localeCompare(b.nomor_antrian);
+        });
+    }
+
+    // Jika All Poli Mode, kita gabungkan dari groupedData
     if (!groupedData || !Array.isArray(groupedData)) return [];
     
-    // Gabungkan data
     let combined = [];
     groupedData.forEach((group) => {
-        if (group.daftar_tunggu && Array.isArray(group.daftar_tunggu)) {
-            const withPoliName = group.daftar_tunggu.map(item => ({
-                ...item,
-                poli_name: group.poli_name // Tambahkan nama poli ke item
-            }));
-            combined = [...combined, ...withPoliName];
-        }
-    });
+        const waiting = group.daftar_tunggu || [];
+        const finished = group.sudah_selesai || []; // Pastikan backend juga kirim ini di mode all, jika belum, hanya waiting yg muncul
+        const allInGroup = [...waiting, ...finished];
 
-    // Urutkan: Dipanggil duluan, lalu Menunggu berdasarkan waktu/nomor
+        const withPoliName = allInGroup.map(item => ({
+            ...item,
+            poli_name: group.poli_name || group.nama_poli 
+        }));
+        combined = [...combined, ...withPoliName];
+    });
+    
     return combined.sort((a, b) => {
-        if (a.status === 'dipanggil' && b.status !== 'dipanggil') return -1;
-        if (a.status !== 'dipanggil' && b.status === 'dipanggil') return 1;
+        const statusOrder = { 'dipanggil': 1, 'menunggu': 2, 'selesai': 3, 'terlewat': 4, 'batal': 5 };
+        const orderA = statusOrder[a.status] || 99;
+        const orderB = statusOrder[b.status] || 99;
+        if (orderA !== orderB) return orderA - orderB;
         return a.nomor_antrian.localeCompare(b.nomor_antrian);
     });
-  }, [groupedData]);
-
+  }, [groupedData, daftarAntrianLengkap, selectedPoli]);
 
   // === 4. ACTION HANDLERS ===
-  const handlePanggilBerikutnya = async () => {
-    if (!selectedPoli || selectedPoli === "all") {
-      alert("Silakan pilih spesifik poli terlebih dahulu untuk memanggil.");
-      return;
-    }
-
+  const handleAction = async (url, body) => {
     try {
-      setLoading(true);
-      setErrorMsg("");
+      setActionLoading(true);
       const token = localStorage.getItem("token");
-
-      const res = await fetch(`${API_BASE}/antrian/panggil-berikutnya`, {
+      const res = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          poli_id: selectedPoli,
-        }),
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
       });
-
       const json = await res.json();
 
-      if (res.status === 404) {
-        alert("Tidak ada antrian lagi yang menunggu.");
-        return;
+      if (res.status === 404 && json.message === 'Tidak ada antrian lagi.') {
+         alert("Tidak ada antrian lagi.");
+      } else if (!res.ok) {
+         throw new Error(json.message || "Gagal memproses.");
       }
-
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "Gagal memanggil antrian berikutnya.");
-      }
-
-      await fetchDashboard(true);
       
+      await fetchDashboard(true);
     } catch (err) {
-      console.error("Error panggil berikutnya:", err);
       alert(err.message);
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
-  const handleSelesaikanPanggilan = async () => {
+  const handlePanggilBerikutnya = () => {
+    if (!selectedPoli || selectedPoli === "all") return alert("Pilih poli spesifik.");
+    handleAction(`${API_BASE}/antrian/panggil-berikutnya`, { poli_id: selectedPoli });
+  };
+
+  const handleSelesaikanPanggilan = () => {
     if (!sedangDipanggil) return;
-
-    try {
-      setLoading(true);
-      setErrorMsg("");
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(`${API_BASE}/antrian/selesai-dipanggil`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nomor_antrian: sedangDipanggil.nomor_antrian,
-        }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "Gagal menyelesaikan panggilan.");
-      }
-
-      await fetchDashboard(true);
-      
-    } catch (err) {
-      console.error("Error selesaikan panggilan:", err);
-      alert(err.message);
-    } finally {
-      setLoading(false);
-    }
+    handleAction(`${API_BASE}/antrian/selesai-dipanggil`, { nomor_antrian: sedangDipanggil.nomor_antrian });
   };
 
-  const handleLewatiAntrian = async (antrianId) => {
-    if(!confirm("Tandai antrian ini sebagai terlewat?")) return;
-    try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
-        
-        const res = await fetch(`${API_BASE}/antrian/terlewat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ antrian_id: antrianId }),
-        });
-
-        const json = await res.json();
-        if(!res.ok) throw new Error(json.message || "Gagal melewati antrian");
-
-        fetchDashboard(true);
-    } catch(err) { alert(err.message); } 
-    finally { setLoading(false); }
+  const handleLewatiAntrian = (id) => {
+    if(confirm("Lewati antrian ini?")) handleAction(`${API_BASE}/antrian/terlewat`, { antrian_id: id });
   }
 
-  const handleBatalkanAntrian = async (antrianId) => {
-    if(!confirm("Batalkan antrian ini?")) return;
-    try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/antrian/batal`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ antrian_id: antrianId }),
-        });
-        const json = await res.json();
-        if(!res.ok) throw new Error(json.message || "Gagal membatalkan antrian");
-        fetchDashboard(true);
-    } catch(err) { alert(err.message); } 
-    finally { setLoading(false); }
+  const handleBatalkanAntrian = (id) => {
+    if(confirm("Batalkan antrian ini?")) handleAction(`${API_BASE}/antrian/batal`, { antrian_id: id, alasan: "Dashboard Admin" });
   }
 
   const getStatusBadge = (status) => {
@@ -300,7 +233,7 @@ export default function AntrianDashboardPage() {
                 value={selectedPoli}
                 onChange={(e) => setSelectedPoli(e.target.value)}
                 disabled={loadingPoli || loading}
-                className="w-full md:w-64 px-3 py-2 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-primary-500 bg-white"
+                className="w-full md:w-64 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
               >
                 <option value="all">-- Semua Poli --</option>
                 {!loadingPoli && polis.map((p) => (
@@ -324,10 +257,10 @@ export default function AntrianDashboardPage() {
             <button
               type="button"
               onClick={() => fetchDashboard(false)}
-              disabled={loading}
+              disabled={loading || actionLoading}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 text-sm font-semibold"
             >
-              <ArrowPathIcon className={`h-4 w-4 ${loading || isRefreshing ? 'animate-spin' : ''}`} />
+              <ArrowPathIcon className={`h-4 w-4 ${loading || isRefreshing || actionLoading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
             
@@ -335,7 +268,7 @@ export default function AntrianDashboardPage() {
                 <>
                     <button
                     onClick={handleSelesaikanPanggilan}
-                    disabled={loading || !sedangDipanggil}
+                    disabled={loading || actionLoading || !sedangDipanggil}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm font-semibold shadow-md disabled:opacity-50"
                     >
                     <CheckCircleIcon className="h-4 w-4" />
@@ -343,10 +276,10 @@ export default function AntrianDashboardPage() {
                     </button>
                     <button
                     onClick={handlePanggilBerikutnya}
-                    disabled={loading}
+                    disabled={loading || actionLoading}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-semibold shadow-md disabled:opacity-50"
                     >
-                    <PhoneArrowDownLeftIcon className="h-4 w-4" />
+                    <PhoneArrowDownLeftIcon className={`h-4 w-4 ${actionLoading ? 'animate-spin' : ''}`} />
                     Panggil Next
                     </button>
                 </>
@@ -358,13 +291,11 @@ export default function AntrianDashboardPage() {
           <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{errorMsg}</div>
         )}
 
-        {/* CONTAINER UTAMA */}
-        <div className={`transition-opacity duration-200 ${isRefreshing ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
+        <div className={`transition-opacity duration-300 ${isRefreshing ? 'opacity-70' : 'opacity-100'}`}>
             
             {/* TAMPILAN SINGLE POLI */}
             {selectedPoli && selectedPoli !== "all" && (
                 <>
-                    {/* ... (Kode Single Poli sama seperti sebelumnya) ... */}
                     <div className="grid md:grid-cols-3 gap-4 mb-6">
                         <div className="p-4 rounded-xl border border-blue-100 bg-blue-50 flex items-center gap-4">
                             <div className="p-3 rounded-full bg-blue-600 shadow-md"><UsersIcon className="h-6 w-6 text-white" /></div>
@@ -397,9 +328,9 @@ export default function AntrianDashboardPage() {
                                 <tr>{["No", "Nomor", "Pasien", "Status", "Panggil", "Selesai", "Aksi"].map((h) => (<th key={h} className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>))}</tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-neutral-100">
-                                {daftarTunggu.length === 0 ? (<tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">Tidak ada antrian untuk tanggal ini.</td></tr>) : (
-                                    daftarTunggu.map((row, idx) => (
-                                        <tr key={row.id} className={`hover:bg-gray-50 transition-colors ${row.status === 'dipanggil' ? 'bg-amber-50/50' : ''}`}>
+                                {allQueues.length === 0 ? (<tr><td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">Tidak ada antrian untuk tanggal ini.</td></tr>) : (
+                                    allQueues.map((row, idx) => (
+                                        <tr key={row.id} className={`hover:bg-gray-50 transition-colors ${row.status === 'dipanggil' ? 'bg-amber-50/50' : row.status === 'selesai' ? 'bg-green-50/30' : ''}`}>
                                             <td className="px-6 py-4 text-sm text-gray-700">{idx + 1}</td>
                                             <td className="px-6 py-4 text-sm font-bold text-gray-900">{row.nomor_antrian}</td>
                                             <td className="px-6 py-4 text-sm text-gray-700">{row.reservation?.user?.name || "-"}</td>
@@ -426,11 +357,10 @@ export default function AntrianDashboardPage() {
                 </>
             )}
 
-            {/* TAMPILAN ALL POLI (RINGKASAN & TABEL GLOBAL) */}
+            {/* TAMPILAN ALL POLI */}
             {(!selectedPoli || selectedPoli === "all") && groupedData && Array.isArray(groupedData) && (
                 <div className="space-y-8">
-                    
-                    {/* BAGIAN 1: KARTU PER POLI */}
+                    {/* Ringkasan Kartu Poli */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                         {groupedData.map((poli) => (
                             <div key={poli.poli_id} className="border rounded-xl p-5 bg-gray-50 hover:shadow-md transition-shadow">
@@ -452,40 +382,27 @@ export default function AntrianDashboardPage() {
                         ))}
                     </div>
 
-                    {/* BAGIAN 2: TABEL SELURUH ANTRIAN (BARU) */}
+                    {/* Tabel Gabungan untuk All Poli */}
                     <div className="bg-white rounded-xl border border-neutral-200 shadow-sm mt-8 overflow-hidden">
                         <div className="p-4 bg-gray-100 border-b flex items-center justify-between">
-                            <h3 className="font-bold text-gray-700 flex items-center gap-2">
-                                <BuildingOfficeIcon className="w-5 h-5" />
-                                Daftar Seluruh Antrian Hari Ini
-                            </h3>
+                            <h3 className="font-bold text-gray-700 flex items-center gap-2"><BuildingOfficeIcon className="w-5 h-5" /> Daftar Seluruh Antrian Hari Ini</h3>
                             <span className="text-xs bg-gray-200 px-2 py-1 rounded-full text-gray-600">Total: {allQueues.length}</span>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-neutral-200">
                                 <thead className="bg-white">
-                                    <tr>
-                                        {["No", "Nomor", "Poli", "Pasien", "Status", "Jam Panggil"].map((h) => (
-                                            <th key={h} className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>
-                                        ))}
-                                    </tr>
+                                    <tr>{["No", "Nomor", "Poli", "Pasien", "Status", "Jam Panggil"].map((h) => (<th key={h} className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">{h}</th>))}</tr>
                                 </thead>
                                 <tbody className="divide-y divide-neutral-100">
-                                    {allQueues.length === 0 ? (
-                                        <tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">Belum ada data antrian.</td></tr>
-                                    ) : (
+                                    {allQueues.length === 0 ? (<tr><td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">Belum ada data antrian.</td></tr>) : (
                                         allQueues.map((row, idx) => (
-                                            <tr key={`${row.id}-${idx}`} className="hover:bg-gray-50">
+                                            <tr key={`${row.id}-${idx}`} className={`hover:bg-gray-50 transition-colors ${row.status === 'dipanggil' ? 'bg-amber-50/50' : row.status === 'selesai' ? 'bg-green-50/30' : ''}`}>
                                                 <td className="px-6 py-3 text-sm text-gray-500">{idx + 1}</td>
                                                 <td className="px-6 py-3 text-sm font-bold text-gray-900">{row.nomor_antrian}</td>
                                                 <td className="px-6 py-3 text-sm text-blue-600 font-medium">{row.poli_name}</td>
                                                 <td className="px-6 py-3 text-sm text-gray-700">{row.reservation?.user?.name || "-"}</td>
-                                                <td className="px-6 py-3 text-sm">
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${getStatusBadge(row.status)}`}>{row.status}</span>
-                                                </td>
-                                                <td className="px-6 py-3 text-sm text-gray-500 font-mono">
-                                                    {row.waktu_panggil ? new Date(row.waktu_panggil).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) : "-"}
-                                                </td>
+                                                <td className="px-6 py-3 text-sm"><span className={`text-[10px] px-2 py-0.5 rounded-full border ${getStatusBadge(row.status)}`}>{row.status.toUpperCase()}</span></td>
+                                                <td className="px-6 py-3 text-sm text-gray-500 font-mono">{row.waktu_panggil ? new Date(row.waktu_panggil).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) : "-"}</td>
                                             </tr>
                                         ))
                                     )}
@@ -493,7 +410,6 @@ export default function AntrianDashboardPage() {
                             </table>
                         </div>
                     </div>
-
                 </div>
             )}
         </div>
@@ -502,4 +418,3 @@ export default function AntrianDashboardPage() {
     </AdminLayout>
   );
 }
-
