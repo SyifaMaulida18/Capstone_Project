@@ -7,7 +7,8 @@ import {
   FileText,
   History,
   MessageSquare,
-  Users
+  Users,
+  AlertCircle // Icon untuk pop up
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -202,6 +203,10 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [showAntrianModal, setShowAntrianModal] = useState(false);
+  
+  // NEW STATE: Untuk pop up profile
+  const [showProfileAlert, setShowProfileAlert] = useState(false);
+
   const [userData, setUserData] = useState(null);
   
   // Menyimpan LIST reservasi aktif, bukan cuma satu
@@ -240,6 +245,22 @@ export default function DashboardPage() {
       setLoading(true);
       try {
         
+        // Cek Profile terlebih dahulu
+        try {
+            const profileRes = await api.get("/profile");
+            // Jika response success tapi data kosong (tergantung return backend)
+            // Biasanya backend return 404 kalau profile not found, 
+            // atau return 200 dengan data null. Kita handle keduanya.
+            if (!profileRes.data) {
+                setShowProfileAlert(true);
+            }
+        } catch (profileError) {
+            // Jika error 404, artinya profile belum dibuat
+            if (profileError.response && profileError.response.status === 404) {
+                setShowProfileAlert(true);
+            }
+        }
+
         const [resReservations, resRekamMedis] = await Promise.all([
             api.get("/my-reservations"),
             api.get("/rekam-medis")
@@ -354,7 +375,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-50">
+    <div className="min-h-screen flex flex-col bg-neutral-50 relative">
       <Header />
       <Navbar
         navItems={[
@@ -363,6 +384,35 @@ export default function DashboardPage() {
           { name: "Reservasi", href: "/user/reservasi" },
         ]}
       />
+
+      {/* POP UP PROFILE ALERT */}
+      {showProfileAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform transition-all scale-100 flex flex-col items-center text-center">
+             <div className="bg-orange-100 p-4 rounded-full mb-4">
+                <AlertCircle className="w-10 h-10 text-orange-600" />
+             </div>
+             <h2 className="text-xl font-bold text-neutral-800 mb-2">Profil Belum Lengkap</h2>
+             <p className="text-sm text-neutral-500 mb-6">
+                Mohon lengkapi data diri Anda (NIK, Tanggal Lahir, Alamat, dll) untuk keperluan administrasi dan rekam medis.
+             </p>
+             <div className="w-full space-y-3">
+                <button 
+                  onClick={() => router.push('/user/profile')}
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg shadow-blue-200"
+                >
+                    Lengkapi Sekarang
+                </button>
+                <button 
+                  onClick={() => setShowProfileAlert(false)}
+                  className="w-full py-3 bg-transparent text-neutral-500 rounded-xl font-semibold hover:bg-neutral-100 transition"
+                >
+                    Nanti Saja
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 pb-24">
         {/* Banner Biru */}

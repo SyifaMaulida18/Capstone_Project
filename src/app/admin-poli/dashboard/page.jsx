@@ -45,11 +45,11 @@ export default function PoliQueuePage() {
         if (userData) {
             setAdmin(userData);
         } else {
-            router.push('/login'); // Redirect jika tidak ada user
+            router.push('/auth/login'); // Redirect jika tidak ada user
         }
       } catch (err) {
         console.error("Gagal load user:", err);
-        router.push('/login');
+        router.push('/auth/login');
       } finally {
         setLoadingUser(false);
       }
@@ -61,7 +61,7 @@ export default function PoliQueuePage() {
   const handleLogout = () => {
     if(confirm("Keluar dari Counter Poli?")) {
         localStorage.clear();
-        router.push('/login');
+        router.push('/auth/login');
     }
   };
 

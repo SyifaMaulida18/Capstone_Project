@@ -1,11 +1,12 @@
 "use client";
 
-import { Lock, LogIn, Mail, Loader2, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import api from "@/services/api";
+import { Eye, EyeOff, Loader2, Lock, LogIn, Mail } from "lucide-react";
 import Image from "next/image";
-import api from "@/services/api"; 
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
+// Komponen Input Helper
 const InputField = ({ label, type, placeholder, required, icon: Icon, endIcon, onEndIconClick, ...props }) => {
   return (
     <div className="space-y-1">
@@ -71,7 +72,7 @@ export default function LoginPage() {
           return; 
         }
       } catch (userError) {
-        // Cek Verifikasi OTP
+        // Cek Verifikasi 403 (User ada tapi belum verifikasi OTP)
         if (userError.response && userError.response.status === 403) {
             const data = userError.response.data;
             if(data.needs_verification) {
@@ -81,16 +82,19 @@ export default function LoginPage() {
             }
         }
         
-        // Jika Error Server (500), lempar error
+        // Jika Error Server (500), lempar error (jangan lanjut ke admin)
         if (userError.response && userError.response.status >= 500) {
             throw userError;
         }
-        // Jika 401/404, lanjut ke Admin Login
+
+        // Jika Error 401 (Password Salah) atau 404 (User tidak ketemu),
+        // Kita ABAIKAN error ini dan LANJUT mencoba Login Admin di bawah.
       }
 
       // -----------------------------------------------------------
       // 2. COBA LOGIN SEBAGAI ADMIN (FALLBACK)
       // -----------------------------------------------------------
+      
       const responseAdmin = await api.post("/login", { 
           Email: email, 
           Password: password 
@@ -102,33 +106,28 @@ export default function LoginPage() {
           const token = adminData.access_token || adminData.token;
           const userAdmin = adminData.admin || adminData.user; 
 
-          // Simpan data penting ke LocalStorage
           localStorage.setItem("token", token);
           localStorage.setItem("user", JSON.stringify(userAdmin));
           
           const role = adminData.role || userAdmin?.role || "admin"; 
           localStorage.setItem("role", role);
 
-          // === LOGIKA REDIRECT BARU ===
+          // === LOGIKA PENGALIHAN HALAMAN ===
           if (role === "superadmin") {
-            // Arahkan ke Dashboard Superadmin
-            router.push("/superadmin/dashboard"); 
+            router.push("/superadmin/admins");
           } 
           else if (role === "admin") {
             // Cek apakah Admin punya Poli ID?
             if (userAdmin.poli_id) {
-                // Jika punya Poli -> Ke Halaman Counter Poli
+                // Admin Poli -> Ke Counter Poli
                 router.push("/admin-poli/dashboard");
             } else {
-                // Jika tidak punya Poli -> Error
-                setErrorMsg("Akun Admin ini tidak terhubung dengan Poli manapun.");
-                localStorage.clear(); // Hapus sesi karena tidak valid
-                setIsLoading(false);
-                return;
+                // Admin Biasa (Tanpa Poli) -> Ke Dashboard Umum
+                router.push("/admin/dashboard");
             }
           } 
           else {
-            // Default fallback
+            // Fallback default
             router.push("/admin/dashboard");
           }
 
