@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 import { Input } from "@/app/superadmin/components/ui/input";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 export default function AddRekamMedisPage() {
   const router = useRouter();
@@ -21,61 +20,37 @@ export default function AddRekamMedisPage() {
     gejala: "",
     diagnosis: "",
     tindakan: "",
-    tanggal_diperiksa: "",
+    resep_obat: "", // Ditambahkan
+    tanggal_diperiksa: new Date().toISOString().split('T')[0], // Default hari ini
   });
 
-  // ✅ Ambil daftar reservasi (misalnya hanya yang confirmed)
+  // Fetch Data Reservasi (Confirmed only)
   useEffect(() => {
     const fetchReservasi = async () => {
       try {
         setLoadingReservasi(true);
-        setErrorMsg("");
+        const token = localStorage.getItem("token");
+        if (!token) return;
 
-        const token =
-          typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-        if (!token) {
-          setErrorMsg("Token tidak ditemukan, silakan login ulang.");
-          setLoadingReservasi(false);
-          return;
-        }
-
-        // Sesuai ReservationController@index
-        // GET /reservations?status=confirmed
-        const res = await fetch(
-          `${API_BASE}/reservations?status=confirmed`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          }
-        );
-
+        const res = await fetch(`${API_BASE}/reservations`, { // Ambil semua reservasi dulu
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const json = await res.json();
+        const allData = json.data || [];
+        
+        // Filter manual jika API belum support ?status=confirmed
+        // Sesuaikan 'confirmed' dengan status yang ada di DB Anda (misal: 'confirmed', 'approved')
+        const filtered = Array.isArray(allData) 
+            ? allData.filter(r => r.status === 'confirmed' || r.status === 'pending') 
+            : [];
 
-        if (!res.ok || json.success === false) {
-          console.error("Gagal fetch reservasi:", json);
-          setErrorMsg(json.message || "Gagal mengambil data reservasi.");
-          setLoadingReservasi(false);
-          return;
-        }
-
-        // Laravel paginator -> json.data.data
-        const paginated = json.data;
-        const items = Array.isArray(paginated)
-          ? paginated
-          : paginated?.data || [];
-
-        setReservations(items);
+        setReservations(filtered);
       } catch (err) {
-        console.error("Gagal fetch reservasi:", err);
-        setErrorMsg("Terjadi kesalahan saat mengambil data reservasi.");
+        console.error(err);
       } finally {
         setLoadingReservasi(false);
       }
     };
-
     fetchReservasi();
   }, []);
 
@@ -85,23 +60,16 @@ export default function AddRekamMedisPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const token = localStorage.getItem("token");
 
     try {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        alert("Token tidak ditemukan, silakan login ulang.");
-        return;
-      }
-
-      // ✅ Payload sesuai RekamMedisController::store
       const payload = {
         reservasi_id: Number(form.reservasi_id),
-        no_medrec: form.no_medrec,
-        gejala: form.gejala || null,
-        diagnosis: form.diagnosis || null,
-        tindakan: form.tindakan || null,
-        resep_obat: null, // belum ada field di form, kirim null dulu
+        no_medrec: form.no_medrec || null, // Kirim null agar backend auto-generate
+        gejala: form.gejala,
+        diagnosis: form.diagnosis,
+        tindakan: form.tindakan,
+        resep_obat: form.resep_obat,
         tanggal_diperiksa: form.tanggal_diperiksa,
       };
 
@@ -118,145 +86,123 @@ export default function AddRekamMedisPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        console.error("Gagal menyimpan rekam medis:", json);
-        const msg =
-          json.message || "Gagal menyimpan rekam medis. Periksa input Anda.";
-        alert(msg);
-        return;
+        throw new Error(json.message || "Gagal menyimpan data.");
       }
 
-      alert("Rekam medis berhasil disimpan");
+      alert("Rekam medis berhasil disimpan!");
       router.push("/superadmin/rekam-medis");
     } catch (err) {
-      console.error("Error submit:", err);
-      alert("Terjadi kesalahan saat menyimpan rekam medis");
+      alert(err.message);
     }
   };
 
   return (
     <AdminLayout>
       <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-3xl mx-auto mt-8">
-        <h1 className="text-2xl font-bold mb-6 text-neutral-800">
-          Tambah Rekam Medis
-        </h1>
-
-        {errorMsg && (
-          <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
-        )}
+        <h1 className="text-2xl font-bold mb-6 text-neutral-800">Tambah Rekam Medis</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Reservasi */}
+          {/* Reservasi Select */}
           <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Reservasi
+            <label className="text-sm font-semibold text-neutral-700 block mb-1">
+              Pilih Reservasi Pasien
             </label>
-            {loadingReservasi ? (
-              <p className="text-neutral-500 text-sm">
-                Memuat daftar reservasi...
-              </p>
-            ) : (
-              <select
-                value={form.reservasi_id}
-                onChange={handleChange("reservasi_id")}
-                required
-                className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="">Pilih reservasi</option>
-                {reservations.map((r) => (
-                  <option key={r.reservid} value={r.reservid}>
-                    {r.reservid} - {r.nama || r.status || "Reservasi"} -{" "}
-                    {r.tanggal_reservasi
-                      ? new Date(r.tanggal_reservasi).toLocaleDateString(
-                          "id-ID"
-                        )
-                      : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          {/* No Medrec */}
-          <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Nomor Medrec
-            </label>
-            <Input
-              value={form.no_medrec}
-              onChange={handleChange("no_medrec")}
+            <select
+              value={form.reservasi_id}
+              onChange={handleChange("reservasi_id")}
               required
-              placeholder="Contoh: RM-00001"
-            />
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none"
+            >
+              <option value="">-- Pilih --</option>
+              {reservations.map((r) => (
+                <option key={r.reservid} value={r.reservid}>
+                  {r.user?.name} - {r.poli?.nama_poli} ({r.tanggal_reservasi})
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Gejala */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             {/* No Medrec */}
+            <div>
+              <label className="text-sm font-semibold text-neutral-700 block mb-1">
+                No. Medrec (Opsional)
+              </label>
+              <Input
+                value={form.no_medrec}
+                onChange={handleChange("no_medrec")}
+                placeholder="Kosongkan utk Auto-Generate"
+              />
+            </div>
+            {/* Tanggal */}
+            <div>
+              <label className="text-sm font-semibold text-neutral-700 block mb-1">
+                Tanggal Diperiksa
+              </label>
+              <Input
+                type="date"
+                value={form.tanggal_diperiksa}
+                onChange={handleChange("tanggal_diperiksa")}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Area Text Inputs */}
           <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Gejala
-            </label>
+            <label className="text-sm font-semibold text-neutral-700 block mb-1">Gejala / Keluhan</label>
             <textarea
               value={form.gejala}
               onChange={handleChange("gejala")}
-              rows={3}
-              className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Keluhan / gejala utama pasien"
+              rows={2}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none"
             />
           </div>
 
-          {/* Diagnosis */}
           <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Diagnosis
-            </label>
+            <label className="text-sm font-semibold text-neutral-700 block mb-1">Diagnosis</label>
             <textarea
               value={form.diagnosis}
               onChange={handleChange("diagnosis")}
-              rows={3}
-              className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Diagnosis dokter"
+              rows={2}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none"
             />
           </div>
 
-          {/* Tindakan */}
           <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Tindakan
-            </label>
+            <label className="text-sm font-semibold text-neutral-700 block mb-1">Tindakan</label>
             <textarea
               value={form.tindakan}
               onChange={handleChange("tindakan")}
-              rows={3}
-              className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Tindakan medis yang dilakukan"
+              rows={2}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:outline-none"
             />
           </div>
 
-          {/* Tanggal diperiksa */}
           <div>
-            <label className="text-sm text-neutral-600 block mb-1">
-              Tanggal Diperiksa
-            </label>
-            <Input
-              type="date"
-              value={form.tanggal_diperiksa}
-              onChange={handleChange("tanggal_diperiksa")}
-              required
+            <label className="text-sm font-semibold text-neutral-700 block mb-1">Resep Obat</label>
+            <textarea
+              value={form.resep_obat}
+              onChange={handleChange("resep_obat")}
+              rows={3}
+              placeholder="- Obat A 3x1..."
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg bg-yellow-50 focus:ring-2 focus:ring-primary-500 focus:outline-none font-mono text-sm"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-6 border-t">
             <button
               type="button"
               onClick={() => router.push("/superadmin/rekam-medis")}
-              className="bg-neutral-100 text-neutral-700 px-4 py-2 rounded-lg hover:bg-neutral-200 transition"
+              className="bg-white border border-neutral-300 text-neutral-700 px-4 py-2 rounded-lg hover:bg-neutral-50"
             >
               Batal
             </button>
             <button
               type="submit"
-              className="bg-secondary-500 text-white px-4 py-2 rounded-lg hover:bg-secondary-600 transition"
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 shadow-sm"
             >
-              Simpan
+              Simpan Data
             </button>
           </div>
         </form>

@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AdminLayout from "@/app/superadmin/components/superadmin_layout";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 export default function RekamMedisRiwayatPage() {
   const searchParams = useSearchParams();
@@ -35,7 +34,7 @@ export default function RekamMedisRiwayatPage() {
           throw new Error("Token tidak ditemukan. Silakan login ulang.");
         }
 
-        // Sesuai RekamMedisController@index -> GET /rekam-medis
+        // GET /rekam-medis (Mengambil semua data)
         const res = await fetch(`${API_BASE}/rekam-medis`, {
           headers: {
             Accept: "application/json",
@@ -44,30 +43,28 @@ export default function RekamMedisRiwayatPage() {
         });
 
         if (!res.ok) {
-          const text = await res.text();
-          throw new Error(
-            `Gagal mengambil riwayat rekam medis (status ${res.status}): ${text}`
-          );
+          throw new Error(`Gagal mengambil data (Status ${res.status})`);
         }
 
         const json = await res.json();
         const allRecords = Array.isArray(json) ? json : json.data || [];
 
-        // Filter berdasarkan patient_id dari relasi reservasi.user
+        // Filter Client-Side berdasarkan ID Pasien (User ID)
+        // Backend: RekamMedis -> belongsTo Reservasi -> belongsTo User
         const filtered = allRecords.filter((r) => {
-          const reservation = r.reservasi || r.reservation || null;
-          const user = reservation?.user || null;
-          if (!user) return false;
-          return String(user.userid) === String(patientId);
+          const reservasi = r.reservasi || {};
+          const user = reservasi.user || {};
+          
+          // Pastikan user.id atau user.userid sesuai dengan database Anda
+          const recordUserId = user.id || user.userid;
+          
+          return String(recordUserId) === String(patientId);
         });
 
         setRecords(filtered);
       } catch (err) {
-        console.error("Error fetch riwayat rekam medis:", err);
-        setErrorMsg(
-          err.message ||
-            "Terjadi kesalahan saat mengambil riwayat rekam medis pasien."
-        );
+        console.error("Error fetch riwayat:", err);
+        setErrorMsg(err.message || "Terjadi kesalahan sistem.");
       } finally {
         setLoading(false);
       }
@@ -79,106 +76,56 @@ export default function RekamMedisRiwayatPage() {
   return (
     <AdminLayout>
       <div className="bg-white p-8 rounded-xl shadow-lg border border-primary-200 max-w-6xl mx-auto min-h-[70vh]">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-800">
-              Riwayat Rekam Medis
-            </h1>
+            <h1 className="text-2xl font-bold text-neutral-800">Riwayat Rekam Medis</h1>
             <p className="text-sm text-neutral-600 mt-1">
-              Pasien: <span className="font-semibold">{patientName}</span>{" "}
-              {patientId && (
-                <span className="text-xs text-neutral-500">
-                  {" "}
-                  (ID: {patientId})
-                </span>
-              )}
+              Pasien: <span className="font-bold text-primary-600">{patientName}</span>
             </p>
           </div>
-
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 rounded-lg border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-100"
+            className="px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 hover:bg-neutral-50 transition"
           >
             Kembali
           </button>
         </div>
 
-        {loading && (
-          <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-700">
-            Memuat riwayat rekam medis...
-          </div>
-        )}
-
-        {!loading && errorMsg && (
-          <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
-            {errorMsg}
-          </div>
-        )}
+        {loading && <p className="text-center py-10">Memuat data riwayat...</p>}
+        {errorMsg && <p className="text-center py-10 text-red-600">{errorMsg}</p>}
 
         {!loading && !errorMsg && records.length === 0 && (
-          <div className="p-4 rounded-lg bg-neutral-50 border border-neutral-200 text-sm text-neutral-700">
-            Belum ada riwayat rekam medis untuk pasien ini.
+          <div className="text-center py-10 bg-neutral-50 rounded-lg border border-dashed border-neutral-300">
+            <p className="text-neutral-500">Belum ada rekam medis untuk pasien ini.</p>
           </div>
         )}
 
         {!loading && !errorMsg && records.length > 0 && (
-          <div className="mt-4 overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border border-neutral-200">
             <table className="min-w-full divide-y divide-neutral-200">
-              <thead className="bg-primary-600">
+              <thead className="bg-primary-600 text-white">
                 <tr>
-                  {[
-                    "No",
-                    "Tanggal Diperiksa",
-                    "No. Medrec",
-                    "Gejala",
-                    "Diagnosis",
-                    "Tindakan",
-                    "Resep Obat",
-                  ].map((header) => (
-                    <th
-                      key={header}
-                      className="px-4 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider"
-                    >
-                      {header}
-                    </th>
-                  ))}
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">No</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tanggal</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">No. Medrec</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Diagnosis</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Tindakan</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase">Resep Obat</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-neutral-100">
                 {records.map((item, idx) => (
-                  <tr
-                    key={item.rekam_medis_id || item.id || idx}
-                    className={idx % 2 === 1 ? "bg-neutral-50" : "bg-white"}
-                  >
+                  <tr key={item.id || idx} className="hover:bg-neutral-50">
+                    <td className="px-4 py-3 text-sm text-neutral-800">{idx + 1}</td>
                     <td className="px-4 py-3 text-sm text-neutral-800">
-                      {idx + 1}
+                      {item.tanggal_diperiksa || "-"}
                     </td>
-                    <td className="px-4 py-3 text-sm text-neutral-800">
-                      {item.tanggal_diperiksa
-                        ? new Date(
-                            item.tanggal_diperiksa
-                          ).toLocaleDateString("id-ID", {
-                            day: "2-digit",
-                            month: "long",
-                            year: "numeric",
-                          })
-                        : "-"}
+                    <td className="px-4 py-3 text-sm font-mono text-neutral-600">
+                      {item.no_medrec || <span className="italic text-xs">Auto</span>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-neutral-800">
-                      {item.no_medrec || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-800">
-                      {item.gejala || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-800">
-                      {item.diagnosis || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-800">
-                      {item.tindakan || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-neutral-800">
-                      {item.resep_obat || "-"}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-neutral-800">{item.diagnosis || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-neutral-800">{item.tindakan || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-neutral-800">{item.resep_obat || "-"}</td>
                   </tr>
                 ))}
               </tbody>
