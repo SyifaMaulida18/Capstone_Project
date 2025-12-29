@@ -1,11 +1,14 @@
 "use client";
 
-import Admin from "../../components/form/admin";
+import AdminLayout from "@/app/superadmin/components/superadmin_layout";
+import AdminForm from "../../components/form/admin"; // Pastikan path import benar
 
 export default function AddAdminPage() {
   return (
-    <div className="p-6">
-      <Admin />
-    </div>
+    <AdminLayout>
+      <div className="p-6">
+        <AdminForm />
+      </div>
+    </AdminLayout>
   );
 }

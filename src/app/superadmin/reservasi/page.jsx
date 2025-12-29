@@ -473,7 +473,7 @@ export default function ReservasiPage() {
                 </div>
 
                 {/* Dokter (WAJIB UNTUK VERIFY) */}
-                <div>
+                {/* <div>
                     <label className="block text-xs font-bold text-gray-500 mb-1">Dokter Penanggung Jawab <span className="text-red-500">*</span></label>
                     <select
                         value={formDokterId}
@@ -491,7 +491,7 @@ export default function ReservasiPage() {
                         )}
                     </select>
                     {!formDokterId && <p className="text-[10px] text-red-500 mt-1">Wajib dipilih sebelum verifikasi</p>}
-                </div>
+                </div> */}
 
                 {selectedReservation.status === 'pending' && (
                     <button

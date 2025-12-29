@@ -25,20 +25,37 @@ export default function SuperadminFeedbackPage() {
       q.set("page", p);
 
       const res = await fetch(`${API_BASE}/feedback?${q.toString()}`, {
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          Accept: "application/json", // Good practice to include
+        },
       });
+
       if (!res.ok) throw new Error(`Gagal mengambil feedback (status ${res.status})`);
+
       const json = await res.json();
-      const paginator = json.data ?? json;
-      // Normalize items: paginator may be a paginator object with .data array, or an array itself
+      
+      // The controller returns: { success: true, message: ..., data: { ...pagination_object... } }
+      // So 'paginator' is primarily json.data
+      const paginator = json.data;
+
       let items = [];
-      if (paginator) {
-        if (Array.isArray(paginator.data)) items = paginator.data;
-        else if (Array.isArray(paginator)) items = paginator;
+      if (paginator && Array.isArray(paginator.data)) {
+        items = paginator.data;
+        setPage(paginator.current_page);
+        setLastPage(paginator.last_page);
+      } else if (Array.isArray(paginator)) {
+        // Fallback if pagination is disabled or different structure
+        items = paginator;
+        setPage(1);
+        setLastPage(1);
+      } else {
+         // Fallback if data is directly the array (unlikely with paginate())
+         items = [];
       }
+
       setFeedbacks(items);
-      setPage((paginator && (paginator.current_page ?? paginator.currentPage)) ?? p);
-      setLastPage((paginator && (paginator.last_page ?? paginator.lastPage)) ?? 1);
+      
     } catch (err) {
       console.error(err);
       setError(err.message || "Terjadi kesalahan");
@@ -57,18 +74,18 @@ export default function SuperadminFeedbackPage() {
       <div className="p-6 bg-white rounded shadow min-h-[60vh]">
         <h1 className="text-2xl font-bold mb-4">Feedback - Superadmin</h1>
 
-        <div className="flex gap-3 mb-4 items-center">
+        <div className="flex gap-3 mb-4 items-center flex-wrap"> {/* Added flex-wrap for responsiveness */}
           <select
             value={ratingFilter}
             onChange={(e) => setRatingFilter(e.target.value)}
             className="px-3 py-2 border rounded"
           >
             <option value="">Semua Rating</option>
-            <option value="5">5</option>
-            <option value="4">4</option>
-            <option value="3">3</option>
-            <option value="2">2</option>
-            <option value="1">1</option>
+            <option value="5">5 Bintang</option>
+            <option value="4">4 Bintang</option>
+            <option value="3">3 Bintang</option>
+            <option value="2">2 Bintang</option>
+            <option value="1">1 Bintang</option>
           </select>
 
           <select
@@ -85,61 +102,93 @@ export default function SuperadminFeedbackPage() {
 
           <button
             onClick={() => fetchFeedbacks(1)}
-            className="px-3 py-2 bg-blue-600 text-white rounded"
+            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
           >
             Terapkan
           </button>
 
-          <div className="ml-auto text-sm text-gray-600">{loading ? 'Memuat...' : `${feedbacks.length} item`}</div>
+          <div className="ml-auto text-sm text-gray-600">
+            {loading ? 'Memuat...' : `${feedbacks.length} item ditampilkan`}
+          </div>
         </div>
 
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+        {error && <p className="text-sm text-red-600 mb-3 bg-red-50 p-2 rounded border border-red-200">{error}</p>}
 
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y">
             <thead className="bg-gray-50 text-left text-sm text-gray-700">
               <tr>
-                <th className="px-3 py-2">No</th>
-                <th className="px-3 py-2">User</th>
-                <th className="px-3 py-2">Rating</th>
-                <th className="px-3 py-2">Kategori</th>
-                <th className="px-3 py-2">Isi</th>
-                <th className="px-3 py-2">Tanggal</th>
+                <th className="px-3 py-2 font-semibold">No</th>
+                <th className="px-3 py-2 font-semibold">User</th>
+                <th className="px-3 py-2 font-semibold">Rating</th>
+                <th className="px-3 py-2 font-semibold">Kategori</th>
+                <th className="px-3 py-2 font-semibold">Isi</th>
+                <th className="px-3 py-2 font-semibold">Tanggal</th>
               </tr>
             </thead>
-            <tbody className="text-sm text-gray-800">
-              {feedbacks.map((f, i) => (
-                <tr key={f.id || i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <td className="px-3 py-2 align-top">{(page - 1) * 10 + i + 1}</td>
-                  <td className="px-3 py-2 align-top">{f.user?.name ?? f.user_name ?? 'Anonim'}</td>
-                  <td className="px-3 py-2 align-top">{f.rating}</td>
-                  <td className="px-3 py-2 align-top">{f.kategori}</td>
-                  <td className="px-3 py-2 align-top">{f.isi_feedback || '-'}</td>
-                  <td className="px-3 py-2 align-top">{new Date(f.created_at).toLocaleString('id-ID')}</td>
-                </tr>
-              ))}
+            <tbody className="text-sm text-gray-800 divide-y">
+              {loading ? (
+                 <tr>
+                    <td colSpan="6" className="text-center py-4 text-gray-500">Sedang memuat data...</td>
+                 </tr>
+              ) : feedbacks.length === 0 ? (
+                 <tr>
+                    <td colSpan="6" className="text-center py-4 text-gray-500">Tidak ada data feedback.</td>
+                 </tr>
+              ) : (
+                feedbacks.map((f, i) => (
+                  <tr key={f.id || i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-3 py-2 align-top">{(page - 1) * 10 + i + 1}</td>
+                    <td className="px-3 py-2 align-top font-medium">
+                        {/* Access user relation defined in controller: Feedback::with('user:userid,name,email') */}
+                        {f.user?.name || 'Anonim'} 
+                        {f.user?.email && <span className="block text-xs text-gray-500">{f.user.email}</span>}
+                    </td>
+                    <td className="px-3 py-2 align-top">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            f.rating >= 4 ? 'bg-green-100 text-green-800' : 
+                            f.rating === 3 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                        }`}>
+                            {f.rating} / 5
+                        </span>
+                    </td>
+                    <td className="px-3 py-2 align-top capitalize">{f.kategori}</td>
+                    <td className="px-3 py-2 align-top max-w-md break-words">{f.isi_feedback || '-'}</td>
+                    <td className="px-3 py-2 align-top whitespace-nowrap text-gray-600">
+                        {new Date(f.created_at).toLocaleDateString('id-ID', {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                        })}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
-          <div>
+        {/* Pagination Controls */}
+        <div className="mt-4 flex items-center justify-between border-t pt-4">
+          <div className="text-sm text-gray-600">
+             Halaman {page} dari {lastPage}
+          </div>
+          <div className="flex gap-2">
             <button
               onClick={() => fetchFeedbacks(Math.max(1, page - 1))}
-              disabled={page <= 1}
-              className="px-3 py-2 border rounded mr-2 disabled:opacity-50"
+              disabled={page <= 1 || loading}
+              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Sebelumnya
             </button>
             <button
               onClick={() => fetchFeedbacks(Math.min(lastPage, page + 1))}
-              disabled={page >= lastPage}
-              className="px-3 py-2 border rounded disabled:opacity-50"
+              disabled={page >= lastPage || loading}
+              className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Berikutnya
             </button>
           </div>
-          <div className="text-sm text-gray-600">Halaman {page} / {lastPage}</div>
         </div>
       </div>
     </AdminLayout>

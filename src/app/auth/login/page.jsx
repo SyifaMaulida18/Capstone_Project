@@ -55,7 +55,6 @@ export default function LoginPage() {
       // 1. COBA LOGIN SEBAGAI USER (PASIEN)
       // -----------------------------------------------------------
       try {
-        // User menggunakan key lowercase: 'email', 'password'
         const responseUser = await api.post("/login-user", { 
             email: email, 
             password: password 
@@ -72,7 +71,7 @@ export default function LoginPage() {
           return; 
         }
       } catch (userError) {
-        // Cek Verifikasi 403 (User ada tapi belum verifikasi OTP)
+        // Cek Verifikasi OTP
         if (userError.response && userError.response.status === 403) {
             const data = userError.response.data;
             if(data.needs_verification) {
@@ -82,44 +81,57 @@ export default function LoginPage() {
             }
         }
         
-        // Jika Error Server (500), lempar error (jangan lanjut ke admin)
+        // Jika Error Server (500), lempar error
         if (userError.response && userError.response.status >= 500) {
             throw userError;
         }
-
-        // Jika Error 401 (Password Salah) atau 404 (User tidak ketemu),
-        // Kita ABAIKAN error ini dan LANJUT mencoba Login Admin di bawah.
+        // Jika 401/404, lanjut ke Admin Login
       }
 
       // -----------------------------------------------------------
       // 2. COBA LOGIN SEBAGAI ADMIN (FALLBACK)
       // -----------------------------------------------------------
-      
-      // PERBAIKAN UTAMA DI SINI:
-      // Backend Admin meminta key 'Email' dan 'Password' (Huruf Besar/PascalCase)
       const responseAdmin = await api.post("/login", { 
-          Email: email,     // Mapping state 'email' ke key 'Email'
-          Password: password // Mapping state 'password' ke key 'Password'
+          Email: email, 
+          Password: password 
       });
       
       const adminData = responseAdmin.data; 
       
       if (adminData.access_token || adminData.token) {
           const token = adminData.access_token || adminData.token;
-          // Ambil object 'admin' dari response backend
           const userAdmin = adminData.admin || adminData.user; 
 
+          // Simpan data penting ke LocalStorage
           localStorage.setItem("token", token);
           localStorage.setItem("user", JSON.stringify(userAdmin));
           
           const role = adminData.role || userAdmin?.role || "admin"; 
           localStorage.setItem("role", role);
 
+          // === LOGIKA REDIRECT BARU ===
           if (role === "superadmin") {
-            router.push("/superadmin/admins");
-          } else {
+            // Arahkan ke Dashboard Superadmin
+            router.push("/superadmin/dashboard"); 
+          } 
+          else if (role === "admin") {
+            // Cek apakah Admin punya Poli ID?
+            if (userAdmin.poli_id) {
+                // Jika punya Poli -> Ke Halaman Counter Poli
+                router.push("/admin-poli/dashboard");
+            } else {
+                // Jika tidak punya Poli -> Error
+                setErrorMsg("Akun Admin ini tidak terhubung dengan Poli manapun.");
+                localStorage.clear(); // Hapus sesi karena tidak valid
+                setIsLoading(false);
+                return;
+            }
+          } 
+          else {
+            // Default fallback
             router.push("/admin/dashboard");
           }
+
       } else {
         throw new Error("Gagal login admin.");
       }
@@ -127,8 +139,6 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Login Failed:", error);
       if (error.response) {
-        // Jika status 422, berarti validasi admin gagal (format salah)
-        // Jika status 401, berarti password salah di kedua percobaan (User & Admin)
         if(error.response.status === 401 || error.response.status === 404) {
             setErrorMsg("Email atau kata sandi salah.");
         } else if (error.response.status === 422) {
@@ -169,10 +179,6 @@ export default function LoginPage() {
             endIcon={showPassword ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>} 
             onEndIconClick={() => setShowPassword(!showPassword)} 
           />
-
-          {/* <div className="flex justify-end">
-            <a href="/auth/forgot-password" className="text-xs text-primary-600 hover:text-primary-800 font-medium">Lupa Kata Sandi?</a>
-          </div> */}
 
           {errorMsg && (
             <p className="text-red-600 text-sm text-center bg-red-50 p-2 rounded animate-pulse border border-red-200">{errorMsg}</p>
