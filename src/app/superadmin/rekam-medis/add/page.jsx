@@ -14,6 +14,13 @@ export default function AddRekamMedisPage() {
   const [loadingReservasi, setLoadingReservasi] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Get today's date in WIB timezone
+  const getTodayWIB = () => {
+    const now = new Date();
+    const wibDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    return `${wibDate.getFullYear()}-${String(wibDate.getMonth() + 1).padStart(2, '0')}-${String(wibDate.getDate()).padStart(2, '0')}`;
+  };
+
   const [form, setForm] = useState({
     reservasi_id: "",
     no_medrec: "",
@@ -21,7 +28,7 @@ export default function AddRekamMedisPage() {
     diagnosis: "",
     tindakan: "",
     resep_obat: "", // Ditambahkan
-    tanggal_diperiksa: new Date().toISOString().split('T')[0], // Default hari ini
+    tanggal_diperiksa: getTodayWIB(), // Default hari ini in WIB
   });
 
   // Fetch Data Reservasi (Confirmed only)

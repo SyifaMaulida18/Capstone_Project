@@ -9,6 +9,7 @@ import { Bars3Icon } from "@heroicons/react/24/outline";
 
 const adminNavItems = [
   { name: "Manajemen Jadwal Dokter", href: "/admin/schedule" },
+  { name: "Manajemen Poli", href: "/admin/polis" },
   // { name: "Manajemen User", href: "/admin/users" },
   { name: "Manajemen Reservasi", href: "/admin/reservasi" },
   { name: "Manajemen Antrian", href: "/admin/antrian" },

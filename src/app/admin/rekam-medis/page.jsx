@@ -168,10 +168,16 @@ export default function MedicalRecordsPage() {
     }
     
     setEditingRecord(null);
+    
+    // Get today's date in WIB timezone
+    const now = new Date();
+    const wibDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const todayWIB = `${wibDate.getFullYear()}-${String(wibDate.getMonth() + 1).padStart(2, '0')}-${String(wibDate.getDate()).padStart(2, '0')}`;
+    
     setRecordForm({
       reservasiId: initialReservasiId || "", 
       noMedrec: "", 
-      tanggalDiperiksa: new Date().toISOString().split('T')[0],
+      tanggalDiperiksa: todayWIB,
       gejala: "",
       diagnosis: "",
       tindakan: "",
@@ -279,8 +285,14 @@ export default function MedicalRecordsPage() {
       <div className="p-6 bg-white rounded-xl shadow-sm min-h-[85vh] border border-gray-100 flex flex-col relative">
         
         {/* === HEADER === */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-gray-800">Manajemen Rekam Medis</h1>
+          <a
+            href="/admin/rekam-medis/add"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 shadow"
+          >
+            Tambah Rekam Medis
+          </a>
         </div>
 
         {errorMsg && (

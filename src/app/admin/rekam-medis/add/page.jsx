@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/app/admin/components/admin_layout";
 import { Input } from "@/app/admin/components/ui/input";
 
@@ -10,10 +10,18 @@ const API_BASE =
 
 export default function AddRekamMedisPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [reservations, setReservations] = useState([]);
   const [loadingReservasi, setLoadingReservasi] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Get today's date in WIB timezone
+  const getTodayWIB = () => {
+    const now = new Date();
+    const wibDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    return `${wibDate.getFullYear()}-${String(wibDate.getMonth() + 1).padStart(2, '0')}-${String(wibDate.getDate()).padStart(2, '0')}`;
+  };
 
   const [form, setForm] = useState({
     reservasi_id: "",
@@ -21,8 +29,16 @@ export default function AddRekamMedisPage() {
     gejala: "",
     diagnosis: "",
     tindakan: "",
-    tanggal_diperiksa: "",
+    tanggal_diperiksa: getTodayWIB(),
   });
+
+  // Prefill dari query param (reservasi_id)
+  useEffect(() => {
+    const qReservasiId = searchParams?.get("reservasi_id");
+    if (qReservasiId) {
+      setForm((prev) => ({ ...prev, reservasi_id: qReservasiId }));
+    }
+  }, [searchParams]);
 
   // ✅ Ambil daftar reservasi (misalnya hanya yang confirmed)
   useEffect(() => {
