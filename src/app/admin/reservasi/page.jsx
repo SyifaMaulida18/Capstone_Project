@@ -1,20 +1,16 @@
 "use client";
 
-import AdminLayout from "@/app/admin/components/admin_layout"; 
+import AdminLayout from "@/app/admin/components/admin_layout";
 import api from "@/services/api";
 import {
+  ChatBubbleLeftRightIcon,
   CheckCircleIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
-  TrashIcon, // (Optional)
-  XCircleIcon,
-  PencilSquareIcon,
-  ChatBubbleLeftRightIcon,
-  FunnelIcon,
-  CheckCircleIcon
+  PencilSquareIcon
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react"; // Pastikan useState diimport
+import { useEffect, useState } from "react"; // Pastikan useState diimport
 
 // Simple dialog component
 function Dialog({ show, onClose, children }) {
