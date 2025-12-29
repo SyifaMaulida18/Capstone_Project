@@ -3,67 +3,96 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Sesuaikan URL Backend
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
+
 export default function FormAdmin({ initialData }) {
   const router = useRouter();
   
-  // State untuk menampung inputan form
+  // State Form
   const [formData, setFormData] = useState({
     nama: "",
     email: "",
     password: "",
+    role: "admin", // Default role
+    poliId: "",    // Untuk relasi poli
   });
 
+  // State Data Master (Poli)
+  const [polis, setPolis] = useState([]);
+  
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingMaster, setIsFetchingMaster] = useState(false);
   const [error, setError] = useState(null);
 
-  // Cek apakah ini mode Edit atau Tambah
   const isEditMode = Boolean(initialData);
 
-  // Mengisi form jika ada data awal (Mode Edit)
+  // 1. Fetch Data Poli untuk Dropdown
+  useEffect(() => {
+    const fetchPolis = async () => {
+      setIsFetchingMaster(true);
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/polis`, {
+            headers: { 
+                "Accept": "application/json",
+                "Authorization": `Bearer ${token}` 
+            }
+        });
+        const json = await res.json();
+        // Handle struktur respons: { data: [...] } atau [...]
+        const data = Array.isArray(json) ? json : (json.data || []);
+        setPolis(data);
+      } catch (err) {
+        console.error("Gagal load poli:", err);
+      } finally {
+        setIsFetchingMaster(false);
+      }
+    };
+    fetchPolis();
+  }, []);
+
+  // 2. Isi Form jika Edit Mode
   useEffect(() => {
     if (isEditMode && initialData) {
       setFormData({
-        nama: initialData.Nama || "", // Backend mengirim 'Nama'
-        email: initialData.Email || "", // Backend mengirim 'Email'
-        password: "", // Password dikosongkan (diisi hanya jika ingin mengubah)
+        nama: initialData.Nama || "",
+        email: initialData.Email || "",
+        password: "", // Password kosong saat edit
+        role: initialData.role || "admin",
+        poliId: initialData.poli_id || "",
       });
     }
   }, [initialData, isEditMode]);
 
-  // Handle perubahan input
+  // Handle Perubahan Input
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle Submit Form
+  // Handle Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
-    // 1. Ambil Token
-    const token = localStorage.getItem("token"); 
-
+    const token = localStorage.getItem("token");
     if (!token) {
-        setError("Anda belum login atau sesi habis.");
+        setError("Sesi habis, silakan login ulang.");
         setIsLoading(false);
         return;
     }
 
-    // 2. Siapkan Payload (Huruf Besar Sesuai Backend)
+    // Payload sesuai Controller Laravel (Huruf Besar/Kecil harus pas)
     const payload = {
         Nama: formData.nama,
         Email: formData.email,
+        role: formData.role,
+        poli_id: formData.poliId || null, // Kirim null jika kosong
     };
 
-    // Logic Password:
-    // - Jika diisi, kirim ke backend.
-    // - Jika kosong & mode Tambah, error.
-    // - Jika kosong & mode Edit, abaikan (backend pakai password lama).
+    // Logic Password
     if (formData.password) {
         payload.Password = formData.password;
     } else if (!isEditMode) {
@@ -72,17 +101,13 @@ export default function FormAdmin({ initialData }) {
         return;
     }
 
-    // 3. Tentukan URL dan Method
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
-    
     const url = isEditMode 
-        ? `${baseUrl}/admins/${initialData.adminID}` 
-        : `${baseUrl}/admins`;
+        ? `${API_BASE}/admins/${initialData.adminID}` 
+        : `${API_BASE}/admins`;
         
     const method = isEditMode ? "PUT" : "POST";
 
     try {
-      // 4. Kirim Request ke Backend
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -93,19 +118,23 @@ export default function FormAdmin({ initialData }) {
         body: JSON.stringify(payload),
       });
 
+      const jsonResponse = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Gagal menyimpan data admin.");
+        // Tangkap pesan error validasi dari Laravel
+        const msg = jsonResponse.message || "Gagal menyimpan data.";
+        const validationErrors = jsonResponse.errors ? JSON.stringify(jsonResponse.errors) : "";
+        throw new Error(`${msg} ${validationErrors}`);
       }
 
       console.log("Success:", isEditMode ? "Updated" : "Created");
       
-      // 5. Redirect kembali ke list admin dan refresh data
+      // Redirect
       router.push("/superadmin/admins"); 
       router.refresh();
       
     } catch (err) {
-      console.error("Failed to save data:", err);
+      console.error("Submit Error:", err);
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -118,88 +147,112 @@ export default function FormAdmin({ initialData }) {
         {isEditMode ? "Edit Data Admin" : "Tambah Admin Baru"}
       </h2>
 
-      {/* Tampilkan Banner Error jika ada */}
       {error && (
-        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm break-words">
             {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Field Nama */}
+        {/* NAMA */}
         <div>
-          <label htmlFor="nama" className="block mb-2 text-sm font-semibold text-neutral-700">
-            Nama Admin
-          </label>
+          <label className="block mb-2 text-sm font-semibold text-neutral-700">Nama Admin</label>
           <input
             type="text"
-            id="nama"
             name="nama"
             value={formData.nama}
             onChange={handleChange}
             required
-            placeholder="Contoh: Admin Loket 1"
-            className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-4 py-2 border rounded-lg focus:ring-primary-500 focus:border-primary-500"
             disabled={isLoading}
           />
         </div>
 
-        {/* Field Email */}
+        {/* EMAIL */}
         <div>
-          <label htmlFor="email" className="block mb-2 text-sm font-semibold text-neutral-700">
-            Email
-          </label>
+          <label className="block mb-2 text-sm font-semibold text-neutral-700">Email</label>
           <input
             type="email"
-            id="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
             required
-            placeholder="Contoh: admin@rs.com"
-            className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            className="w-full px-4 py-2 border rounded-lg focus:ring-primary-500 focus:border-primary-500"
             disabled={isLoading}
           />
         </div>
 
-        {/* Field Password */}
+        {/* PASSWORD */}
         <div>
-          <label htmlFor="password" className="block mb-2 text-sm font-semibold text-neutral-700">
-            Password {isEditMode && <span className="text-gray-400 font-normal text-xs">(Kosongkan jika tidak ingin mengubah)</span>}
+          <label className="block mb-2 text-sm font-semibold text-neutral-700">
+            Password {isEditMode && <span className="text-gray-400 font-normal text-xs">(Isi hanya jika ingin mengubah)</span>}
           </label>
           <input
             type="password"
-            id="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
-            required={!isEditMode} 
-            placeholder="Minimal 6 karakter"
-            className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            required={!isEditMode}
+            minLength={6}
+            className="w-full px-4 py-2 border rounded-lg focus:ring-primary-500 focus:border-primary-500"
             disabled={isLoading}
           />
         </div>
 
-        {/* Tombol Aksi */}
+        {/* GRID: ROLE & POLI */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* ROLE */}
+            <div>
+                <label className="block mb-2 text-sm font-semibold text-neutral-700">Role</label>
+                <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-white"
+                    disabled={isLoading}
+                >
+                    <option value="admin">Admin</option>
+                    <option value="superadmin">Superadmin</option>
+                </select>
+            </div>
+
+            {/* POLI (Opsional) */}
+            <div>
+                <label className="block mb-2 text-sm font-semibold text-neutral-700">Poli (Opsional)</label>
+                <select
+                    name="poliId"
+                    value={formData.poliId}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-white"
+                    disabled={isLoading || isFetchingMaster}
+                >
+                    <option value="">-- Tidak Ada Poli --</option>
+                    {polis.map((p) => (
+                        <option key={p.poli_id} value={p.poli_id}>
+                            {p.poli_name}
+                        </option>
+                    ))}
+                </select>
+                {isFetchingMaster && <p className="text-xs text-gray-400 mt-1">Memuat data poli...</p>}
+            </div>
+        </div>
+
+        {/* BUTTONS */}
         <div className="flex justify-end pt-4 space-x-3">
           <button
             type="button"
             onClick={() => router.back()}
             disabled={isLoading}
-            className="flex items-center space-x-2 bg-white text-neutral-700 border border-neutral-200 px-4 py-2 rounded-lg shadow-sm hover:bg-neutral-100 transition-colors font-semibold disabled:opacity-50"
+            className="px-4 py-2 bg-white text-neutral-700 border rounded-lg hover:bg-neutral-100 font-semibold"
           >
             Batal
           </button>
           <button
             type="submit"
             disabled={isLoading}
-            className="flex items-center space-x-2 bg-secondary-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-secondary-600 transition-colors font-semibold disabled:opacity-50"
+            className="px-4 py-2 bg-secondary-500 text-white rounded-lg hover:bg-secondary-600 font-semibold shadow-md disabled:opacity-50"
           >
-            {isLoading
-              ? "Menyimpan..."
-              : isEditMode
-              ? "Simpan Perubahan"
-              : "Tambah Admin"}
+            {isLoading ? "Menyimpan..." : "Simpan Data"}
           </button>
         </div>
       </form>

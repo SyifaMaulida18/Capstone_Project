@@ -1,18 +1,20 @@
 "use client";
 
-import AdminLayout from "@/app/admin/components/admin_layout"; // Sesuaikan path layout Anda
+import AdminLayout from "@/app/admin/components/admin_layout"; 
 import api from "@/services/api";
 import {
   CheckCircleIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
-  TrashIcon,
+  TrashIcon, // (Optional)
   XCircleIcon,
   PencilSquareIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  FunnelIcon,
+  CheckCircleIcon
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react"; // Pastikan useState diimport
 
 // Simple dialog component
 function Dialog({ show, onClose, children }) {
@@ -112,9 +114,9 @@ export default function ReservasiPage() {
         keluhan: r.keluhan,
         
         poli: r.poli?.poli_name || "-",
-        poliId: r.poli_id, // Pastikan backend mengirim poli_id
+        poliId: r.poli_id, 
         dokter: r.dokter?.nama_dokter || "-",
-        dokterId: r.dokter_id, // Pastikan backend mengirim dokter_id
+        dokterId: r.dokter_id, 
         
         tanggal: r.tanggal_reservasi,
         status: r.status,
@@ -140,9 +142,9 @@ export default function ReservasiPage() {
       setPolis(Array.isArray(poliData) ? poliData : []);
 
       // 2. Fetch Dokter
-      // Pastikan ada endpoint /api/dokters di backend Anda
       try {
         const resDokter = await api.get("/dokters", { headers: { Authorization: `Bearer ${token}` } });
+        // console.log("Data Dokter:", resDokter.data); // Debugging
         const dokterData = resDokter.data?.data ?? resDokter.data ?? [];
         setDokters(Array.isArray(dokterData) ? dokterData : []);
       } catch (e) {
@@ -163,9 +165,9 @@ export default function ReservasiPage() {
   const handleDetail = (reservasi) => {
     setSelectedReservation(reservasi);
     
-    // Isi form dengan data yang ada
-    setFormPoliId(reservasi.poliId || "");
-    setFormDokterId(reservasi.dokterId || "");
+    // Isi form dengan data yang ada, pastikan string agar dropdown terpilih
+    setFormPoliId(reservasi.poliId ? String(reservasi.poliId) : "");
+    setFormDokterId(reservasi.dokterId ? String(reservasi.dokterId) : "");
     setFormTanggal(reservasi.tanggal || "");
     
     setShowDetailDialog(true);
@@ -225,8 +227,6 @@ export default function ReservasiPage() {
             return;
         }
         await handleUpdateReservation(); 
-        // Note: Setelah update, dialog tertutup. Admin perlu buka lagi untuk klik verify jika ingin 2 step.
-        // Atau bisa dilanjut chaining jika UX mengizinkan. Di sini kita refresh list saja.
         return; 
     }
 
@@ -290,9 +290,11 @@ export default function ReservasiPage() {
   });
 
   // Filter dokter berdasarkan poli yang dipilih
-  const filteredDokters = dokters.filter(d => 
-    !formPoliId || String(d.poli_id) === String(formPoliId)
-  );
+  const filteredDokters = dokters.filter(d => {
+    if (!formPoliId) return false;
+    // Konversi ke string agar aman (misal backend kirim integer 1, form string "1")
+    return String(d.poli_id) === String(formPoliId);
+  });
 
   return (
     <AdminLayout>
