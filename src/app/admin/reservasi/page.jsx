@@ -9,7 +9,6 @@ import {
   PencilSquareIcon,
   ChatBubbleLeftRightIcon
 } from "@heroicons/react/24/outline";
-import api from "@/services/api";
 import { useRouter } from "next/navigation";
 
 // Simple dialog component
