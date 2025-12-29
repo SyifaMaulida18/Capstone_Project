@@ -15,8 +15,7 @@ import {
 import AdminLayout from "@/app/admin/components/admin_layout";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
-// Arahkan langsung ke halaman tambah rekam medis dengan param untuk prefilling
-const MEDICAL_RECORDS_ADD_PATH = "/admin/rekam-medis/add";
+const MEDICAL_RECORDS_PATH = "/admin/rekam-medis";
 
 export default function AntrianDashboardPage() {
   const [polis, setPolis] = useState([]);
@@ -313,7 +312,7 @@ export default function AntrianDashboardPage() {
                                     </div>
                                     <div className="z-10">
                                         {sedangDipanggil.reservation?.reservid && (
-                                          <Link href={`${MEDICAL_RECORDS_ADD_PATH}?reservasi_id=${sedangDipanggil.reservation.reservid}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow">
+                                            <Link href={`${MEDICAL_RECORDS_PATH}?reservasi_id=${sedangDipanggil.reservation.reservid}&patient_id=${sedangDipanggil.reservation.user?.userid || sedangDipanggil.reservation.user?.id}&patient_name=${encodeURIComponent(sedangDipanggil.reservation.user?.name || "")}`} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 shadow">
                                                 <DocumentTextIcon className="w-4 h-4"/> Input Rekam Medis
                                             </Link>
                                         )}
